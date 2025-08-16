@@ -1,0 +1,544 @@
+@page
+@model CS2DemoParserWeb.Pages.SqlCheatSheetModel
+@{
+    ViewData["Title"] = "SQL Query Cheat Sheet";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🔍 SQL Query Cheat Sheet</h1>
+                <a href="/" class="btn btn-outline-secondary">← Back to Main</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Table of Contents -->
+            <div class="card position-sticky" style="top: 20px;">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">📋 Quick Navigation</h6>
+                </div>
+                <div class="card-body">
+                    <nav class="nav flex-column">
+                        <a class="nav-link" href="#basics">SQL Basics</a>
+                        <a class="nav-link" href="#tables">Database Tables</a>
+                        <a class="nav-link" href="#joins">Common Joins</a>
+                        <a class="nav-link" href="#examples">Query Examples</a>
+                        <a class="nav-link" href="#functions">SQL Functions</a>
+                        <a class="nav-link" href="#tips">Tips & Tricks</a>
+                        <a class="nav-link" href="#safety">Safety Rules</a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <!-- SQL Basics -->
+            <section id="basics" class="mb-5">
+                <h2>🔤 SQL Basics</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h5>Basic SELECT Statement</h5>
+                        <pre><code>SELECT column1, column2, column3
+FROM TableName
+WHERE condition
+ORDER BY column1 DESC
+LIMIT 100</code></pre>
+
+                        <h5 class="mt-4">Essential Keywords</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul>
+                                    <li><code>SELECT</code> - Choose columns to display</li>
+                                    <li><code>FROM</code> - Specify the table</li>
+                                    <li><code>WHERE</code> - Filter rows</li>
+                                    <li><code>ORDER BY</code> - Sort results</li>
+                                    <li><code>GROUP BY</code> - Group rows for aggregation</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul>
+                                    <li><code>JOIN</code> - Combine tables</li>
+                                    <li><code>COUNT()</code> - Count rows</li>
+                                    <li><code>SUM()</code> - Sum values</li>
+                                    <li><code>AVG()</code> - Calculate average</li>
+                                    <li><code>TOP n</code> - Limit results (MS SQL)</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <h5 class="mt-4">Comparison Operators</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul>
+                                    <li><code>=</code> - Equal to</li>
+                                    <li><code>!=</code> or <code>&lt;&gt;</code> - Not equal</li>
+                                    <li><code>&lt;</code> - Less than</li>
+                                    <li><code>&gt;</code> - Greater than</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul>
+                                    <li><code>LIKE</code> - Pattern matching</li>
+                                    <li><code>IN</code> - Match any value in list</li>
+                                    <li><code>IS NULL</code> - Check for null values</li>
+                                    <li><code>BETWEEN</code> - Range check</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Database Tables -->
+            <section id="tables" class="mb-5">
+                <h2>🗃️ Key Database Tables</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="accordion" id="tablesAccordion">
+                            <!-- Core Tables -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#coreTables">
+                                        Core Tables (Essential Data)
+                                    </button>
+                                </h2>
+                                <div id="coreTables" class="accordion-collapse collapse show" data-bs-parent="#tablesAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>DemoFiles</h6>
+                                                <small>Main demo information</small>
+                                                <ul class="small">
+                                                    <li>Id, FileName, MapName</li>
+                                                    <li>ParsedAt, Duration, DemoSource</li>
+                                                </ul>
+                                                
+                                                <h6>Players</h6>
+                                                <small>Player information</small>
+                                                <ul class="small">
+                                                    <li>Id, PlayerName, Team</li>
+                                                    <li>DemoFileId, SteamId</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Rounds</h6>
+                                                <small>Round-by-round data</small>
+                                                <ul class="small">
+                                                    <li>Id, RoundNumber, Winner</li>
+                                                    <li>StartTick, EndTick, Reason</li>
+                                                </ul>
+                                                
+                                                <h6>Matches</h6>
+                                                <small>Match information</small>
+                                                <ul class="small">
+                                                    <li>Id, DemoFileId</li>
+                                                    <li>ScoreTeam1, ScoreTeam2</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Combat Tables -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#combatTables">
+                                        Combat Tables (Kills, Damage, Weapons)
+                                    </button>
+                                </h2>
+                                <div id="combatTables" class="accordion-collapse collapse" data-bs-parent="#tablesAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <h6>Kills</h6>
+                                                <ul class="small">
+                                                    <li>AttackerId, VictimId</li>
+                                                    <li>Weapon, IsHeadshot</li>
+                                                    <li>AttackerPositionX/Y/Z</li>
+                                                    <li>VictimPositionX/Y/Z</li>
+                                                    <li>Distance</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6>Damages</h6>
+                                                <ul class="small">
+                                                    <li>AttackerId, VictimId</li>
+                                                    <li>Damage, Weapon</li>
+                                                    <li>Hitgroup, ArmorDamage</li>
+                                                    <li>HealthRemaining</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6>WeaponFires</h6>
+                                                <ul class="small">
+                                                    <li>PlayerId, Weapon</li>
+                                                    <li>PositionX/Y/Z</li>
+                                                    <li>ViewAngleX/Y</li>
+                                                    <li>Tick, RoundId</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Utility Tables -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#utilityTables">
+                                        Utility Tables (Grenades, Flashes, Smokes)
+                                    </button>
+                                </h2>
+                                <div id="utilityTables" class="accordion-collapse collapse" data-bs-parent="#tablesAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <h6>Grenades</h6>
+                                                <ul class="small">
+                                                    <li>PlayerId, GrenadeType</li>
+                                                    <li>ThrowPositionX/Y/Z</li>
+                                                    <li>DetonatePositionX/Y/Z</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6>FlashEvents</h6>
+                                                <ul class="small">
+                                                    <li>ThrowerPlayerId</li>
+                                                    <li>VictimPlayerId</li>
+                                                    <li>Duration, Distance</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6>SmokeClouds</h6>
+                                                <ul class="small">
+                                                    <li>PlayerId, CenterX/Y/Z</li>
+                                                    <li>StartTick, EndTick</li>
+                                                    <li>Radius</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Economy Tables -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#economyTables">
+                                        Economy Tables (Money, Equipment)
+                                    </button>
+                                </h2>
+                                <div id="economyTables" class="accordion-collapse collapse" data-bs-parent="#tablesAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>EconomyEvents</h6>
+                                                <ul class="small">
+                                                    <li>PlayerId, EventType</li>
+                                                    <li>Equipment, Money, Value</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Equipment</h6>
+                                                <ul class="small">
+                                                    <li>PlayerId, EquipmentType</li>
+                                                    <li>Action, Value, Position</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Common Joins -->
+            <section id="joins" class="mb-5">
+                <h2>🔗 Common JOIN Patterns</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h5>Player Information with Demo</h5>
+                        <pre><code>SELECT p.PlayerName, p.Team, d.MapName, d.FileName
+FROM Players p
+INNER JOIN DemoFiles d ON p.DemoFileId = d.Id</code></pre>
+
+                        <h5 class="mt-4">Kills with Player Names</h5>
+                        <pre><code>SELECT 
+    attacker.PlayerName AS Attacker,
+    victim.PlayerName AS Victim,
+    k.Weapon,
+    k.IsHeadshot
+FROM Kills k
+INNER JOIN Players attacker ON k.AttackerId = attacker.Id
+INNER JOIN Players victim ON k.VictimId = victim.Id</code></pre>
+
+                        <h5 class="mt-4">Round Data with Match Info</h5>
+                        <pre><code>SELECT r.RoundNumber, r.Winner, d.MapName
+FROM Rounds r
+INNER JOIN Matches m ON r.MatchId = m.Id
+INNER JOIN DemoFiles d ON m.DemoFileId = d.Id</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Query Examples -->
+            <section id="examples" class="mb-5">
+                <h2>💡 Practical Query Examples</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Top Fraggers</h5>
+                                <pre><code>SELECT TOP 10
+    p.PlayerName,
+    COUNT(k.Id) AS Kills
+FROM Players p
+INNER JOIN Kills k ON p.Id = k.AttackerId
+GROUP BY p.PlayerName
+ORDER BY Kills DESC</code></pre>
+
+                                <h5 class="mt-4">Headshot Percentage</h5>
+                                <pre><code>SELECT 
+    p.PlayerName,
+    COUNT(k.Id) AS TotalKills,
+    SUM(CASE WHEN k.IsHeadshot = 1 
+        THEN 1 ELSE 0 END) AS Headshots,
+    CAST(SUM(CASE WHEN k.IsHeadshot = 1 
+        THEN 1 ELSE 0 END) AS FLOAT) 
+    / COUNT(k.Id) * 100 AS HSPercentage
+FROM Players p
+INNER JOIN Kills k ON p.Id = k.AttackerId
+GROUP BY p.PlayerName
+HAVING COUNT(k.Id) > 10</code></pre>
+
+                                <h5 class="mt-4">Map Statistics</h5>
+                                <pre><code>SELECT 
+    d.MapName,
+    COUNT(DISTINCT d.Id) AS TimesPlayed,
+    AVG(CAST(d.Duration AS FLOAT)) AS AvgDuration
+FROM DemoFiles d
+GROUP BY d.MapName
+ORDER BY TimesPlayed DESC</code></pre>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Weapon Effectiveness</h5>
+                                <pre><code>SELECT 
+    k.Weapon,
+    COUNT(*) AS TotalKills,
+    AVG(k.Distance) AS AvgDistance,
+    SUM(CASE WHEN k.IsHeadshot = 1 
+        THEN 1 ELSE 0 END) AS Headshots
+FROM Kills k
+WHERE k.Weapon IS NOT NULL
+GROUP BY k.Weapon
+ORDER BY TotalKills DESC</code></pre>
+
+                                <h5 class="mt-4">Round Duration Analysis</h5>
+                                <pre><code>SELECT 
+    r.Winner,
+    AVG(CAST(r.EndTick - r.StartTick AS FLOAT) / 128) 
+        AS AvgRoundTimeSeconds,
+    COUNT(*) AS RoundCount
+FROM Rounds r
+WHERE r.EndTick IS NOT NULL
+GROUP BY r.Winner</code></pre>
+
+                                <h5 class="mt-4">Economy Analysis</h5>
+                                <pre><code>SELECT 
+    p.PlayerName,
+    SUM(e.Money) AS TotalSpent,
+    COUNT(DISTINCT e.RoundId) AS RoundsWithPurchases
+FROM Players p
+INNER JOIN EconomyEvents e ON p.Id = e.PlayerId
+WHERE e.EventType = 'Purchase'
+GROUP BY p.PlayerName
+ORDER BY TotalSpent DESC</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SQL Functions -->
+            <section id="functions" class="mb-5">
+                <h2>⚙️ Useful SQL Functions</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Aggregate Functions</h5>
+                                <ul>
+                                    <li><code>COUNT(*)</code> - Count all rows</li>
+                                    <li><code>COUNT(column)</code> - Count non-null values</li>
+                                    <li><code>SUM(column)</code> - Sum numeric values</li>
+                                    <li><code>AVG(column)</code> - Calculate average</li>
+                                    <li><code>MIN(column)</code> - Find minimum value</li>
+                                    <li><code>MAX(column)</code> - Find maximum value</li>
+                                </ul>
+
+                                <h5>String Functions</h5>
+                                <ul>
+                                    <li><code>LIKE '%pattern%'</code> - Contains pattern</li>
+                                    <li><code>LIKE 'pattern%'</code> - Starts with pattern</li>
+                                    <li><code>LIKE '%pattern'</code> - Ends with pattern</li>
+                                    <li><code>LEN(string)</code> - String length</li>
+                                    <li><code>UPPER(string)</code> - Convert to uppercase</li>
+                                    <li><code>LOWER(string)</code> - Convert to lowercase</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Conditional Logic</h5>
+                                <ul>
+                                    <li><code>CASE WHEN condition THEN value ELSE other END</code></li>
+                                    <li><code>ISNULL(column, default)</code> - Replace null values</li>
+                                    <li><code>NULLIF(value1, value2)</code> - Return null if equal</li>
+                                </ul>
+
+                                <h5>Date/Time Functions</h5>
+                                <ul>
+                                    <li><code>GETDATE()</code> - Current date/time</li>
+                                    <li><code>DATEADD(day, 7, date)</code> - Add time period</li>
+                                    <li><code>DATEDIFF(day, date1, date2)</code> - Calculate difference</li>
+                                    <li><code>YEAR(date)</code> - Extract year</li>
+                                    <li><code>MONTH(date)</code> - Extract month</li>
+                                    <li><code>DAY(date)</code> - Extract day</li>
+                                </ul>
+
+                                <h5>Math Functions</h5>
+                                <ul>
+                                    <li><code>ROUND(number, decimals)</code> - Round number</li>
+                                    <li><code>CEILING(number)</code> - Round up</li>
+                                    <li><code>FLOOR(number)</code> - Round down</li>
+                                    <li><code>ABS(number)</code> - Absolute value</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tips & Tricks -->
+            <section id="tips" class="mb-5">
+                <h2>💡 Tips & Tricks</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Performance Tips</h5>
+                                <ul>
+                                    <li>Always use <code>TOP n</code> to limit results</li>
+                                    <li>Add WHERE clauses to filter early</li>
+                                    <li>Use specific column names instead of <code>*</code></li>
+                                    <li>Index columns used in WHERE and JOIN clauses</li>
+                                </ul>
+
+                                <h5>Common Patterns</h5>
+                                <ul>
+                                    <li>Use <code>COUNT(DISTINCT column)</code> for unique counts</li>
+                                    <li>Use <code>HAVING</code> to filter grouped results</li>
+                                    <li>Use <code>EXISTS</code> for checking relationships</li>
+                                    <li>Use <code>UNION</code> to combine similar queries</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Debugging Queries</h5>
+                                <ul>
+                                    <li>Start simple and add complexity gradually</li>
+                                    <li>Test JOINs with small result sets first</li>
+                                    <li>Use <code>SELECT COUNT(*)</code> to verify row counts</li>
+                                    <li>Comment out parts of complex queries to isolate issues</li>
+                                </ul>
+
+                                <h5>Data Types</h5>
+                                <ul>
+                                    <li>String values need single quotes: <code>'text'</code></li>
+                                    <li>Numbers don't need quotes: <code>123</code></li>
+                                    <li>Dates use quotes: <code>'2024-01-01'</code></li>
+                                    <li>Use <code>CAST</code> to convert types when needed</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Safety Rules -->
+            <section id="safety" class="mb-5">
+                <h2>🛡️ Safety Rules & Limitations</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h5>🔒 What's Allowed</h5>
+                            <ul class="mb-0">
+                                <li>Only <strong>SELECT</strong> statements are permitted</li>
+                                <li>Access to approved tables and columns only</li>
+                                <li>All standard SQL functions and operators</li>
+                                <li>JOINs between related tables</li>
+                                <li>Subqueries and CTEs (Common Table Expressions)</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <h5>⚠️ What's Blocked</h5>
+                            <ul class="mb-0">
+                                <li>INSERT, UPDATE, DELETE, DROP statements</li>
+                                <li>CREATE, ALTER statements</li>
+                                <li>System functions and stored procedures</li>
+                                <li>Access to system tables</li>
+                                <li>Queries that run longer than 30 seconds</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-success">
+                            <h5>✅ Best Practices</h5>
+                            <ul class="mb-0">
+                                <li>Always include a <code>TOP n</code> clause to limit results</li>
+                                <li>Test queries with small limits first</li>
+                                <li>Use the validation button before executing</li>
+                                <li>Start with simple queries and build complexity</li>
+                                <li>Use meaningful aliases for better readability</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    pre {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        font-size: 0.85rem;
+    }
+    
+    code {
+        background-color: #f8f9fa;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+    
+    .small {
+        font-size: 0.8rem;
+    }
+    
+    .accordion-button:not(.collapsed) {
+        background-color: #e7f3ff;
+    }
+</style>

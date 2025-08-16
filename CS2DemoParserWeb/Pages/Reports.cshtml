@@ -1,0 +1,285 @@
+@page
+@model CS2DemoParserWeb.Pages.ReportsModel
+@{
+    ViewData["Title"] = "Reports";
+}
+
+<div class="text-center mb-4">
+    <h1 class="display-5">Reports & Analytics</h1>
+    <p class="lead">Generate and export detailed reports from your demo data</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">📊 Report Generator</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Kills Report</h6>
+                                <p class="card-text">Export detailed kill statistics and weapon usage data</p>
+                                <button class="btn btn-primary" onclick="generateReport('kills')">Generate</button>
+                                <button class="btn btn-success ms-2" onclick="downloadReport('kills')">Download CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Player Statistics</h6>
+                                <p class="card-text">Export comprehensive player performance metrics</p>
+                                <button class="btn btn-primary" onclick="generateReport('player-stats')">Generate</button>
+                                <button class="btn btn-success ms-2" onclick="downloadReport('player-stats')">Download CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Round Analysis</h6>
+                                <p class="card-text">Export round-by-round analysis and outcomes</p>
+                                <button class="btn btn-primary" onclick="generateReport('rounds')">Generate</button>
+                                <button class="btn btn-success ms-2" onclick="downloadReport('rounds')">Download CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Economy Report</h6>
+                                <p class="card-text">Export economy and buy round analysis</p>
+                                <button class="btn btn-primary" onclick="generateReport('economy')">Generate</button>
+                                <button class="btn btn-success ms-2" onclick="downloadReport('economy')">Download CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Weapon Statistics</h6>
+                                <p class="card-text">Export weapon kill counts and headshot percentages</p>
+                                <button class="btn btn-primary" onclick="generateReport('weapons')">Generate</button>
+                                <button class="btn btn-success ms-2" onclick="downloadReport('weapons')">Download CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Custom Query</h6>
+                                <p class="card-text">Export results from a custom SQL query</p>
+                                <button class="btn btn-warning" onclick="window.location.href='/Query'">Build Query</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="demoSelect" class="form-label">Demo File Filter</label>
+                        <select class="form-select" id="demoSelect" name="demoId">
+                            <option value="">All Demos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="mapSelect" class="form-label">Map Filter</label>
+                        <select class="form-select" id="mapSelect" name="mapName">
+                            <option value="">All Maps</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="reportResult" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadDemos();
+    loadMaps();
+});
+
+async function loadDemos() {
+    try {
+        const response = await fetch('/api/demo/demos');
+        const demos = await response.json();
+        
+        const select = document.getElementById('demoSelect');
+        select.innerHTML = '<option value="">All Demos</option>';
+        
+        demos.forEach(demo => {
+            const option = document.createElement('option');
+            option.value = demo.id;
+            option.textContent = `${demo.fileName} (${demo.mapName})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading demos:', error);
+    }
+}
+
+async function loadMaps() {
+    try {
+        const response = await fetch('/api/heatmap/maps');
+        const maps = await response.json();
+        
+        const select = document.getElementById('mapSelect');
+        select.innerHTML = '<option value="">All Maps</option>';
+        
+        maps.forEach(map => {
+            const option = document.createElement('option');
+            option.value = map;
+            option.textContent = map;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading maps:', error);
+    }
+}
+
+async function generateReport(reportType) {
+    const demoId = document.getElementById('demoSelect').value;
+    const mapName = document.getElementById('mapSelect').value;
+    const resultDiv = document.getElementById('reportResult');
+    
+    const params = new URLSearchParams();
+    if (demoId) params.append('demoId', demoId);
+    if (mapName) params.append('mapName', mapName);
+    
+    resultDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div><p>Generating report...</p></div>';
+    
+    try {
+        const response = await fetch(`/api/reports/${reportType}?${params}`);
+        
+        if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                displayJsonReport(data, reportType);
+            } else {
+                // Handle CSV or other formats
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const filename = `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`;
+                
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h6>Report Generated Successfully</h6>
+                        <p>Your ${reportType} report has been generated and is ready for download.</p>
+                        <a href="${url}" download="${filename}" class="btn btn-success">Download Report</a>
+                    </div>
+                `;
+            }
+        } else {
+            const error = await response.text();
+            resultDiv.innerHTML = `<div class="alert alert-danger">Error generating report: ${error}</div>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+    }
+}
+
+function displayJsonReport(data, reportType) {
+    const resultDiv = document.getElementById('reportResult');
+    
+    if (Array.isArray(data) && data.length > 0) {
+        const headers = Object.keys(data[0]);
+        
+        let html = `
+            <div class="alert alert-success">
+                <h6>${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report</h6>
+                <p>Found ${data.length} records</p>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            ${headers.map(h => `<th>${h}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.slice(0, 50).map(row => `
+                            <tr>
+                                ${headers.map(h => `<td>${row[h] || ''}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        if (data.length > 50) {
+            html += `<p class="text-muted">Showing first 50 records of ${data.length} total.</p>`;
+        }
+        
+        resultDiv.innerHTML = html;
+    } else {
+        resultDiv.innerHTML = '<div class="alert alert-warning">No data found for this report.</div>';
+    }
+}
+
+async function downloadReport(reportType) {
+    const demoId = document.getElementById('demoSelect').value;
+    const mapName = document.getElementById('mapSelect').value;
+    const resultDiv = document.getElementById('reportResult');
+    
+    const params = new URLSearchParams();
+    if (demoId) params.append('demoId', demoId);
+    if (mapName) params.append('mapName', mapName);
+    
+    resultDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div><p>Downloading CSV report...</p></div>';
+    
+    try {
+        const url = `/api/reports/${reportType}/csv?${params}`;
+        
+        // Use window.open for better browser compatibility
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`;
+        link.target = '_blank';
+        link.style.display = 'none';
+        
+        // Add to DOM temporarily for Firefox compatibility
+        document.body.appendChild(link);
+        
+        // Trigger download
+        link.click();
+        
+        // Clean up
+        setTimeout(() => {
+            document.body.removeChild(link);
+        }, 100);
+        
+        resultDiv.innerHTML = `
+            <div class="alert alert-success">
+                <h6>CSV Report Download Started</h6>
+                <p>Your ${reportType} report download should start automatically. If it doesn't, <a href="${url}" download="${reportType}_report_${new Date().toISOString().split('T')[0]}.csv">click here to download</a>.</p>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        
+        // Fallback: direct window.open
+        const url = `/api/reports/${reportType}/csv?${params}`;
+        window.open(url, '_blank');
+        
+        resultDiv.innerHTML = `
+            <div class="alert alert-info">
+                <h6>Download Opening in New Tab</h6>
+                <p>Your ${reportType} report is opening in a new tab. If it doesn't appear, <a href="${url}" target="_blank">click here</a>.</p>
+            </div>
+        `;
+    }
+}
+</script>

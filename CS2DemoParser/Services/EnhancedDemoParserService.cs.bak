@@ -1,0 +1,490 @@
+using DemoFile;
+using DemoFile.Game.Cs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using CS2DemoParser.Data;
+using CS2DemoParser.Models;
+using System.Collections.Concurrent;
+
+namespace CS2DemoParser.Services;
+
+/// <summary>
+/// Enhanced CS2 Demo Parser with comprehensive data extraction capabilities
+/// </summary>
+public class EnhancedDemoParserService
+{
+    private readonly CS2DemoContext _context;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<EnhancedDemoParserService> _logger;
+    
+    // Core collections (from SimpleDemoParserService)
+    private readonly ConcurrentDictionary<int, Models.Player> _players = new();
+    private readonly ConcurrentBag<Models.Kill> _kills = new();
+    private readonly ConcurrentBag<Models.Damage> _damages = new();
+    private readonly ConcurrentBag<Models.WeaponFire> _weaponFires = new();
+    private readonly ConcurrentBag<Models.Round> _rounds = new();
+    private readonly ConcurrentBag<Models.PlayerMatchStats> _playerMatchStats = new();
+    private readonly ConcurrentBag<Models.GameEvent> _gameEvents = new();
+
+    // PHASE 1: Enhanced gameplay tracking
+    private readonly ConcurrentBag<Models.Grenade> _grenades = new();
+    private readonly ConcurrentBag<Models.Bomb> _bombs = new();
+    private readonly ConcurrentBag<Models.PlayerPosition> _playerPositions = new();
+    private readonly ConcurrentBag<Models.ChatMessage> _chatMessages = new();
+    private readonly ConcurrentBag<Models.Equipment> _equipment = new();
+    
+    // PHASE 2: Advanced analytics
+    private readonly ConcurrentBag<Models.FlashEvent> _flashEvents = new();
+    private readonly ConcurrentBag<Models.EconomyEvent> _economyEvents = new();
+    private readonly ConcurrentBag<Models.BulletImpact> _bulletImpacts = new();
+    private readonly ConcurrentBag<Models.PlayerMovement> _playerMovements = new();
+    private readonly ConcurrentBag<Models.WeaponState> _weaponStates = new();
+    
+    // PHASE 3: Entity system integration
+    private readonly ConcurrentBag<Models.EntityLifecycle> _entityLifecycles = new();
+    private readonly ConcurrentBag<Models.PlayerBehaviorEvent> _playerBehaviorEvents = new();
+    private readonly ConcurrentBag<Models.GrenadeTrajectory> _grenadeTrajectories = new();
+
+    // State tracking
+    private Models.DemoFile? _currentDemoFile;
+    private Models.Match? _currentMatch;
+    private Models.Round? _currentRound;
+    private int _currentRoundNumber = 0;
+    private CsDemoParser? _demo;
+    
+    // Advanced state tracking
+    private readonly Dictionary<int, Models.PlayerRoundStats> _currentRoundStats = new();
+    private readonly Dictionary<int, PlayerGameState> _playerStates = new();
+    private readonly Dictionary<int, DateTime> _lastPositionUpdate = new();
+
+    public EnhancedDemoParserService(CS2DemoContext context, IConfiguration configuration, ILogger<EnhancedDemoParserService> logger)
+    {
+        _context = context;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    public async Task<bool> ParseDemoAsync(string filePath)
+    {
+        try
+        {
+            _logger.LogInformation("Starting enhanced parsing of demo file: {FilePath}", filePath);
+
+            var fileInfo = new FileInfo(filePath);
+            if (!fileInfo.Exists)
+            {
+                _logger.LogError("Demo file not found: {FilePath}", filePath);
+                return false;
+            }
+
+            await CreateDemoFileRecord(fileInfo);
+
+            await using var fileStream = fileInfo.OpenRead();
+            var demo = new CsDemoParser();
+            _demo = demo;
+
+            // Setup comprehensive event handlers
+            SetupCoreEventHandlers(demo);
+            SetupEnhancedEventHandlers(demo);
+            SetupEntityEventHandlers(demo);
+            SetupUserMessageHandlers(demo);
+
+            _logger.LogInformation("Parsing demo file with enhanced capabilities...");
+            var reader = DemoFileReader.Create(demo, fileStream);
+            await reader.ReadAllAsync();
+
+            await SaveComprehensiveDataToDatabase();
+
+            _logger.LogInformation("Successfully parsed demo file with enhanced data: {FilePath}", filePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing demo file: {FilePath}", filePath);
+            return false;
+        }
+    }
+
+    #region Core Event Handlers (Enhanced from SimpleDemoParserService)
+
+    private void SetupCoreEventHandlers(CsDemoParser demo)
+    {
+        // Original events with enhancements
+        demo.Source1GameEvents.RoundStart += OnRoundStart;
+        demo.Source1GameEvents.RoundEnd += OnRoundEnd;
+        demo.Source1GameEvents.PlayerDeath += OnPlayerDeath;
+        demo.Source1GameEvents.PlayerHurt += OnPlayerHurt;
+        demo.Source1GameEvents.WeaponFire += OnWeaponFire;
+    }
+
+    private void SetupEnhancedEventHandlers(CsDemoParser demo)
+    {
+        // PHASE 1: Core gameplay enhancements
+        
+        // Bomb events
+        demo.Source1GameEvents.BombPlanted += OnBombPlanted;
+        demo.Source1GameEvents.BombDefused += OnBombDefused;
+        demo.Source1GameEvents.BombExploded += OnBombExploded;
+        demo.Source1GameEvents.BombBeginplant += OnBombBeginPlant;
+        demo.Source1GameEvents.BombBegindefuse += OnBombBeginDefuse;
+        demo.Source1GameEvents.BombAbortplant += OnBombAbortPlant;
+        demo.Source1GameEvents.BombAbortdefuse += OnBombAbortDefuse;
+
+        // Grenade events
+        demo.Source1GameEvents.GrenadeThrown += OnGrenadeThrown;
+        demo.Source1GameEvents.FlashbangDetonate += OnFlashbangDetonate;
+        demo.Source1GameEvents.SmokegrenadeDetonate += OnSmokegrenadeDetonate;
+        demo.Source1GameEvents.HegrenadeDetonate += OnHegrenadeDetonate;
+        demo.Source1GameEvents.MolotovDetonate += OnMolotovDetonate;
+        demo.Source1GameEvents.DecoyDetonate += OnDecoyDetonate;
+
+        // Player interaction events
+        demo.Source1GameEvents.PlayerBlind += OnPlayerBlind;
+        demo.Source1GameEvents.PlayerFootstep += OnPlayerFootstep;
+        demo.Source1GameEvents.PlayerJump += OnPlayerJump;
+        demo.Source1GameEvents.PlayerSpawn += OnPlayerSpawn;
+        demo.Source1GameEvents.PlayerTeam += OnPlayerTeam;
+
+        // Economy events
+        demo.Source1GameEvents.ItemPurchase += OnItemPurchase;
+        demo.Source1GameEvents.ItemPickup += OnItemPickup;
+        demo.Source1GameEvents.ItemRemove += OnItemRemove;
+        demo.Source1GameEvents.EnterBuyzone += OnEnterBuyzone;
+        demo.Source1GameEvents.ExitBuyzone += OnExitBuyzone;
+
+        // Communication events
+        demo.Source1GameEvents.PlayerChat += OnPlayerChat;
+        demo.Source1GameEvents.PlayerRadio += OnPlayerRadio;
+
+        // PHASE 2: Advanced analytics events
+        demo.Source1GameEvents.BulletDamage += OnBulletDamage;
+        demo.Source1GameEvents.BulletImpact += OnBulletImpact;
+        demo.Source1GameEvents.WeaponReload += OnWeaponReload;
+        demo.Source1GameEvents.WeaponZoom += OnWeaponZoom;
+        demo.Source1GameEvents.InspectWeapon += OnInspectWeapon;
+    }
+
+    private void SetupEntityEventHandlers(CsDemoParser demo)
+    {
+        // PHASE 3: Entity system integration
+        
+        // Player pawn tracking for position updates
+        demo.EntityEvents.CCSPlayerPawn.AddChangeCallback(
+            pawn => new { pawn.Origin, pawn.EyeAngles, pawn.Health, pawn.ArmorValue },
+            OnPlayerStateChanged
+        );
+
+        // Weapon tracking
+        demo.EntityEvents.CCSWeaponBase.AddChangeCallback(
+            weapon => new { weapon.OwnerEntity, weapon.NextPrimaryAttack, weapon.Clip1 },
+            OnWeaponStateChanged
+        );
+
+        // Grenade tracking
+        demo.EntityEvents.CBaseCSGrenadeProjectile.Create += OnGrenadeEntityCreated;
+        demo.EntityEvents.CBaseCSGrenadeProjectile.Delete += OnGrenadeEntityDestroyed;
+
+        // Economic item tracking
+        demo.EntityEvents.CEconEntity.Create += OnEconomicItemCreated;
+        demo.EntityEvents.CEconEntity.Delete += OnEconomicItemDestroyed;
+    }
+
+    private void SetupUserMessageHandlers(CsDemoParser demo)
+    {
+        // Chat and communication
+        demo.BaseUserMessageEvents.UserMessageSayText += OnSayText;
+        demo.BaseUserMessageEvents.UserMessageSayText2 += OnSayText2;
+        
+        // CS-specific user messages
+        demo.UserMessageEvents.Damage += OnDamageUserMessage;
+        demo.UserMessageEvents.RadioText += OnRadioTextUserMessage;
+        demo.UserMessageEvents.AdjustMoney += OnAdjustMoneyUserMessage;
+        demo.UserMessageEvents.ItemPickup += OnItemPickupUserMessage;
+        demo.UserMessageEvents.ReportHit += OnReportHitUserMessage;
+    }
+
+    #endregion
+
+    #region Enhanced Event Implementations
+
+    // Example enhanced implementations - showing pattern for comprehensive data extraction
+
+    private void OnBombPlanted(Source1BombPlantedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "planted",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} planted bomb at {e.Site}"
+        };
+
+        // Enhanced: Add position data
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            bomb.PositionX = (decimal)playerPos.Value.X;
+            bomb.PositionY = (decimal)playerPos.Value.Y;
+            bomb.PositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_planted", bomb.Description, true);
+    }
+
+    private void OnGrenadeThrown(Source1GrenadeThrownEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        // Enhanced: Comprehensive grenade tracking with trajectory data
+        var grenadeTrajectory = new Models.GrenadeTrajectory
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            ThrowTick = _demo.CurrentDemoTick.Value,
+            ThrowTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = e.Weapon,
+            Team = e.Player.CSTeamNum.ToString(),
+            Description = $"{e.Player.PlayerName} threw {e.Weapon}"
+        };
+
+        // Enhanced: Capture throw position and angles
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            grenadeTrajectory.ThrowPositionX = (decimal)playerPos.Value.X;
+            grenadeTrajectory.ThrowPositionY = (decimal)playerPos.Value.Y;
+            grenadeTrajectory.ThrowPositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        var eyeAngles = e.Player.PlayerPawn?.EyeAngles;
+        if (eyeAngles != null)
+        {
+            grenadeTrajectory.ThrowAngleX = (decimal)eyeAngles.Value.Pitch;
+            grenadeTrajectory.ThrowAngleY = (decimal)eyeAngles.Value.Yaw;
+        }
+
+        // Enhanced: Movement state analysis
+        var velocity = e.Player.PlayerPawn?.Velocity;
+        if (velocity != null)
+        {
+            grenadeTrajectory.ThrowVelocityX = (decimal)velocity.X;
+            grenadeTrajectory.ThrowVelocityY = (decimal)velocity.Y;
+            grenadeTrajectory.ThrowVelocityZ = (decimal)velocity.Z;
+            
+            // Calculate throw style
+            var speed = Math.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y);
+            grenadeTrajectory.IsRunThrow = speed > 100; // Running threshold
+            grenadeTrajectory.IsJumpThrow = velocity.Z > 50; // Jump threshold
+        }
+
+        _grenadeTrajectories.Add(grenadeTrajectory);
+        LogGameEvent(_demo, "grenade_thrown", grenadeTrajectory.Description);
+    }
+
+    private void OnPlayerBlind(Source1PlayerBlindEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var playerModel = GetOrCreatePlayer(e.Player);
+        var attackerModel = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
+
+        // Enhanced: Comprehensive flash analysis
+        var flashEvent = new Models.FlashEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            FlashedPlayerId = playerModel.Id,
+            FlasherPlayerId = attackerModel?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            FlashDuration = e.BlindDuration,
+            FlashedPlayerTeam = e.Player.CSTeamNum.ToString(),
+            FlasherPlayerTeam = e.Attacker?.CSTeamNum.ToString(),
+            IsTeamFlash = e.Attacker?.CSTeamNum == e.Player.CSTeamNum,
+            IsSelfFlash = e.Attacker?.EntityIndex == e.Player.EntityIndex,
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} flashed by {e.Attacker?.PlayerName ?? "unknown"} for {e.BlindDuration:F2}s"
+        };
+
+        // Enhanced: Position analysis
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            flashEvent.FlashedPlayerPositionX = (decimal)playerPos.Value.X;
+            flashEvent.FlashedPlayerPositionY = (decimal)playerPos.Value.Y;
+            flashEvent.FlashedPlayerPositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _flashEvents.Add(flashEvent);
+        LogGameEvent(_demo, "player_blind", flashEvent.Description);
+    }
+
+    #endregion
+
+    #region Entity Event Handlers
+
+    private void OnPlayerStateChanged(CCSPlayerPawn pawn, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || pawn.Controller == null) return;
+
+        // Enhanced: Continuous player state tracking
+        var player = GetOrCreatePlayer(pawn.Controller);
+        var now = DateTime.UtcNow;
+        
+        // Throttle position updates to reduce data volume
+        if (_lastPositionUpdate.TryGetValue(player.Id, out var lastUpdate) && 
+            (now - lastUpdate).TotalMilliseconds < 100) // 10 Hz position updates
+            return;
+
+        var position = new Models.PlayerPosition
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            PositionX = (decimal)newState.Origin.X,
+            PositionY = (decimal)newState.Origin.Y,
+            PositionZ = (decimal)newState.Origin.Z,
+            ViewAngleX = (decimal)newState.EyeAngles.Pitch,
+            ViewAngleY = (decimal)newState.EyeAngles.Yaw,
+            Health = newState.Health,
+            Armor = newState.ArmorValue,
+            Team = pawn.Controller.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _playerPositions.Add(position);
+        _lastPositionUpdate[player.Id] = now;
+    }
+
+    private void OnWeaponStateChanged(CCSWeaponBase weapon, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || weapon.OwnerEntity?.Value == null) return;
+
+        // Enhanced: Weapon state tracking for reload patterns, ammunition usage
+        var weaponState = new Models.WeaponState
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            WeaponName = weapon.GetType().Name,
+            AmmoClip = newState.Clip1,
+            State = "state_change",
+            Team = "Unknown", // Would need to resolve through owner
+            RoundNumber = _currentRoundNumber,
+            Description = $"Weapon state changed: {weapon.GetType().Name}"
+        };
+
+        _weaponStates.Add(weaponState);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private Models.Player GetOrCreatePlayer(CCSPlayerController playerController)
+    {
+        if (_players.TryGetValue((int)playerController.EntityIndex.Value, out var existingPlayer))
+        {
+            return existingPlayer;
+        }
+
+        var player = new Models.Player
+        {
+            DemoFileId = _currentDemoFile!.Id,
+            PlayerSlot = (int)playerController.EntityIndex.Value,
+            UserId = (int)playerController.EntityIndex.Value,
+            SteamId = playerController.SteamID,
+            PlayerName = playerController.PlayerName ?? "Unknown",
+            Team = playerController.CSTeamNum.ToString(),
+            IsBot = playerController.PlayerInfo?.Fakeplayer ?? false,
+            IsHltv = playerController.PlayerInfo?.Ishltv ?? false,
+            IsConnected = playerController.Connected == PlayerConnectedState.PlayerConnected,
+            ConnectedAt = DateTime.UtcNow
+        };
+
+        _players.TryAdd((int)playerController.EntityIndex.Value, player);
+        return player;
+    }
+
+    #endregion
+
+    // TODO: Implement remaining event handlers and database saving logic
+    // This is a foundation showing the enhanced pattern - full implementation would continue with:
+    // 1. All remaining event handlers
+    // 2. Enhanced database saving with new collections
+    // 3. Advanced analytics calculations
+    // 4. Performance optimizations
+
+    #region Placeholder Methods (to be implemented)
+    
+    private async Task CreateDemoFileRecord(FileInfo fileInfo) { /* Implementation */ }
+    private void OnRoundStart(Source1RoundStartEvent e) { /* Enhanced implementation */ }
+    private void OnRoundEnd(Source1RoundEndEvent e) { /* Enhanced implementation */ }
+    private void OnPlayerDeath(Source1PlayerDeathEvent e) { /* Enhanced implementation */ }
+    private void OnPlayerHurt(Source1PlayerHurtEvent e) { /* Enhanced implementation */ }
+    private void OnWeaponFire(Source1WeaponFireEvent e) { /* Enhanced implementation */ }
+    private void LogGameEvent(CsDemoParser demo, string eventName, string description, bool isImportant = false) { /* Implementation */ }
+    private async Task SaveComprehensiveDataToDatabase() { /* Enhanced implementation */ }
+    
+    // Placeholder implementations for remaining handlers
+    private void OnBombDefused(Source1BombDefusedEvent e) { /* Implementation */ }
+    private void OnBombExploded(Source1BombExplodedEvent e) { /* Implementation */ }
+    private void OnBombBeginPlant(Source1BombBeginplantEvent e) { /* Implementation */ }
+    private void OnBombBeginDefuse(Source1BombBegindefuseEvent e) { /* Implementation */ }
+    private void OnBombAbortPlant(Source1BombAbortplantEvent e) { /* Implementation */ }
+    private void OnBombAbortDefuse(Source1BombAbortdefuseEvent e) { /* Implementation */ }
+    private void OnFlashbangDetonate(Source1FlashbangDetonateEvent e) { /* Implementation */ }
+    private void OnSmokegrenadeDetonate(Source1SmokegrenadeDetonateEvent e) { /* Implementation */ }
+    private void OnHegrenadeDetonate(Source1HegrenadeDetonateEvent e) { /* Implementation */ }
+    private void OnMolotovDetonate(Source1MolotovDetonateEvent e) { /* Implementation */ }
+    private void OnDecoyDetonate(Source1DecoyDetonateEvent e) { /* Implementation */ }
+    private void OnPlayerFootstep(Source1PlayerFootstepEvent e) { /* Implementation */ }
+    private void OnPlayerJump(Source1PlayerJumpEvent e) { /* Implementation */ }
+    private void OnPlayerSpawn(Source1PlayerSpawnEvent e) { /* Implementation */ }
+    private void OnPlayerTeam(Source1PlayerTeamEvent e) { /* Implementation */ }
+    private void OnItemPurchase(Source1ItemPurchaseEvent e) { /* Implementation */ }
+    private void OnItemPickup(Source1ItemPickupEvent e) { /* Implementation */ }
+    private void OnItemRemove(Source1ItemRemoveEvent e) { /* Implementation */ }
+    private void OnEnterBuyzone(Source1EnterBuyzoneEvent e) { /* Implementation */ }
+    private void OnExitBuyzone(Source1ExitBuyzoneEvent e) { /* Implementation */ }
+    private void OnPlayerChat(Source1PlayerChatEvent e) { /* Implementation */ }
+    private void OnPlayerRadio(Source1PlayerRadioEvent e) { /* Implementation */ }
+    private void OnBulletDamage(Source1BulletDamageEvent e) { /* Implementation */ }
+    private void OnBulletImpact(Source1BulletImpactEvent e) { /* Implementation */ }
+    private void OnWeaponReload(Source1WeaponReloadEvent e) { /* Implementation */ }
+    private void OnWeaponZoom(Source1WeaponZoomEvent e) { /* Implementation */ }
+    private void OnInspectWeapon(Source1InspectWeaponEvent e) { /* Implementation */ }
+    private void OnGrenadeEntityCreated(CBaseCSGrenadeProjectile grenade) { /* Implementation */ }
+    private void OnGrenadeEntityDestroyed(CBaseCSGrenadeProjectile grenade) { /* Implementation */ }
+    private void OnEconomicItemCreated(CEconEntity item) { /* Implementation */ }
+    private void OnEconomicItemDestroyed(CEconEntity item) { /* Implementation */ }
+    private void OnSayText(CUserMessageSayText message) { /* Implementation */ }
+    private void OnSayText2(CUserMessageSayText2 message) { /* Implementation */ }
+    private void OnDamageUserMessage(CCSUsrMsg_Damage message) { /* Implementation */ }
+    private void OnRadioTextUserMessage(CCSUsrMsg_RadioText message) { /* Implementation */ }
+    private void OnAdjustMoneyUserMessage(CCSUsrMsg_AdjustMoney message) { /* Implementation */ }
+    private void OnItemPickupUserMessage(CCSUsrMsg_ItemPickup message) { /* Implementation */ }
+    private void OnReportHitUserMessage(CCSUsrMsg_ReportHit message) { /* Implementation */ }
+
+    #endregion
+}
+
+// PlayerGameState class is now defined in CorrectedDemoParserService.cs

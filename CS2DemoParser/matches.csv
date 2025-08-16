@@ -1,0 +1,3 @@
+Id,DemoFileId,MapName,GameMode,StartTime,EndTime,TotalRounds,CTScore,TScore,CTScoreFirstHalf,TScoreFirstHalf,CTScoreSecondHalf,TScoreSecondHalf,CTScoreOvertime,TScoreOvertime,IsOvertime,IsFinished,WinnerTeam,WinCondition,MaxRounds,RoundTimeLimit,FreezeTime,BuyTime
+1,1,unknown,,"2025-06-17 22:18:59.804847","2025-06-17 22:19:07.758602",26,0,0,0,0,0,0,,,0,1,,,0,0.0,0.0,0.0
+2,2,Unknown,,"2025-06-17 22:51:24.117783","2025-06-17 22:51:32.293948",26,0,0,0,0,0,0,,,0,1,,,0,0.0,0.0,0.0

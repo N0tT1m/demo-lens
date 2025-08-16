@@ -1,0 +1,250 @@
+@page
+@model CS2DemoParserWeb.Pages.UploadModel
+@{
+    ViewData["Title"] = "Upload Demo Files";
+}
+
+<div class="text-center mb-4">
+    <h1 class="display-5">Upload Demo Files</h1>
+    <p class="lead">Upload your CS2 demo files for parsing and analysis</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">📁 Upload Demo File</h5>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="demoFile" class="form-label">Select CS2 Demo File (.dem)</label>
+                        <input type="file" class="form-control" id="demoFile" name="file" accept=".dem" required>
+                        <div class="form-text">Maximum file size: 1GB</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="demoSource" class="form-label">Demo Source</label>
+                        <select class="form-select" id="demoSource" name="demoSource" required>
+                            <option value="">Select demo source...</option>
+                            <option value="matchmaking">Matchmaking/Valve</option>
+                            <option value="faceit">Faceit</option>
+                            <option value="esea">ESEA</option>
+                            <option value="other">Other/Unknown</option>
+                        </select>
+                        <div class="form-text">
+                            <small>
+                                <strong>Faceit:</strong> Warmup → Knife Round → Live Game<br>
+                                <strong>ESEA:</strong> Warmup → Knife Round → Live Game<br>
+                                <strong>MM/Valve:</strong> Warmup → Live Game
+                            </small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="mapName" class="form-label">Map Name</label>
+                        <select class="form-select" id="mapName" name="mapName" required>
+                            <option value="">Select map...</option>
+                            <option value="de_ancient">Ancient (de_ancient)</option>
+                            <option value="de_anubis">Anubis (de_anubis)</option>
+                            <option value="de_dust2">Dust2 (de_dust2)</option>
+                            <option value="de_inferno">Inferno (de_inferno)</option>
+                            <option value="de_mirage">Mirage (de_mirage)</option>
+                            <option value="de_nuke">Nuke (de_nuke)</option>
+                            <option value="de_overpass">Overpass (de_overpass)</option>
+                            <option value="de_train">Train (de_train)</option>
+                            <option value="de_vertigo">Vertigo (de_vertigo)</option>
+                            <option value="de_italy">Italy (de_italy)</option>
+                            <option value="de_office">Office (de_office)</option>
+                            <option value="cs_assault">Assault (cs_assault)</option>
+                            <option value="cs_militia">Militia (cs_militia)</option>
+                            <option value="other">Other/Custom Map</option>
+                        </select>
+                        <div class="form-text">Select the map to ensure accurate parsing and heatmap visualization</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="uploadBtn">Upload Demo</button>
+                </form>
+                
+                <div id="uploadProgress" class="mt-3" style="display: none;">
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted">Uploading...</small>
+                </div>
+                
+                <div id="uploadResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">📋 Recent Demo Files</h5>
+            </div>
+            <div class="card-body">
+                <div id="demosContainer">
+                    <p class="text-muted">Loading recent demos...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    setupUploadForm();
+    loadRecentDemos();
+});
+
+function setupUploadForm() {
+    const form = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadResult = document.getElementById('uploadResult');
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('demoFile');
+        const demoSourceSelect = document.getElementById('demoSource');
+        const mapNameSelect = document.getElementById('mapName');
+        const file = fileInput.files[0];
+        const demoSource = demoSourceSelect.value;
+        const mapName = mapNameSelect.value;
+        
+        if (!file) {
+            showAlert('Please select a file', 'danger');
+            return;
+        }
+        
+        if (!demoSource) {
+            showAlert('Please select a demo source', 'danger');
+            return;
+        }
+        
+        if (!mapName) {
+            showAlert('Please select a map name', 'danger');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('demoSource', demoSource);
+        formData.append('mapName', mapName);
+
+        uploadBtn.disabled = true;
+        uploadProgress.style.display = 'block';
+        uploadResult.innerHTML = '';
+
+        try {
+            const response = await fetch('/api/demo/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            let result;
+            try {
+                result = await response.json();
+            } catch (jsonError) {
+                const text = await response.text();
+                throw new Error(`Server responded with ${response.status}: ${text}`);
+            }
+
+            if (response.ok) {
+                let successMessage = `
+                    <div class="alert alert-success">
+                        <strong>Upload successful!</strong><br>
+                        File: ${result.originalName}<br>
+                        Size: ${(result.size / 1024 / 1024).toFixed(2)} MB<br>
+                `;
+                
+                if (result.parsed === true) {
+                    successMessage += `<span class="text-success">✓ Demo parsed successfully!</span>`;
+                    loadRecentDemos();
+                } else if (result.parsed === false) {
+                    successMessage += `<span class="text-warning">⚠ Upload successful but parsing failed</span><br>`;
+                    if (result.parseError) {
+                        successMessage += `<small class="text-muted">Error: ${result.parseError}</small><br>`;
+                    }
+                    successMessage += `<button class="btn btn-sm btn-primary mt-2" onclick="parseDemo('${result.fileName}')">Retry Parse</button>`;
+                } else {
+                    successMessage += `<button class="btn btn-sm btn-primary mt-2" onclick="parseDemo('${result.fileName}')">Parse Demo</button>`;
+                }
+                
+                successMessage += `</div>`;
+                uploadResult.innerHTML = successMessage;
+                fileInput.value = '';
+            } else {
+                throw new Error(result.message || result.title || 'Upload failed');
+            }
+        } catch (error) {
+            uploadResult.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Upload failed:</strong> ${error.message}
+                </div>
+            `;
+        } finally {
+            uploadBtn.disabled = false;
+            uploadProgress.style.display = 'none';
+        }
+    });
+}
+
+async function parseDemo(fileName) {
+    try {
+        const response = await fetch(`/api/demo/parse/${fileName}`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert(`Demo parsed successfully in ${result.duration}`, 'success');
+            loadRecentDemos();
+        } else {
+            throw new Error(result.message || 'Parsing failed');
+        }
+    } catch (error) {
+        showAlert(`Parsing failed: ${error.message}`, 'danger');
+    }
+}
+
+async function loadRecentDemos() {
+    try {
+        const response = await fetch('/api/demo/demos');
+        const demos = await response.json();
+        
+        let html = '';
+        if (demos.length === 0) {
+            html = '<p class="text-muted">No demo files found. Upload a demo to get started!</p>';
+        } else {
+            html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>File Name</th><th>Map</th><th>Duration</th><th>Players</th><th>Parsed At</th></tr></thead><tbody>';
+            demos.forEach(demo => {
+                const parsedAt = new Date(demo.parsedAt).toLocaleDateString();
+                const duration = demo.duration ? `${demo.duration.toFixed(2)}s` : 'N/A';
+                html += `<tr><td>${demo.fileName}</td><td>${demo.mapName || 'Unknown'}</td><td>${duration}</td><td>${demo.playerCount}</td><td>${parsedAt}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+        }
+        
+        document.getElementById('demosContainer').innerHTML = html;
+    } catch (error) {
+        document.getElementById('demosContainer').innerHTML = '<p class="text-danger">Error loading demos</p>';
+    }
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.insertBefore(alertDiv, document.body.firstChild);
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>

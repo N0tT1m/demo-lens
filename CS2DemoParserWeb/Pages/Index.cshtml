@@ -1,0 +1,150 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Demo Lens";
+}
+
+<div class="text-center mb-5">
+    <h1 class="display-4">Demo Lens</h1>
+    <p class="lead">Analyze your CS2 demo files with comprehensive data extraction and visualization</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="mb-3">
+                    <i class="fas fa-upload" style="font-size: 3rem; color: var(--accent-color);"></i>
+                </div>
+                <h5 class="card-title">Upload Demos</h5>
+                <p class="card-text">Upload your CS2 demo files for parsing and analysis</p>
+                <a href="/Upload" class="btn btn-primary">Upload Files</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="mb-3">
+                    <i class="fas fa-map" style="font-size: 3rem; color: var(--success-color);"></i>
+                </div>
+                <h5 class="card-title">Heatmaps</h5>
+                <p class="card-text">Generate heatmap visualizations of player movements and actions</p>
+                <a href="/Heatmap" class="btn btn-success">View Heatmaps</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="mb-3">
+                    <i class="fas fa-chart-bar" style="font-size: 3rem; color: var(--info-color);"></i>
+                </div>
+                <h5 class="card-title">Reports</h5>
+                <p class="card-text">Export detailed reports and statistics from your demo data</p>
+                <a href="/Reports" class="btn btn-info">Generate Reports</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="mb-3">
+                    <i class="fas fa-search" style="font-size: 3rem; color: var(--warning-color);"></i>
+                </div>
+                <h5 class="card-title">Query Builder</h5>
+                <p class="card-text">Build custom queries to explore your demo database</p>
+                <a href="/Query" class="btn btn-warning">Query Data</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">📊 Database Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div id="statisticsContainer">
+                    <p class="text-muted">Loading statistics...</p>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="loadStatistics()">Refresh Statistics</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">📋 Recent Demo Files</h5>
+            </div>
+            <div class="card-body">
+                <div id="demosContainer" style="max-height: 300px; overflow-y: auto;">
+                    <p class="text-muted">Loading recent demos...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadStatistics();
+    loadRecentDemos();
+});
+
+async function loadStatistics() {
+    try {
+        const response = await fetch('/api/demo/statistics');
+        const stats = await response.json();
+
+        document.getElementById('statisticsContainer').innerHTML = `
+            <div class="row text-center">
+                <div class="col-4"><strong>${stats.demoFiles}</strong><br><small>Demo Files</small></div>
+                <div class="col-4"><strong>${stats.kills}</strong><br><small>Kills</small></div>
+                <div class="col-4"><strong>${stats.rounds}</strong><br><small>Rounds</small></div>
+            </div>
+            <div class="row text-center mt-2">
+                <div class="col-4"><strong>${stats.players}</strong><br><small>Players</small></div>
+                <div class="col-4"><strong>${stats.damages}</strong><br><small>Damage Events</small></div>
+                <div class="col-4"><strong>${stats.weaponFires}</strong><br><small>Weapon Fires</small></div>
+            </div>
+            <div class="row text-center mt-2">
+                <div class="col-4"><strong>${stats.economyEvents}</strong><br><small>Economy Events</small></div>
+                <div class="col-4"><strong>${stats.playerPositions}</strong><br><small>Positions</small></div>
+                <div class="col-4"><strong>${stats.equipment}</strong><br><small>Equipment</small></div>
+            </div>
+        `;
+    } catch (error) {
+        document.getElementById('statisticsContainer').innerHTML = '<p class="text-danger">Error loading statistics</p>';
+    }
+}
+
+async function loadRecentDemos() {
+    try {
+        const response = await fetch('/api/demo/demos');
+        const demos = await response.json();
+        
+        let html = '';
+        if (demos.length === 0) {
+            html = '<p class="text-muted">No demo files found. Upload a demo to get started!</p>';
+        } else {
+            html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>File Name</th><th>Map</th><th>Parsed At</th></tr></thead><tbody>';
+            demos.slice(0, 5).forEach(demo => {
+                const parsedAt = new Date(demo.parsedAt).toLocaleDateString();
+                html += `<tr><td>${demo.fileName}</td><td>${demo.mapName || 'Unknown'}</td><td>${parsedAt}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+        }
+        
+        document.getElementById('demosContainer').innerHTML = html;
+    } catch (error) {
+        document.getElementById('demosContainer').innerHTML = '<p class="text-danger">Error loading demos</p>';
+    }
+}
+</script>

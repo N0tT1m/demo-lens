@@ -1,0 +1,208 @@
+@page
+@model CS2DemoParserWeb.Pages.HeatmapModel
+@{
+    ViewData["Title"] = "Heatmaps";
+}
+
+<div class="text-center mb-4">
+    <h1 class="display-5">Heatmap Visualizations</h1>
+    <p class="lead">Generate and view heatmaps of player movements and actions</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">🗺️ Heatmap Generator</h5>
+            </div>
+            <div class="card-body">
+                <form id="heatmapForm">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="demoSelect" class="form-label">Demo File</label>
+                            <select class="form-select" id="demoSelect" name="demoId" required>
+                                <option value="">Select a demo file...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="mapSelect" class="form-label">Map</label>
+                            <select class="form-select" id="mapSelect" name="mapName" required>
+                                <option value="">Select a map...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="eventType" class="form-label">Event Type</label>
+                            <select class="form-select" id="eventType" name="eventType" required>
+                                <option value="">Select event type...</option>
+                                <option value="kills">Kills</option>
+                                <option value="deaths">Deaths</option>
+                                <option value="positions">Player Positions</option>
+                                <option value="grenades">Grenades</option>
+                                <option value="weapon_fires">Weapon Fires</option>
+                                <option value="bomb_plants">Bomb Plants/Defuses</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="teamFilter" class="form-label">Team Filter</label>
+                            <select class="form-select" id="teamFilter" name="team">
+                                <option value="">All Teams</option>
+                                <option value="2">Terrorists</option>
+                                <option value="3">Counter-Terrorists</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="roundFilter" class="form-label">Round Filter</label>
+                            <select class="form-select" id="roundFilter" name="roundNumber">
+                                <option value="">All Rounds</option>
+                            </select>
+                            <div class="form-text">Select specific round or leave as "All Rounds"</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="playerFilter" class="form-label">Player Filter</label>
+                            <select class="form-select" id="playerFilter" name="playerName">
+                                <option value="">All Players</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Generate Heatmap</button>
+                </form>
+                
+                <div id="heatmapResult" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadDemos();
+    loadMaps();
+    setupHeatmapForm();
+    setupDemoChangeHandler();
+});
+
+async function loadDemos() {
+    try {
+        const response = await fetch('/api/demo/demos');
+        const demos = await response.json();
+        
+        const select = document.getElementById('demoSelect');
+        select.innerHTML = '<option value="">Select a demo file...</option>';
+        
+        demos.forEach(demo => {
+            const option = document.createElement('option');
+            option.value = demo.id;
+            option.textContent = `${demo.fileName} (${demo.mapName})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading demos:', error);
+    }
+}
+
+async function loadMaps() {
+    try {
+        const response = await fetch('/api/heatmap/maps');
+        const maps = await response.json();
+        
+        const select = document.getElementById('mapSelect');
+        select.innerHTML = '<option value="">Select a map...</option>';
+        
+        maps.forEach(map => {
+            const option = document.createElement('option');
+            option.value = map;
+            option.textContent = map;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading maps:', error);
+    }
+}
+
+function setupHeatmapForm() {
+    const form = document.getElementById('heatmapForm');
+    const resultDiv = document.getElementById('heatmapResult');
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        
+        resultDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div><p>Generating heatmap...</p></div>';
+        
+        try {
+            const response = await fetch(`/api/heatmap/generate?${params}`);
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const imageUrl = URL.createObjectURL(blob);
+                
+                resultDiv.innerHTML = `
+                    <div class="text-center">
+                        <h6>Generated Heatmap</h6>
+                        <img src="${imageUrl}" class="img-fluid" alt="Heatmap" style="max-width: 100%; height: auto;">
+                        <div class="mt-2">
+                            <a href="${imageUrl}" download="heatmap.png" class="btn btn-success">Download Heatmap</a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const error = await response.text();
+                resultDiv.innerHTML = `<div class="alert alert-danger">Error generating heatmap: ${error}</div>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        }
+    });
+}
+
+function setupDemoChangeHandler() {
+    const demoSelect = document.getElementById('demoSelect');
+    const playerSelect = document.getElementById('playerFilter');
+    const roundSelect = document.getElementById('roundFilter');
+    
+    demoSelect.addEventListener('change', async function() {
+        const selectedDemoId = this.value;
+        
+        // Clear and reset filters
+        playerSelect.innerHTML = '<option value="">All Players</option>';
+        roundSelect.innerHTML = '<option value="">All Rounds</option>';
+        
+        if (selectedDemoId) {
+            try {
+                // Load players and rounds for the selected demo in parallel
+                const [playersResponse, roundsResponse] = await Promise.all([
+                    fetch(`/api/heatmap/players?demoId=${selectedDemoId}`),
+                    fetch(`/api/heatmap/rounds?demoId=${selectedDemoId}`)
+                ]);
+                
+                const players = await playersResponse.json();
+                const rounds = await roundsResponse.json();
+                
+                // Populate players dropdown
+                players.forEach(player => {
+                    const option = document.createElement('option');
+                    option.value = player;
+                    option.textContent = player;
+                    playerSelect.appendChild(option);
+                });
+                
+                // Populate rounds dropdown
+                rounds.forEach(round => {
+                    const option = document.createElement('option');
+                    option.value = round;
+                    option.textContent = `Round ${round}`;
+                    roundSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading players and rounds for demo:', error);
+            }
+        }
+    });
+}
+</script>

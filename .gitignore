@@ -1,0 +1,52 @@
+# Large files and uploads
+CS2DemoParserWeb/publish/
+CS2DemoParserWeb/uploads/
+*.exe
+*.dem
+
+# Build outputs
+bin/
+obj/
+publish/
+publish-test/
+
+# IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Configuration files with sensitive data
+appsettings.Development.json
+appsettings.Local.json
+*.secret.json
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Database files
+*.db
+*.db-*
+*.mdf
+*.ldf
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Azure and deployment
+azure-credentials.json
+deployment-outputs.json
+
+# Personal/sensitive files
+*personal*
+*private*

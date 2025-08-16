@@ -1,0 +1,1599 @@
+using DemoFile;
+using DemoFile.Game.Cs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using CS2DemoParser.Data;
+using CS2DemoParser.Models;
+using System.Collections.Concurrent;
+
+namespace CS2DemoParser.Services;
+
+public class SimpleDemoParserService
+{
+    private readonly CS2DemoContext _context;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<SimpleDemoParserService> _logger;
+    private readonly List<Models.Player> _players = new();
+    private readonly List<Models.Kill> _kills = new();
+    private readonly List<Models.Damage> _damages = new();
+    private readonly List<Models.WeaponFire> _weaponFires = new();
+    private readonly List<Models.Round> _rounds = new();
+    private readonly List<Models.PlayerMatchStats> _playerMatchStats = new();
+    private readonly List<Models.PlayerRoundStats> _playerRoundStats = new();
+    private readonly List<Models.GameEvent> _gameEvents = new();
+
+    // 🔴 CRITICAL: Add missing collections for comprehensive tracking
+    private readonly List<Models.Grenade> _grenades = new();
+    private readonly List<Models.Bomb> _bombs = new();
+    private readonly List<Models.PlayerPosition> _playerPositions = new();
+    private readonly List<Models.ChatMessage> _chatMessages = new();
+    private readonly List<Models.Equipment> _equipment = new();
+    private readonly List<Models.EconomyEvent> _economyEvents = new();
+    private readonly List<Models.FlashEvent> _flashEvents = new();
+    private readonly List<Models.WeaponState> _weaponStates = new();
+    private readonly List<Models.PlayerMovement> _playerMovements = new();
+    private readonly List<Models.BulletImpact> _bulletImpacts = new();
+
+    private Models.DemoFile? _currentDemoFile;
+    private Models.Match? _currentMatch;
+    private Models.Round? _currentRound;
+    private int _currentRoundNumber = 0;
+    private readonly Dictionary<int, Models.Player> _playerLookup = new();
+    private CsDemoParser? _demo;
+
+    // 🔴 CRITICAL: Add entity state tracking
+    private readonly Dictionary<int, DateTime> _lastPositionUpdate = new();
+    private readonly Dictionary<int, PlayerGameState> _playerStates = new();
+    private readonly Dictionary<int, List<string>> _playerInventories = new();
+    private readonly TimeSpan _positionUpdateInterval = TimeSpan.FromMilliseconds(200); // 5 Hz
+
+    public SimpleDemoParserService(CS2DemoContext context, IConfiguration configuration, ILogger<SimpleDemoParserService> logger)
+    {
+        _context = context;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    public async Task<bool> ParseDemoAsync(string filePath)
+    {
+        try
+        {
+            _logger.LogInformation("Starting to parse demo file: {FilePath}", filePath);
+
+            var fileInfo = new FileInfo(filePath);
+            if (!fileInfo.Exists)
+            {
+                _logger.LogError("Demo file not found: {FilePath}", filePath);
+                return false;
+            }
+
+            await CreateDemoFileRecord(fileInfo);
+
+            await using var fileStream = fileInfo.OpenRead();
+            var demo = new CsDemoParser();
+            _demo = demo;
+
+            SetupEventHandlers(demo);
+
+            _logger.LogInformation("Parsing demo file...");
+            var reader = DemoFileReader.Create(demo, fileStream);
+            await reader.ReadAllAsync();
+
+            await SaveDataToDatabase();
+
+            _logger.LogInformation("Successfully parsed demo file: {FilePath}", filePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing demo file: {FilePath}", filePath);
+            return false;
+        }
+    }
+
+    private async Task CreateDemoFileRecord(FileInfo fileInfo)
+    {
+        _currentDemoFile = new Models.DemoFile
+        {
+            FileName = fileInfo.Name,
+            FilePath = fileInfo.FullName,
+            FileSize = fileInfo.Length,
+            CreatedAt = fileInfo.CreationTime,
+            ParsedAt = DateTime.UtcNow
+        };
+
+        _context.DemoFiles.Add(_currentDemoFile);
+        await _context.SaveChangesAsync();
+    }
+
+    private void SetupEventHandlers(CsDemoParser demo)
+    {
+        // Original core events
+        demo.Source1GameEvents.RoundStart += OnRoundStart;
+        demo.Source1GameEvents.RoundEnd += OnRoundEnd;
+        demo.Source1GameEvents.PlayerDeath += OnPlayerDeath;
+        demo.Source1GameEvents.PlayerHurt += OnPlayerHurt;
+        demo.Source1GameEvents.WeaponFire += OnWeaponFire;
+
+        // 🔴 CRITICAL: BOMB/OBJECTIVE TRACKING (Complete bomb system)
+        demo.Source1GameEvents.BombPlanted += OnBombPlanted;
+        demo.Source1GameEvents.BombDefused += OnBombDefused;
+        demo.Source1GameEvents.BombExploded += OnBombExploded;
+        demo.Source1GameEvents.BombBeginplant += OnBombBeginPlant;
+        demo.Source1GameEvents.BombBegindefuse += OnBombBeginDefuse;
+        demo.Source1GameEvents.BombAbortplant += OnBombAbortPlant;
+        demo.Source1GameEvents.BombAbortdefuse += OnBombAbortDefuse;
+        demo.Source1GameEvents.BombDropped += OnBombDropped;
+        demo.Source1GameEvents.BombPickup += OnBombPickup;
+
+        // 🔴 CRITICAL: GRENADE/UTILITY TRACKING (Complete utility system)
+        demo.Source1GameEvents.GrenadeThrown += OnGrenadeThrown;
+        demo.Source1GameEvents.FlashbangDetonate += OnFlashbangDetonate;
+        demo.Source1GameEvents.SmokegrenadeDetonate += OnSmokegrenadeDetonate;
+        demo.Source1GameEvents.SmokegrenadeExpired += OnSmokegrenadeExpired;
+        demo.Source1GameEvents.HegrenadeDetonate += OnHegrenadeDetonate;
+        demo.Source1GameEvents.MolotovDetonate += OnMolotovDetonate;
+        demo.Source1GameEvents.InfernoStartburn += OnInfernoStartburn;
+        demo.Source1GameEvents.InfernoExtinguish += OnInfernoExtinguish;
+        demo.Source1GameEvents.DecoyDetonate += OnDecoyDetonate;
+        demo.Source1GameEvents.DecoyStarted += OnDecoyStarted;
+        demo.Source1GameEvents.GrenadeBounce += OnGrenadeBounce;
+
+        // 🔴 CRITICAL: ECONOMY/BUYING SYSTEM (Complete economy tracking)
+        demo.Source1GameEvents.ItemPurchase += OnItemPurchase;
+        demo.Source1GameEvents.ItemPickup += OnItemPickup;
+        demo.Source1GameEvents.ItemRemove += OnItemRemove;
+        demo.Source1GameEvents.ItemEquip += OnItemEquip;
+        demo.Source1GameEvents.EnterBuyzone += OnEnterBuyzone;
+        demo.Source1GameEvents.ExitBuyzone += OnExitBuyzone;
+        demo.Source1GameEvents.BuytimeEnded += OnBuytimeEnded;
+        demo.Source1GameEvents.BuymenuOpen += OnBuymenuOpen;
+        demo.Source1GameEvents.BuymenuClose += OnBuymenuClose;
+
+        // 🔴 CRITICAL: COMPREHENSIVE Source1GameEvents (Major gameplay events)
+        demo.Source1GameEvents.PlayerBlind += OnPlayerBlind;
+        demo.Source1GameEvents.PlayerFootstep += OnPlayerFootstep;
+        demo.Source1GameEvents.PlayerJump += OnPlayerJump;
+        demo.Source1GameEvents.PlayerSpawn += OnPlayerSpawn;
+        demo.Source1GameEvents.PlayerTeam += OnPlayerTeam;
+        demo.Source1GameEvents.PlayerConnect += OnPlayerConnect;
+        demo.Source1GameEvents.PlayerDisconnect += OnPlayerDisconnect;
+        demo.Source1GameEvents.PlayerChat += OnPlayerChat;
+        demo.Source1GameEvents.PlayerRadio += OnPlayerRadio;
+        demo.Source1GameEvents.WeaponReload += OnWeaponReload;
+        demo.Source1GameEvents.WeaponZoom += OnWeaponZoom;
+        demo.Source1GameEvents.InspectWeapon += OnInspectWeapon;
+        demo.Source1GameEvents.SilencerDetach += OnSilencerDetach;
+        demo.Source1GameEvents.SilencerOff += OnSilencerOff;
+        demo.Source1GameEvents.SilencerOn += OnSilencerOn;
+        demo.Source1GameEvents.BulletDamage += OnBulletDamage;
+        demo.Source1GameEvents.BulletImpact += OnBulletImpact;
+        demo.Source1GameEvents.RoundFreezeEnd += OnRoundFreezeEnd;
+        demo.Source1GameEvents.RoundTimeWarning += OnRoundTimeWarning;
+        demo.Source1GameEvents.WarmupEnd += OnWarmupEnd;
+
+        // Additional important events
+        demo.Source1GameEvents.VoteStarted += OnVoteStarted;
+        demo.Source1GameEvents.VotePassed += OnVotePassed;
+        demo.Source1GameEvents.VoteFailed += OnVoteFailed;
+        demo.Source1GameEvents.GameStart += OnGameStart;
+        demo.Source1GameEvents.GameEnd += OnGameEnd;
+
+        // 🔴 CRITICAL: ENTITY STATE TRACKING (Real-time position, health, inventory)
+        demo.EntityEvents.CCSPlayerPawn.AddChangeCallback(
+            pawn => new { pawn.Origin, pawn.EyeAngles, pawn.Health, pawn.ArmorValue, pawn.Velocity },
+            OnPlayerStateChanged
+        );
+
+        demo.EntityEvents.CCSWeaponBase.AddChangeCallback(
+            weapon => new { weapon.OwnerEntity, weapon.Clip1, weapon.Clip2 },
+            OnWeaponStateChanged
+        );
+
+        // Track player inventory changes
+        demo.EntityEvents.CCSPlayerPawn.AddCollectionChangeCallback(
+            pawn => pawn.WeaponServices?.MyWeapons,
+            OnPlayerWeaponInventoryChanged
+        );
+
+        // Communication tracking
+        demo.BaseUserMessageEvents.UserMessageSayText += OnSayText;
+        demo.BaseUserMessageEvents.UserMessageSayText2 += OnSayText2;
+
+        // CS-specific user messages for economy
+        demo.UserMessageEvents.AdjustMoney += OnAdjustMoneyMessage;
+        demo.UserMessageEvents.ItemPickup += OnItemPickupMessage;
+    }
+
+    private void OnRoundStart(Source1RoundStartEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        _currentRoundNumber++;
+
+        // Create match if it doesn't exist
+        if (_currentMatch == null)
+        {
+            _currentMatch = new Models.Match
+            {
+                DemoFileId = _currentDemoFile.Id,
+                MapName = "unknown", // TODO: Find proper way to get map name
+                StartTime = DateTime.UtcNow,
+                IsFinished = false
+            };
+
+            _currentDemoFile.MapName = "unknown"; // TODO: Find proper way to get map name
+            _currentDemoFile.TotalTicks = _demo.CurrentDemoTick.Value;
+            _currentDemoFile.TickRate = CsDemoParser.TickRate;
+        }
+
+        _currentRound = new Models.Round
+        {
+            DemoFileId = _currentDemoFile.Id,
+            MatchId = _currentMatch.Id,
+            RoundNumber = _currentRoundNumber,
+            StartTick = _demo.CurrentDemoTick.Value,
+            StartTime = DateTime.UtcNow,
+            CTScore = _demo.TeamCounterTerrorist?.Score ?? 0,
+            TScore = _demo.TeamTerrorist?.Score ?? 0
+        };
+
+        _rounds.Add(_currentRound);
+
+        // Register players
+        foreach (var player in _demo.Players.Where(p => p.PlayerName != null))
+        {
+            GetOrCreatePlayer(player);
+        }
+
+        LogGameEvent(_demo, "round_start", "Round started", true);
+    }
+
+    private void OnRoundEnd(Source1RoundEndEvent e)
+    {
+        if (_demo == null || _currentRound == null) return;
+
+        _currentRound.EndTick = _demo.CurrentDemoTick.Value;
+        _currentRound.EndTime = DateTime.UtcNow;
+        _currentRound.Duration = (float)(DateTime.UtcNow - _currentRound.StartTime).TotalSeconds;
+        _currentRound.WinnerTeam = e.Winner.ToString();
+        _currentRound.EndReason = e.Reason.ToString();
+        _currentRound.CTScore = _demo.TeamCounterTerrorist?.Score ?? 0;
+        _currentRound.TScore = _demo.TeamTerrorist?.Score ?? 0;
+
+        LogGameEvent(_demo, "round_end", $"Round ended - Winner: {e.Winner}, Reason: {e.Reason}", true);
+    }
+
+    private void OnPlayerDeath(Source1PlayerDeathEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var victim = GetOrCreatePlayer(e.Player);
+        var killer = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
+        var assister = e.Assister != null ? GetOrCreatePlayer(e.Assister) : null;
+
+        var kill = new Models.Kill
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            KillerId = killer?.Id,
+            VictimId = victim.Id,
+            AssisterId = assister?.Id,
+            Weapon = e.Weapon ?? "unknown",
+            IsHeadshot = e.Headshot,
+            IsWallbang = e.Penetrated > 0,
+            Penetration = e.Penetrated,
+            IsNoScope = e.Noscope,
+            ThroughSmoke = e.Thrusmoke,
+            AttackerBlind = e.Attackerblind,
+            KillerTeam = e.Attacker?.CSTeamNum.ToString(),
+            VictimTeam = e.Player.CSTeamNum.ToString(),
+            IsTeamKill = e.Attacker?.CSTeamNum == e.Player.CSTeamNum
+        };
+
+        _kills.Add(kill);
+        LogGameEvent(_demo, "player_death", $"{e.Player.PlayerName} killed by {e.Attacker?.PlayerName} with {e.Weapon}");
+    }
+
+    private void OnPlayerHurt(Source1PlayerHurtEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var victim = GetOrCreatePlayer(e.Player);
+        var attacker = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
+
+        var damage = new Models.Damage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            AttackerId = attacker?.Id,
+            VictimId = victim.Id,
+            Weapon = e.Weapon ?? "unknown",
+            DamageAmount = e.DmgHealth,
+            DamageArmor = e.DmgArmor,
+            Health = e.Health,
+            Armor = e.Armor,
+            AttackerTeam = e.Attacker?.CSTeamNum.ToString(),
+            VictimTeam = e.Player.CSTeamNum.ToString(),
+            IsTeamDamage = e.Attacker?.CSTeamNum == e.Player.CSTeamNum
+        };
+
+        _damages.Add(damage);
+        LogGameEvent(_demo, "player_hurt", $"{e.Player.PlayerName} hurt by {e.Attacker?.PlayerName} for {e.DmgHealth} damage");
+    }
+
+    private void OnWeaponFire(Source1WeaponFireEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+
+        var weaponFire = new Models.WeaponFire
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            PlayerId = player.Id,
+            Weapon = e.Weapon ?? "unknown",
+            Team = e.Player.CSTeamNum.ToString(),
+            IsSilenced = e.Silenced
+        };
+
+        _weaponFires.Add(weaponFire);
+    }
+
+    private Models.Player GetOrCreatePlayer(DemoFile.Game.Cs.CCSPlayerController playerController)
+    {
+        if (_playerLookup.TryGetValue((int)playerController.EntityIndex.Value, out var existingPlayer))
+        {
+            return existingPlayer;
+        }
+
+        var player = new Models.Player
+        {
+            DemoFileId = _currentDemoFile!.Id,
+            PlayerSlot = (int)playerController.EntityIndex.Value,
+            UserId = (int)playerController.EntityIndex.Value,
+            SteamId = playerController.SteamID,
+            PlayerName = playerController.PlayerName ?? "Unknown",
+            Team = playerController.CSTeamNum.ToString(),
+            IsBot = playerController.PlayerInfo?.Fakeplayer ?? false,
+            IsHltv = playerController.PlayerInfo?.Ishltv ?? false,
+            IsConnected = playerController.Connected == PlayerConnectedState.PlayerConnected,
+            ConnectedAt = DateTime.UtcNow
+        };
+
+        _players.Add(player);
+        _playerLookup[(int)playerController.EntityIndex.Value] = player;
+        return player;
+    }
+
+    private void LogGameEvent(CsDemoParser demo, string eventName, string description, bool isImportant = false)
+    {
+        if (_currentDemoFile == null) return;
+
+        var gameEvent = new Models.GameEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            Tick = demo.CurrentDemoTick.Value,
+            GameTime = (float)demo.CurrentGameTime.Value,
+            EventName = eventName,
+            Description = description,
+            IsImportant = isImportant,
+            RoundNumber = _currentRoundNumber,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _gameEvents.Add(gameEvent);
+    }
+
+    #region 🔴 CRITICAL: COMPREHENSIVE EVENT HANDLERS IMPLEMENTATION
+
+    // 🔴 BOMB/OBJECTIVE TRACKING - Complete bomb system
+    private void OnBombPlanted(Source1BombPlantedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "planted",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} planted bomb at {e.Site}"
+        };
+
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            bomb.PositionX = (decimal)playerPos.Value.X;
+            bomb.PositionY = (decimal)playerPos.Value.Y;
+            bomb.PositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_planted", bomb.Description, true);
+    }
+
+    private void OnBombDefused(Source1BombDefusedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "defused",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} defused bomb at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_defused", bomb.Description, true);
+    }
+
+    private void OnBombExploded(Source1BombExplodedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "exploded",
+            Site = e.Site.ToString(),
+            Team = "Terrorist",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Bomb exploded at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_exploded", bomb.Description, true);
+    }
+
+    private void OnBombBeginPlant(Source1BombBeginplantEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "begin_plant",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} started planting at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_begin_plant", bomb.Description);
+    }
+
+    private void OnBombBeginDefuse(Source1BombBegindefuseEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "begin_defuse",
+            Team = e.Player.CSTeamNum.ToString(),
+            HasKit = e.Haskit,
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} started defusing {(e.Haskit ? "with kit" : "without kit")}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_begin_defuse", bomb.Description);
+    }
+
+    private void OnBombAbortPlant(Source1BombAbortplantEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "abort_plant",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} aborted planting at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_abort_plant", bomb.Description);
+    }
+
+    private void OnBombAbortDefuse(Source1BombAbortdefuseEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "abort_defuse",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} aborted defusing"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_abort_defuse", bomb.Description);
+    }
+
+    private void OnBombDropped(Source1BombDroppedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "dropped",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} dropped the bomb"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_dropped", bomb.Description);
+    }
+
+    private void OnBombPickup(Source1BombPickupEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "picked_up",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} picked up the bomb"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_pickup", bomb.Description);
+    }
+
+    // 🔴 GRENADE/UTILITY TRACKING - Complete utility system
+    private void OnGrenadeThrown(Source1GrenadeThrownEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = e.Weapon,
+            EventType = "thrown",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} threw {e.Weapon}"
+        };
+
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            grenade.PositionX = (decimal)playerPos.Value.X;
+            grenade.PositionY = (decimal)playerPos.Value.Y;
+            grenade.PositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "grenade_thrown", grenade.Description);
+    }
+
+    private void OnFlashbangDetonate(Source1FlashbangDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "flashbang",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Flashbang detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "flashbang_detonate", grenade.Description);
+    }
+
+    private void OnSmokegrenadeDetonate(Source1SmokegrenadeDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "smokegrenade",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Smoke detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "smoke_detonate", grenade.Description);
+    }
+
+    private void OnSmokegrenadeExpired(Source1SmokegrenadeExpiredEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "smokegrenade",
+            EventType = "expired",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Smoke expired at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "smoke_expired", grenade.Description);
+    }
+
+    private void OnHegrenadeDetonate(Source1HegrenadeDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "hegrenade",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"HE grenade detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "he_detonate", grenade.Description);
+    }
+
+    private void OnMolotovDetonate(Source1MolotovDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "molotov",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Molotov detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "molotov_detonate", grenade.Description);
+    }
+
+    private void OnInfernoStartburn(Source1InfernoStartburnEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        LogGameEvent(_demo, "inferno_startburn", $"Fire started burning at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})");
+    }
+
+    private void OnInfernoExtinguish(Source1InfernoExtinguishEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        LogGameEvent(_demo, "inferno_extinguish", $"Fire extinguished at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})");
+    }
+
+    private void OnDecoyDetonate(Source1DecoyDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "decoy",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Decoy detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "decoy_detonate", grenade.Description);
+    }
+
+    private void OnDecoyStarted(Source1DecoyStartedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        LogGameEvent(_demo, "decoy_started", $"Decoy started at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})");
+    }
+
+    private void OnGrenadeBounce(Source1GrenadeBounceEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        LogGameEvent(_demo, "grenade_bounce", $"Grenade bounced at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})");
+    }
+
+    // 🔴 ECONOMY/BUYING SYSTEM - Complete economy tracking
+    private void OnItemPurchase(Source1ItemPurchaseEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var equipment = new Models.Equipment
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EquipmentName = e.Weapon,
+            EventType = "purchased",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _equipment.Add(equipment);
+
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "purchase",
+            ItemName = e.Weapon,
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} purchased {e.Weapon}"
+        };
+
+        _economyEvents.Add(economyEvent);
+        LogGameEvent(_demo, "item_purchase", economyEvent.Description);
+    }
+
+    private void OnItemPickup(Source1ItemPickupEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var equipment = new Models.Equipment
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EquipmentName = e.Item,
+            EventType = "picked_up",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _equipment.Add(equipment);
+        LogGameEvent(_demo, "item_pickup", $"{e.Player.PlayerName} picked up {e.Item}");
+    }
+
+    private void OnItemRemove(Source1ItemRemoveEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var equipment = new Models.Equipment
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EquipmentName = e.Item,
+            EventType = "removed",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _equipment.Add(equipment);
+        LogGameEvent(_demo, "item_remove", $"{e.Player.PlayerName} removed {e.Item}");
+    }
+
+    private void OnItemEquip(Source1ItemEquipEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var equipment = new Models.Equipment
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EquipmentName = e.Item,
+            EventType = "equipped",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _equipment.Add(equipment);
+        LogGameEvent(_demo, "item_equip", $"{e.Player.PlayerName} equipped {e.Item}");
+    }
+
+    private void OnEnterBuyzone(Source1EnterBuyzoneEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "enter_buyzone",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} entered buy zone"
+        };
+
+        _economyEvents.Add(economyEvent);
+        LogGameEvent(_demo, "enter_buyzone", economyEvent.Description);
+    }
+
+    private void OnExitBuyzone(Source1ExitBuyzoneEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "exit_buyzone",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} left buy zone"
+        };
+
+        _economyEvents.Add(economyEvent);
+        LogGameEvent(_demo, "exit_buyzone", economyEvent.Description);
+    }
+
+    private void OnBuytimeEnded(Source1BuytimeEndedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "buytime_ended",
+            Team = "All",
+            RoundNumber = _currentRoundNumber,
+            Description = "Buy time ended"
+        };
+
+        _economyEvents.Add(economyEvent);
+        LogGameEvent(_demo, "buytime_ended", economyEvent.Description, true);
+    }
+
+    private void OnBuymenuOpen(Source1BuymenuOpenEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "buymenu_open",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} opened buy menu"
+        };
+
+        _economyEvents.Add(economyEvent);
+        LogGameEvent(_demo, "buymenu_open", economyEvent.Description);
+    }
+
+    private void OnBuymenuClose(Source1BuymenuCloseEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "buymenu_close",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} closed buy menu"
+        };
+
+        _economyEvents.Add(economyEvent);
+        LogGameEvent(_demo, "buymenu_close", economyEvent.Description);
+    }
+
+    // 🔴 ENTITY STATE TRACKING - Real-time position, health, inventory
+    private void OnPlayerStateChanged(CCSPlayerPawn pawn, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || pawn.Controller == null) return;
+
+        var player = GetOrCreatePlayer(pawn.Controller);
+        var now = DateTime.UtcNow;
+        
+        // Throttle position updates to avoid data explosion
+        if (_lastPositionUpdate.TryGetValue(player.Id, out var lastUpdate) && 
+            (now - lastUpdate) < _positionUpdateInterval)
+            return;
+
+        var position = new Models.PlayerPosition
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            PositionX = (decimal)newState.Origin.X,
+            PositionY = (decimal)newState.Origin.Y,
+            PositionZ = (decimal)newState.Origin.Z,
+            ViewAngleX = (decimal)newState.EyeAngles.Pitch,
+            ViewAngleY = (decimal)newState.EyeAngles.Yaw,
+            Health = newState.Health,
+            Armor = newState.ArmorValue,
+            Team = pawn.Controller.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        var velocity = newState.Velocity;
+        var speed = Math.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y);
+        
+        var movement = new Models.PlayerMovement
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            PositionX = (decimal)newState.Origin.X,
+            PositionY = (decimal)newState.Origin.Y,
+            PositionZ = (decimal)newState.Origin.Z,
+            VelocityX = (decimal)velocity.X,
+            VelocityY = (decimal)velocity.Y,
+            VelocityZ = (decimal)velocity.Z,
+            Speed = (float)speed,
+            Team = pawn.Controller.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _playerPositions.Add(position);
+        _playerMovements.Add(movement);
+        _lastPositionUpdate[player.Id] = now;
+
+        // Update player state tracking
+        _playerStates[player.Id] = new PlayerGameState
+        {
+            LastPosition = newState.Origin,
+            LastViewAngle = newState.EyeAngles,
+            Health = newState.Health,
+            Armor = newState.ArmorValue,
+            LastUpdate = now
+        };
+    }
+
+    private void OnWeaponStateChanged(CCSWeaponBase weapon, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || weapon.OwnerEntity?.Value == null) return;
+
+        var weaponState = new Models.WeaponState
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            WeaponName = weapon.GetType().Name,
+            AmmoClip = newState.Clip1,
+            AmmoReserve = newState.Clip2,
+            State = "state_change",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Weapon state changed: {weapon.GetType().Name}"
+        };
+
+        _weaponStates.Add(weaponState);
+    }
+
+    private void OnPlayerWeaponInventoryChanged(CCSPlayerPawn pawn, dynamic oldWeapons, dynamic newWeapons)
+    {
+        if (_demo == null || _currentDemoFile == null || pawn.Controller == null) return;
+
+        var player = GetOrCreatePlayer(pawn.Controller);
+        
+        // Track inventory changes
+        var newInventory = new List<string>();
+        if (newWeapons != null)
+        {
+            foreach (var weapon in newWeapons)
+            {
+                if (weapon?.Value != null)
+                {
+                    newInventory.Add(weapon.Value.GetType().Name);
+                }
+            }
+        }
+
+        _playerInventories[player.Id] = newInventory;
+        
+        var inventoryDescription = string.Join(", ", newInventory);
+        LogGameEvent(_demo, "inventory_change", $"{pawn.Controller.PlayerName} inventory: {inventoryDescription}");
+    }
+
+    // 🔴 COMPREHENSIVE Source1GameEvents - Major gameplay events
+    private void OnPlayerBlind(Source1PlayerBlindEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var playerModel = GetOrCreatePlayer(e.Player);
+        var attackerModel = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
+
+        var flashEvent = new Models.FlashEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            FlashedPlayerId = playerModel.Id,
+            FlasherPlayerId = attackerModel?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            FlashDuration = e.BlindDuration,
+            FlashedPlayerTeam = e.Player.CSTeamNum.ToString(),
+            FlasherPlayerTeam = e.Attacker?.CSTeamNum.ToString(),
+            IsTeamFlash = e.Attacker?.CSTeamNum == e.Player.CSTeamNum,
+            IsSelfFlash = e.Attacker?.EntityIndex == e.Player.EntityIndex,
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} flashed by {e.Attacker?.PlayerName ?? "unknown"} for {e.BlindDuration:F2}s"
+        };
+
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            flashEvent.FlashedPlayerPositionX = (decimal)playerPos.Value.X;
+            flashEvent.FlashedPlayerPositionY = (decimal)playerPos.Value.Y;
+            flashEvent.FlashedPlayerPositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _flashEvents.Add(flashEvent);
+        LogGameEvent(_demo, "player_blind", flashEvent.Description);
+    }
+
+    private void OnPlayerFootstep(Source1PlayerFootstepEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_footstep", $"{e.Player.PlayerName} footstep");
+    }
+
+    private void OnPlayerJump(Source1PlayerJumpEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_jump", $"{e.Player.PlayerName} jumped");
+    }
+
+    private void OnPlayerSpawn(Source1PlayerSpawnEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_spawn", $"{e.Player.PlayerName} spawned", true);
+    }
+
+    private void OnPlayerTeam(Source1PlayerTeamEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_team", $"{e.Player.PlayerName} joined team {e.Team}");
+    }
+
+    private void OnPlayerConnect(Source1PlayerConnectEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "player_connect", $"{e.Name} connected", true);
+    }
+
+    private void OnPlayerDisconnect(Source1PlayerDisconnectEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "player_disconnect", $"{e.Name} disconnected ({e.Reason})", true);
+    }
+
+    private void OnPlayerChat(Source1PlayerChatEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var chatMessage = new Models.ChatMessage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            Message = e.Text ?? "",
+            IsTeamMessage = e.Teamonly,
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _chatMessages.Add(chatMessage);
+        LogGameEvent(_demo, "player_chat", $"{e.Player.PlayerName}: {e.Text}");
+    }
+
+    private void OnPlayerRadio(Source1PlayerRadioEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_radio", $"{e.Player.PlayerName} radio: {e.Slot}");
+    }
+
+    private void OnWeaponReload(Source1WeaponReloadEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "weapon_reload", $"{e.Player.PlayerName} reloaded");
+    }
+
+    private void OnWeaponZoom(Source1WeaponZoomEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "weapon_zoom", $"{e.Player.PlayerName} zoomed");
+    }
+
+    private void OnInspectWeapon(Source1InspectWeaponEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "inspect_weapon", $"{e.Player.PlayerName} inspected weapon");
+    }
+
+    private void OnSilencerDetach(Source1SilencerDetachEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "silencer_detach", $"{e.Player.PlayerName} detached silencer");
+    }
+
+    private void OnSilencerOff(Source1SilencerOffEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "silencer_off", $"{e.Player.PlayerName} turned silencer off");
+    }
+
+    private void OnSilencerOn(Source1SilencerOnEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "silencer_on", $"{e.Player.PlayerName} turned silencer on");
+    }
+
+    private void OnBulletDamage(Source1BulletDamageEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var bulletImpact = new Models.BulletImpact
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            ImpactX = (decimal)e.X,
+            ImpactY = (decimal)e.Y,
+            ImpactZ = (decimal)e.Z,
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Bullet damage at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        _bulletImpacts.Add(bulletImpact);
+        LogGameEvent(_demo, "bullet_damage", bulletImpact.Description);
+    }
+
+    private void OnBulletImpact(Source1BulletImpactEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bulletImpact = new Models.BulletImpact
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            ImpactX = (decimal)e.X,
+            ImpactY = (decimal)e.Y,
+            ImpactZ = (decimal)e.Z,
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} bullet impact at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        _bulletImpacts.Add(bulletImpact);
+        LogGameEvent(_demo, "bullet_impact", bulletImpact.Description);
+    }
+
+    private void OnRoundFreezeEnd(Source1RoundFreezeEndEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "round_freeze_end", "Round freeze time ended", true);
+    }
+
+    private void OnRoundTimeWarning(Source1RoundTimeWarningEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "round_time_warning", "Round time warning", true);
+    }
+
+    private void OnWarmupEnd(Source1WarmupEndEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "warmup_end", "Warmup ended", true);
+    }
+
+    private void OnVoteStarted(Source1VoteStartedEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "vote_started", $"Vote started: {e.Issue}");
+    }
+
+    private void OnVotePassed(Source1VotePassedEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "vote_passed", $"Vote passed: {e.Details}");
+    }
+
+    private void OnVoteFailed(Source1VoteFailedEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "vote_failed", $"Vote failed: {e.Reason}");
+    }
+
+    private void OnGameStart(Source1GameStartEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "game_start", "Game started", true);
+    }
+
+    private void OnGameEnd(Source1GameEndEvent e)
+    {
+        if (_demo == null) return;
+        LogGameEvent(_demo, "game_end", "Game ended", true);
+    }
+
+    // Communication tracking
+    private void OnSayText(CUserMessageSayText message)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        var chatMessage = new Models.ChatMessage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            Message = message.Text ?? "",
+            IsTeamMessage = false,
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber
+        };
+
+        _chatMessages.Add(chatMessage);
+    }
+
+    private void OnSayText2(CUserMessageSayText2 message)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        Models.Player? player = null;
+        if (message.Entityindex >= 0)
+        {
+            var entity = _demo.GetEntityByIndex<CCSPlayerController>(new CEntityIndex((uint)message.Entityindex));
+            if (entity != null)
+                player = GetOrCreatePlayer(entity);
+        }
+
+        var chatMessage = new Models.ChatMessage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            Message = $"{message.Param1} {message.Param2} {message.Param3} {message.Param4}".Trim(),
+            IsTeamMessage = false,
+            Team = player?.Team ?? "Unknown",
+            RoundNumber = _currentRoundNumber
+        };
+
+        _chatMessages.Add(chatMessage);
+    }
+
+    // CS-specific user messages for economy
+    private void OnAdjustMoneyMessage(CCSUsrMsg_AdjustMoney message)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "money_adjust",
+            MoneyChange = message.Amount,
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Money adjusted: {message.Amount}"
+        };
+
+        _economyEvents.Add(economyEvent);
+    }
+
+    private void OnItemPickupMessage(CCSUsrMsg_ItemPickup message)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var economyEvent = new Models.EconomyEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "item_pickup_msg",
+            ItemName = message.Item,
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Item pickup message: {message.Item}"
+        };
+
+        _economyEvents.Add(economyEvent);
+    }
+
+    #endregion
+
+    private async Task SaveDataToDatabase()
+    {
+        try
+        {
+            _logger.LogInformation("Saving parsed data to database...");
+
+            // Save players first
+            if (_players.Any())
+            {
+                _context.Players.AddRange(_players);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved {Count} players", _players.Count);
+            }
+
+            // Save match
+            if (_currentMatch != null)
+            {
+                _currentMatch.EndTime = DateTime.UtcNow;
+                _currentMatch.IsFinished = true;
+                _currentMatch.TotalRounds = _currentRoundNumber;
+                _context.Matches.Add(_currentMatch);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved match data");
+            }
+
+            // Save rounds
+            if (_rounds.Any())
+            {
+                _context.Rounds.AddRange(_rounds);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved {Count} rounds", _rounds.Count);
+            }
+
+            // Save kills
+            if (_kills.Any())
+            {
+                _context.Kills.AddRange(_kills);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved {Count} kills", _kills.Count);
+            }
+
+            // Save damages
+            if (_damages.Any())
+            {
+                _context.Damages.AddRange(_damages);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved {Count} damage events", _damages.Count);
+            }
+
+            // Save weapon fires
+            if (_weaponFires.Any())
+            {
+                _context.WeaponFires.AddRange(_weaponFires);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved {Count} weapon fire events", _weaponFires.Count);
+            }
+
+            // Save game events
+            if (_gameEvents.Any())
+            {
+                _context.GameEvents.AddRange(_gameEvents);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved {Count} game events", _gameEvents.Count);
+            }
+
+            await CalculateAndSavePlayerMatchStats();
+
+            _logger.LogInformation("Successfully saved all data to database");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving data to database");
+            throw;
+        }
+    }
+
+    private async Task CalculateAndSavePlayerMatchStats()
+    {
+        if (_currentMatch == null) return;
+
+        foreach (var player in _players)
+        {
+            var playerKills = _kills.Where(k => k.KillerId == player.Id).ToList();
+            var playerDeaths = _kills.Where(k => k.VictimId == player.Id).ToList();
+            var playerDamages = _damages.Where(d => d.AttackerId == player.Id).ToList();
+
+            var matchStats = new Models.PlayerMatchStats
+            {
+                PlayerId = player.Id,
+                MatchId = _currentMatch.Id,
+                Kills = playerKills.Count,
+                Deaths = playerDeaths.Count,
+                HeadshotKills = playerKills.Count(k => k.IsHeadshot),
+                TotalDamageDealt = playerDamages.Sum(d => d.DamageAmount),
+                WallbangKills = playerKills.Count(k => k.IsWallbang),
+                RoundsPlayed = _currentRoundNumber
+            };
+
+            matchStats.HeadshotPercentage = matchStats.Kills > 0 ? (float)matchStats.HeadshotKills / matchStats.Kills * 100 : 0;
+            matchStats.KDRatio = matchStats.Deaths > 0 ? (float)matchStats.Kills / matchStats.Deaths : matchStats.Kills;
+            matchStats.ADR = _currentRoundNumber > 0 ? (float)matchStats.TotalDamageDealt / _currentRoundNumber : 0;
+
+            _playerMatchStats.Add(matchStats);
+        }
+
+        if (_playerMatchStats.Any())
+        {
+            _context.PlayerMatchStats.AddRange(_playerMatchStats);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} player match stats", _playerMatchStats.Count);
+        }
+    }
+}

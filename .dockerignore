@@ -1,0 +1,47 @@
+# Build artifacts (exclude our project build artifacts but allow demofile-net)
+CS2DemoParser/bin/
+CS2DemoParser/obj/
+CS2DemoParserWeb/bin/
+CS2DemoParserWeb/obj/
+QueryDemoData/bin/
+QueryDemoData/obj/
+QueryRounds/bin/
+QueryRounds/obj/
+**/out/
+
+# Dependencies
+**/node_modules/
+
+# IDE files
+**/.vs/
+**/.vscode/
+**/*.user
+**/*.suo
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Database files (will be mounted)
+**/*.db
+**/*.db-*
+
+# Logs
+**/logs/
+**/*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local data
+data/
+uploads/
+
+# Build cache
+.nuget/

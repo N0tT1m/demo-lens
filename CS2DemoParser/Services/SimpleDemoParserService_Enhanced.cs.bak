@@ -1,0 +1,928 @@
+using DemoFile;
+using DemoFile.Game.Cs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using CS2DemoParser.Data;
+using CS2DemoParser.Models;
+using System.Collections.Concurrent;
+
+namespace CS2DemoParser.Services;
+
+/// <summary>
+/// Enhanced version of SimpleDemoParserService with immediate improvements
+/// This class extends the original SimpleDemoParserService with the most impactful enhancements
+/// while maintaining the same API and structure for easy adoption.
+/// </summary>
+public class SimpleDemoParserService_Enhanced
+{
+    #region Original Fields + Enhancements
+    private readonly CS2DemoContext _context;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<SimpleDemoParserService_Enhanced> _logger;
+    
+    // Original collections
+    private readonly List<Models.Player> _players = new();
+    private readonly List<Models.Kill> _kills = new();
+    private readonly List<Models.Damage> _damages = new();
+    private readonly List<Models.WeaponFire> _weaponFires = new();
+    private readonly List<Models.Round> _rounds = new();
+    private readonly List<Models.PlayerMatchStats> _playerMatchStats = new();
+    private readonly List<Models.PlayerRoundStats> _playerRoundStats = new();
+    private readonly List<Models.GameEvent> _gameEvents = new();
+
+    // ENHANCED: Add critical missing collections
+    private readonly List<Models.Grenade> _grenades = new();
+    private readonly List<Models.Bomb> _bombs = new();
+    private readonly List<Models.PlayerPosition> _playerPositions = new();
+    private readonly List<Models.ChatMessage> _chatMessages = new();
+    private readonly List<Models.Equipment> _equipment = new();
+
+    // Original state tracking
+    private Models.DemoFile? _currentDemoFile;
+    private Models.Match? _currentMatch;
+    private Models.Round? _currentRound;
+    private int _currentRoundNumber = 0;
+    private readonly Dictionary<int, Models.Player> _playerLookup = new();
+    private CsDemoParser? _demo;
+
+    // ENHANCED: Add position tracking throttling
+    private readonly Dictionary<int, DateTime> _lastPositionUpdate = new();
+    private readonly TimeSpan _positionUpdateInterval = TimeSpan.FromMilliseconds(500); // 2 Hz
+    #endregion
+
+    public SimpleDemoParserService_Enhanced(CS2DemoContext context, IConfiguration configuration, ILogger<SimpleDemoParserService_Enhanced> logger)
+    {
+        _context = context;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    public async Task<bool> ParseDemoAsync(string filePath)
+    {
+        try
+        {
+            _logger.LogInformation("Starting enhanced parsing of demo file: {FilePath}", filePath);
+
+            var fileInfo = new FileInfo(filePath);
+            if (!fileInfo.Exists)
+            {
+                _logger.LogError("Demo file not found: {FilePath}", filePath);
+                return false;
+            }
+
+            await CreateDemoFileRecord(fileInfo);
+
+            await using var fileStream = fileInfo.OpenRead();
+            var demo = new CsDemoParser();
+            _demo = demo;
+
+            // ENHANCED: Setup both original and new event handlers
+            SetupOriginalEventHandlers(demo);
+            SetupEnhancedEventHandlers(demo);
+
+            _logger.LogInformation("Parsing demo file with enhanced capabilities...");
+            var reader = DemoFileReader.Create(demo, fileStream);
+            await reader.ReadAllAsync();
+
+            // ENHANCED: Save additional data
+            await SaveEnhancedDataToDatabase();
+
+            _logger.LogInformation("Successfully parsed demo file with enhanced data: {FilePath}", filePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing demo file: {FilePath}", filePath);
+            return false;
+        }
+    }
+
+    #region Original Event Handlers (Unchanged)
+    private void SetupOriginalEventHandlers(CsDemoParser demo)
+    {
+        // Keep original handlers exactly as they were
+        demo.Source1GameEvents.RoundStart += OnRoundStart;
+        demo.Source1GameEvents.RoundEnd += OnRoundEnd;
+        demo.Source1GameEvents.PlayerDeath += OnPlayerDeath;
+        demo.Source1GameEvents.PlayerHurt += OnPlayerHurt;
+        demo.Source1GameEvents.WeaponFire += OnWeaponFire;
+    }
+    #endregion
+
+    #region ENHANCED: New High-Impact Event Handlers
+    private void SetupEnhancedEventHandlers(CsDemoParser demo)
+    {
+        // CRITICAL: Bomb events - Most impactful for round analysis
+        demo.Source1GameEvents.BombPlanted += OnBombPlanted;
+        demo.Source1GameEvents.BombDefused += OnBombDefused;
+        demo.Source1GameEvents.BombExploded += OnBombExploded;
+        demo.Source1GameEvents.BombBeginplant += OnBombBeginPlant;
+        demo.Source1GameEvents.BombBegindefuse += OnBombBeginDefuse;
+
+        // HIGH IMPACT: Grenade events - Essential for utility analysis
+        demo.Source1GameEvents.GrenadeThrown += OnGrenadeThrown;
+        demo.Source1GameEvents.FlashbangDetonate += OnFlashbangDetonate;
+        demo.Source1GameEvents.SmokegrenadeDetonate += OnSmokegrenadeDetonate;
+        demo.Source1GameEvents.HegrenadeDetonate += OnHegrenadeDetonate;
+
+        // HIGH IMPACT: Player movement and positioning
+        demo.Source1GameEvents.PlayerBlind += OnPlayerBlind;
+        demo.Source1GameEvents.PlayerFootstep += OnPlayerFootstep;
+        demo.Source1GameEvents.PlayerJump += OnPlayerJump;
+
+        // MEDIUM IMPACT: Communication
+        demo.Source1GameEvents.PlayerChat += OnPlayerChat;
+        demo.BaseUserMessageEvents.UserMessageSayText += OnSayText;
+        demo.BaseUserMessageEvents.UserMessageSayText2 += OnSayText2;
+
+        // MEDIUM IMPACT: Economy
+        demo.Source1GameEvents.ItemPurchase += OnItemPurchase;
+        demo.Source1GameEvents.EnterBuyzone += OnEnterBuyzone;
+        demo.Source1GameEvents.ExitBuyzone += OnExitBuyzone;
+
+        // HIGH IMPACT: Entity position tracking
+        demo.EntityEvents.CCSPlayerPawn.AddChangeCallback(
+            pawn => new { pawn.Origin, pawn.EyeAngles, pawn.Health },
+            OnPlayerPositionChanged
+        );
+    }
+
+    // ENHANCED: Bomb Event Implementations
+    private void OnBombPlanted(Source1BombPlantedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "planted",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} planted bomb at {e.Site}"
+        };
+
+        // Capture position data
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            bomb.PositionX = (decimal)playerPos.Value.X;
+            bomb.PositionY = (decimal)playerPos.Value.Y;
+            bomb.PositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_planted", bomb.Description, true);
+    }
+
+    private void OnBombDefused(Source1BombDefusedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "defused",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} defused bomb at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_defused", bomb.Description, true);
+    }
+
+    private void OnBombExploded(Source1BombExplodedEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "exploded",
+            Site = e.Site.ToString(),
+            Team = "Terrorist",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Bomb exploded at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_exploded", bomb.Description, true);
+    }
+
+    private void OnBombBeginPlant(Source1BombBeginplantEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "begin_plant",
+            Site = e.Site.ToString(),
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} started planting at {e.Site}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_begin_plant", bomb.Description);
+    }
+
+    private void OnBombBeginDefuse(Source1BombBegindefuseEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var bomb = new Models.Bomb
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EventType = "begin_defuse",
+            Site = "Unknown", // Site not available in begin_defuse event
+            Team = e.Player.CSTeamNum.ToString(),
+            HasKit = e.Haskit,
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} started defusing {(e.Haskit ? "with kit" : "without kit")}"
+        };
+
+        _bombs.Add(bomb);
+        LogGameEvent(_demo, "bomb_begin_defuse", bomb.Description);
+    }
+
+    // ENHANCED: Grenade Event Implementations
+    private void OnGrenadeThrown(Source1GrenadeThrownEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = e.Weapon,
+            EventType = "thrown",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber,
+            Description = $"{e.Player.PlayerName} threw {e.Weapon}"
+        };
+
+        // Capture throw position
+        var playerPos = e.Player.PlayerPawn?.Origin;
+        if (playerPos != null)
+        {
+            grenade.PositionX = (decimal)playerPos.Value.X;
+            grenade.PositionY = (decimal)playerPos.Value.Y;
+            grenade.PositionZ = (decimal)playerPos.Value.Z;
+        }
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "grenade_thrown", grenade.Description);
+    }
+
+    private void OnFlashbangDetonate(Source1FlashbangDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "flashbang",
+            EventType = "detonated",
+            Team = "Unknown", // Team not available in detonate event
+            RoundNumber = _currentRoundNumber,
+            Description = $"Flashbang detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "flashbang_detonate", grenade.Description);
+    }
+
+    private void OnSmokegrenadeDetonate(Source1SmokegrenadeDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "smokegrenade",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"Smoke detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "smoke_detonate", grenade.Description);
+    }
+
+    private void OnHegrenadeDetonate(Source1HegrenadeDetonateEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) return;
+
+        var grenade = new Models.Grenade
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            GrenadeType = "hegrenade",
+            EventType = "detonated",
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber,
+            Description = $"HE grenade detonated at ({e.X:F1}, {e.Y:F1}, {e.Z:F1})"
+        };
+
+        grenade.PositionX = (decimal)e.X;
+        grenade.PositionY = (decimal)e.Y;
+        grenade.PositionZ = (decimal)e.Z;
+
+        _grenades.Add(grenade);
+        LogGameEvent(_demo, "he_detonate", grenade.Description);
+    }
+
+    // ENHANCED: Player Position Tracking
+    private void OnPlayerPositionChanged(CCSPlayerPawn pawn, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || pawn.Controller == null) return;
+
+        var player = GetOrCreatePlayer(pawn.Controller);
+        var now = DateTime.UtcNow;
+        
+        // Throttle position updates to avoid data explosion
+        if (_lastPositionUpdate.TryGetValue(player.Id, out var lastUpdate) && 
+            (now - lastUpdate) < _positionUpdateInterval)
+            return;
+
+        var position = new Models.PlayerPosition
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            PositionX = (decimal)newState.Origin.X,
+            PositionY = (decimal)newState.Origin.Y,
+            PositionZ = (decimal)newState.Origin.Z,
+            ViewAngleX = (decimal)newState.EyeAngles.Pitch,
+            ViewAngleY = (decimal)newState.EyeAngles.Yaw,
+            Health = newState.Health,
+            Armor = 0, // ArmorValue not in the callback data
+            Team = pawn.Controller.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _playerPositions.Add(position);
+        _lastPositionUpdate[player.Id] = now;
+    }
+
+    // ENHANCED: Communication Tracking
+    private void OnPlayerChat(Source1PlayerChatEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var chatMessage = new Models.ChatMessage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            Message = e.Text ?? "",
+            IsTeamMessage = e.Teamonly,
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _chatMessages.Add(chatMessage);
+        LogGameEvent(_demo, "player_chat", $"{e.Player.PlayerName}: {e.Text}");
+    }
+
+    private void OnSayText(CUserMessageSayText message)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        var chatMessage = new Models.ChatMessage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            Message = message.Text ?? "",
+            IsTeamMessage = false,
+            Team = "Unknown",
+            RoundNumber = _currentRoundNumber
+        };
+
+        _chatMessages.Add(chatMessage);
+    }
+
+    private void OnSayText2(CUserMessageSayText2 message)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        // Get player from entity index if available
+        Models.Player? player = null;
+        if (message.Entityindex >= 0)
+        {
+            var entity = _demo.GetEntityByIndex<CCSPlayerController>(new CEntityIndex((uint)message.Entityindex));
+            if (entity != null)
+                player = GetOrCreatePlayer(entity);
+        }
+
+        var chatMessage = new Models.ChatMessage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            Message = $"{message.Param1} {message.Param2} {message.Param3} {message.Param4}".Trim(),
+            IsTeamMessage = false,
+            Team = player?.Team ?? "Unknown",
+            RoundNumber = _currentRoundNumber
+        };
+
+        _chatMessages.Add(chatMessage);
+    }
+
+    // ENHANCED: Basic player behavior tracking
+    private void OnPlayerBlind(Source1PlayerBlindEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_blind", $"{e.Player.PlayerName} blinded for {e.BlindDuration:F2}s");
+    }
+
+    private void OnPlayerFootstep(Source1PlayerFootstepEvent e)
+    {
+        // Only log important footsteps to avoid spam
+        if (_demo == null || e.Player == null) return;
+        // Could track footstep patterns here for stealth analysis
+    }
+
+    private void OnPlayerJump(Source1PlayerJumpEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "player_jump", $"{e.Player.PlayerName} jumped");
+    }
+
+    // ENHANCED: Basic economy tracking
+    private void OnItemPurchase(Source1ItemPurchaseEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+        
+        var equipment = new Models.Equipment
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EquipmentName = e.Weapon,
+            EventType = "purchased",
+            Team = e.Player.CSTeamNum.ToString(),
+            RoundNumber = _currentRoundNumber
+        };
+
+        _equipment.Add(equipment);
+        LogGameEvent(_demo, "item_purchase", $"{e.Player.PlayerName} bought {e.Weapon}");
+    }
+
+    private void OnEnterBuyzone(Source1EnterBuyzoneEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "enter_buyzone", $"{e.Player.PlayerName} entered buy zone");
+    }
+
+    private void OnExitBuyzone(Source1ExitBuyzoneEvent e)
+    {
+        if (_demo == null || e.Player == null) return;
+        LogGameEvent(_demo, "exit_buyzone", $"{e.Player.PlayerName} left buy zone");
+    }
+    #endregion
+
+    #region Original Methods (Copied from SimpleDemoParserService)
+    
+    private async Task CreateDemoFileRecord(FileInfo fileInfo)
+    {
+        _currentDemoFile = new Models.DemoFile
+        {
+            FileName = fileInfo.Name,
+            FilePath = fileInfo.FullName,
+            FileSize = fileInfo.Length,
+            CreatedAt = fileInfo.CreationTime,
+            ParsedAt = DateTime.UtcNow
+        };
+
+        _context.DemoFiles.Add(_currentDemoFile);
+        await _context.SaveChangesAsync();
+    }
+
+    private void OnRoundStart(Source1RoundStartEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        _currentRoundNumber++;
+
+        // Create match if it doesn't exist
+        if (_currentMatch == null)
+        {
+            _currentMatch = new Models.Match
+            {
+                DemoFileId = _currentDemoFile.Id,
+                MapName = "unknown", // TODO: Find proper way to get map name
+                StartTime = DateTime.UtcNow,
+                IsFinished = false
+            };
+
+            _currentDemoFile.MapName = "unknown"; // TODO: Find proper way to get map name
+            _currentDemoFile.TotalTicks = _demo.CurrentDemoTick.Value;
+            _currentDemoFile.TickRate = CsDemoParser.TickRate;
+        }
+
+        _currentRound = new Models.Round
+        {
+            DemoFileId = _currentDemoFile.Id,
+            MatchId = _currentMatch.Id,
+            RoundNumber = _currentRoundNumber,
+            StartTick = _demo.CurrentDemoTick.Value,
+            StartTime = DateTime.UtcNow,
+            CTScore = _demo.TeamCounterTerrorist?.Score ?? 0,
+            TScore = _demo.TeamTerrorist?.Score ?? 0
+        };
+
+        _rounds.Add(_currentRound);
+
+        // Register players
+        foreach (var player in _demo.Players.Where(p => p.PlayerName != null))
+        {
+            GetOrCreatePlayer(player);
+        }
+
+        LogGameEvent(_demo, "round_start", "Round started", true);
+    }
+
+    private void OnRoundEnd(Source1RoundEndEvent e)
+    {
+        if (_demo == null || _currentRound == null) return;
+
+        _currentRound.EndTick = _demo.CurrentDemoTick.Value;
+        _currentRound.EndTime = DateTime.UtcNow;
+        _currentRound.Duration = (float)(DateTime.UtcNow - _currentRound.StartTime).TotalSeconds;
+        _currentRound.WinnerTeam = e.Winner.ToString();
+        _currentRound.EndReason = e.Reason.ToString();
+        _currentRound.CTScore = _demo.TeamCounterTerrorist?.Score ?? 0;
+        _currentRound.TScore = _demo.TeamTerrorist?.Score ?? 0;
+
+        LogGameEvent(_demo, "round_end", $"Round ended - Winner: {e.Winner}, Reason: {e.Reason}", true);
+    }
+
+    private void OnPlayerDeath(Source1PlayerDeathEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var victim = GetOrCreatePlayer(e.Player);
+        var killer = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
+        var assister = e.Assister != null ? GetOrCreatePlayer(e.Assister) : null;
+
+        var kill = new Models.Kill
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            KillerId = killer?.Id,
+            VictimId = victim.Id,
+            AssisterId = assister?.Id,
+            Weapon = e.Weapon ?? "unknown",
+            IsHeadshot = e.Headshot,
+            IsWallbang = e.Penetrated > 0,
+            Penetration = e.Penetrated,
+            IsNoScope = e.Noscope,
+            ThroughSmoke = e.Thrusmoke,
+            AttackerBlind = e.Attackerblind,
+            KillerTeam = e.Attacker?.CSTeamNum.ToString(),
+            VictimTeam = e.Player.CSTeamNum.ToString(),
+            IsTeamKill = e.Attacker?.CSTeamNum == e.Player.CSTeamNum
+        };
+
+        _kills.Add(kill);
+        LogGameEvent(_demo, "player_death", $"{e.Player.PlayerName} killed by {e.Attacker?.PlayerName} with {e.Weapon}");
+    }
+
+    private void OnPlayerHurt(Source1PlayerHurtEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var victim = GetOrCreatePlayer(e.Player);
+        var attacker = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
+
+        var damage = new Models.Damage
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            AttackerId = attacker?.Id,
+            VictimId = victim.Id,
+            Weapon = e.Weapon ?? "unknown",
+            DamageAmount = e.DmgHealth,
+            DamageArmor = e.DmgArmor,
+            Health = e.Health,
+            Armor = e.Armor,
+            AttackerTeam = e.Attacker?.CSTeamNum.ToString(),
+            VictimTeam = e.Player.CSTeamNum.ToString(),
+            IsTeamDamage = e.Attacker?.CSTeamNum == e.Player.CSTeamNum
+        };
+
+        _damages.Add(damage);
+        LogGameEvent(_demo, "player_hurt", $"{e.Player.PlayerName} hurt by {e.Attacker?.PlayerName} for {e.DmgHealth} damage");
+    }
+
+    private void OnWeaponFire(Source1WeaponFireEvent e)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
+
+        var player = GetOrCreatePlayer(e.Player);
+
+        var weaponFire = new Models.WeaponFire
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            PlayerId = player.Id,
+            Weapon = e.Weapon ?? "unknown",
+            Team = e.Player.CSTeamNum.ToString(),
+            IsSilenced = e.Silenced
+        };
+
+        _weaponFires.Add(weaponFire);
+    }
+
+    private Models.Player GetOrCreatePlayer(DemoFile.Game.Cs.CCSPlayerController playerController)
+    {
+        if (_playerLookup.TryGetValue((int)playerController.EntityIndex.Value, out var existingPlayer))
+        {
+            return existingPlayer;
+        }
+
+        var player = new Models.Player
+        {
+            DemoFileId = _currentDemoFile!.Id,
+            PlayerSlot = (int)playerController.EntityIndex.Value,
+            UserId = (int)playerController.EntityIndex.Value,
+            SteamId = playerController.SteamID,
+            PlayerName = playerController.PlayerName ?? "Unknown",
+            Team = playerController.CSTeamNum.ToString(),
+            IsBot = playerController.PlayerInfo?.Fakeplayer ?? false,
+            IsHltv = playerController.PlayerInfo?.Ishltv ?? false,
+            IsConnected = playerController.Connected == PlayerConnectedState.PlayerConnected,
+            ConnectedAt = DateTime.UtcNow
+        };
+
+        _players.Add(player);
+        _playerLookup[(int)playerController.EntityIndex.Value] = player;
+        return player;
+    }
+
+    private void LogGameEvent(CsDemoParser demo, string eventName, string description, bool isImportant = false)
+    {
+        if (_currentDemoFile == null) return;
+
+        var gameEvent = new Models.GameEvent
+        {
+            DemoFileId = _currentDemoFile.Id,
+            Tick = demo.CurrentDemoTick.Value,
+            GameTime = (float)demo.CurrentGameTime.Value,
+            EventName = eventName,
+            Description = description,
+            IsImportant = isImportant,
+            RoundNumber = _currentRoundNumber,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _gameEvents.Add(gameEvent);
+    }
+    #endregion
+
+    #region ENHANCED: Database Saving with Additional Collections
+    private async Task SaveEnhancedDataToDatabase()
+    {
+        try
+        {
+            _logger.LogInformation("Saving enhanced parsed data to database...");
+
+            // Save original data
+            await SaveOriginalData();
+
+            // ENHANCED: Save new collections
+            await SaveEnhancedData();
+
+            await CalculateAndSavePlayerMatchStats();
+
+            _logger.LogInformation("Successfully saved all enhanced data to database");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving enhanced data to database");
+            throw;
+        }
+    }
+
+    private async Task SaveOriginalData()
+    {
+        // Save players first
+        if (_players.Any())
+        {
+            _context.Players.AddRange(_players);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} players", _players.Count);
+        }
+
+        // Save match
+        if (_currentMatch != null)
+        {
+            _currentMatch.EndTime = DateTime.UtcNow;
+            _currentMatch.IsFinished = true;
+            _currentMatch.TotalRounds = _currentRoundNumber;
+            _context.Matches.Add(_currentMatch);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved match data");
+        }
+
+        // Save rounds
+        if (_rounds.Any())
+        {
+            _context.Rounds.AddRange(_rounds);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} rounds", _rounds.Count);
+        }
+
+        // Save kills
+        if (_kills.Any())
+        {
+            _context.Kills.AddRange(_kills);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} kills", _kills.Count);
+        }
+
+        // Save damages
+        if (_damages.Any())
+        {
+            _context.Damages.AddRange(_damages);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} damage events", _damages.Count);
+        }
+
+        // Save weapon fires
+        if (_weaponFires.Any())
+        {
+            _context.WeaponFires.AddRange(_weaponFires);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} weapon fire events", _weaponFires.Count);
+        }
+
+        // Save game events
+        if (_gameEvents.Any())
+        {
+            _context.GameEvents.AddRange(_gameEvents);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} game events", _gameEvents.Count);
+        }
+    }
+
+    private async Task SaveEnhancedData()
+    {
+        // ENHANCED: Save bombs
+        if (_bombs.Any())
+        {
+            _context.Bombs.AddRange(_bombs);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} bomb events", _bombs.Count);
+        }
+
+        // ENHANCED: Save grenades
+        if (_grenades.Any())
+        {
+            _context.Grenades.AddRange(_grenades);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} grenade events", _grenades.Count);
+        }
+
+        // ENHANCED: Save player positions (may be large)
+        if (_playerPositions.Any())
+        {
+            const int batchSize = 1000;
+            for (int i = 0; i < _playerPositions.Count; i += batchSize)
+            {
+                var batch = _playerPositions.Skip(i).Take(batchSize);
+                _context.PlayerPositions.AddRange(batch);
+                await _context.SaveChangesAsync();
+            }
+            _logger.LogInformation("Saved {Count} player positions", _playerPositions.Count);
+        }
+
+        // ENHANCED: Save chat messages
+        if (_chatMessages.Any())
+        {
+            _context.ChatMessages.AddRange(_chatMessages);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} chat messages", _chatMessages.Count);
+        }
+
+        // ENHANCED: Save equipment
+        if (_equipment.Any())
+        {
+            _context.Equipment.AddRange(_equipment);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} equipment events", _equipment.Count);
+        }
+    }
+
+    private async Task CalculateAndSavePlayerMatchStats()
+    {
+        if (_currentMatch == null) return;
+
+        foreach (var player in _players)
+        {
+            var playerKills = _kills.Where(k => k.KillerId == player.Id).ToList();
+            var playerDeaths = _kills.Where(k => k.VictimId == player.Id).ToList();
+            var playerDamages = _damages.Where(d => d.AttackerId == player.Id).ToList();
+
+            var matchStats = new Models.PlayerMatchStats
+            {
+                PlayerId = player.Id,
+                MatchId = _currentMatch.Id,
+                Kills = playerKills.Count,
+                Deaths = playerDeaths.Count,
+                HeadshotKills = playerKills.Count(k => k.IsHeadshot),
+                TotalDamageDealt = playerDamages.Sum(d => d.DamageAmount),
+                WallbangKills = playerKills.Count(k => k.IsWallbang),
+                RoundsPlayed = _currentRoundNumber
+            };
+
+            matchStats.HeadshotPercentage = matchStats.Kills > 0 ? (float)matchStats.HeadshotKills / matchStats.Kills * 100 : 0;
+            matchStats.KDRatio = matchStats.Deaths > 0 ? (float)matchStats.Kills / matchStats.Deaths : matchStats.Kills;
+            matchStats.ADR = _currentRoundNumber > 0 ? (float)matchStats.TotalDamageDealt / _currentRoundNumber : 0;
+
+            _playerMatchStats.Add(matchStats);
+        }
+
+        if (_playerMatchStats.Any())
+        {
+            _context.PlayerMatchStats.AddRange(_playerMatchStats);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} player match stats", _playerMatchStats.Count);
+        }
+    }
+    #endregion
+}
