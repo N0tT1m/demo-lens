@@ -27,7 +27,7 @@
 2. **Extract Files** to desired location
 3. **Clone demofile-net dependency**:
    ```bash
-   cd demo-lens-folder
+   cd demo-lens
    git clone https://github.com/saul/demofile-net.git
    ```
 4. **Install .NET 9**: [Download .NET Runtime](https://dotnet.microsoft.com/download)
