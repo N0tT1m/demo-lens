@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Set the connection string environment variable if not already set
+if [ -z "$CONNECTION_STRING" ]; then
+    export CONNECTION_STRING="Server=sqlserver,1433;Database=demos;User Id=sa;Password=$SQL_PASSWORD;TrustServerCertificate=true;"
+    echo "Set CONNECTION_STRING environment variable"
+fi
+
 # Wait for SQL Server to be ready
 echo "Waiting for SQL Server to be ready..."
 until /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P "$SQL_PASSWORD" -Q "SELECT 1" > /dev/null 2>&1

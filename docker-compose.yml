@@ -32,6 +32,7 @@ services:
       - CONNECTION_STRING=Server=sqlserver,1433;Database=demos;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=true;
       - ASPNETCORE_URLS=http://+:80
       - DOTNET_RUNNING_IN_CONTAINER=true
+      - SQL_PASSWORD=${SQL_PASSWORD}
     volumes:
       - ./uploads:/app/uploads
       - ./data:/app/data
