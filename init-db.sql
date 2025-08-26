@@ -14,5 +14,8 @@ GO
 
 -- The application will handle EF migrations automatically on startup
 -- This script just ensures the database exists
-PRINT 'Database initialization completed.';
+
+-- Wait for application to create tables, then apply performance indexes
+-- Note: This will run after EF migrations have created the base schema
+PRINT 'Database initialization completed. Performance indexes will be applied via separate script.';
 GO

@@ -10,6 +10,7 @@ services:
     volumes:
       - sqldata:/var/opt/mssql
       - ./init-db.sql:/usr/config/init-db.sql
+      - ./database_performance_indexes.sql:/usr/config/database_performance_indexes.sql
     restart: unless-stopped
     healthcheck:
       test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${SQL_PASSWORD}" -Q "SELECT 1" || exit 1
