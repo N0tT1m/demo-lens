@@ -11,12 +11,19 @@ builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 
 // Add Entity Framework - make it optional for testing
-try 
-{
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? 
-        Environment.GetEnvironmentVariable("CONNECTION_STRING") ?? 
-        throw new InvalidOperationException("No connection string configured. Set CONNECTION_STRING environment variable or configure DefaultConnection in appsettings.json");
+var configConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var envConnectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING");
+var sqlPassword = Environment.GetEnvironmentVariable("SQL_PASSWORD");
 
+Console.WriteLine($"Config connection string: {(string.IsNullOrEmpty(configConnectionString) ? "NULL/EMPTY" : "SET")}");
+Console.WriteLine($"Environment CONNECTION_STRING: {(string.IsNullOrEmpty(envConnectionString) ? "NULL/EMPTY" : "SET")}");
+Console.WriteLine($"Environment SQL_PASSWORD: {(string.IsNullOrEmpty(sqlPassword) ? "NULL/EMPTY" : "SET")}");
+
+var connectionString = configConnectionString ?? envConnectionString;
+
+if (!string.IsNullOrEmpty(connectionString))
+{
+    Console.WriteLine("Configuring Entity Framework with connection string");
     builder.Services.AddDbContext<CS2DemoContext>(options =>
         options.UseSqlServer(connectionString, sqlOptions =>
         {
@@ -24,9 +31,9 @@ try
             sqlOptions.CommandTimeout(30);
         }));
 }
-catch (Exception ex)
+else
 {
-    Console.WriteLine($"Database configuration failed: {ex.Message}");
+    Console.WriteLine("WARNING: No connection string found. Database features will be disabled.");
 }
 
 // Add CS2DemoParser service - make optional for testing
@@ -71,17 +78,31 @@ if (app.Environment.IsProduction())
     try
     {
         using var scope = app.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<CS2DemoContext>();
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        var context = scope.ServiceProvider.GetService<CS2DemoContext>();
         
-        logger.LogInformation("Running database migrations on startup...");
-        await context.Database.MigrateAsync();
-        logger.LogInformation("Database migrations completed successfully");
+        if (context != null)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Running database migrations on startup...");
+            await context.Database.MigrateAsync();
+            logger.LogInformation("Database migrations completed successfully");
+        }
+        else
+        {
+            Console.WriteLine("Skipping database migrations - no DbContext configured");
+        }
     }
     catch (Exception ex)
     {
-        var logger = app.Services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Failed to run database migrations on startup");
+        var logger = app.Services.GetService<ILogger<Program>>();
+        if (logger != null)
+        {
+            logger.LogError(ex, "Failed to run database migrations on startup");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to run database migrations on startup: {ex.Message}");
+        }
     }
 }
 

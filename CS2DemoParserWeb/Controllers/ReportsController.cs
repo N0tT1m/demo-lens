@@ -16,10 +16,23 @@ namespace CS2DemoParserWeb.Controllers
 
         public ReportsController(IConfiguration configuration, ILogger<ReportsController> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection") 
-                ?? Environment.GetEnvironmentVariable("CONNECTION_STRING")
-                ?? throw new InvalidOperationException("No connection string configured. Set CONNECTION_STRING environment variable or configure DefaultConnection in appsettings.json");
             _logger = logger;
+            
+            var configString = configuration.GetConnectionString("DefaultConnection");
+            var envString = Environment.GetEnvironmentVariable("CONNECTION_STRING");
+            
+            _logger.LogInformation("Connection string from config: {ConfigString}", string.IsNullOrEmpty(configString) ? "NULL/EMPTY" : "SET");
+            _logger.LogInformation("Connection string from environment: {EnvString}", string.IsNullOrEmpty(envString) ? "NULL/EMPTY" : "SET");
+            
+            _connectionString = configString ?? envString;
+            
+            if (string.IsNullOrEmpty(_connectionString))
+            {
+                _logger.LogError("No connection string found in configuration or environment variables");
+                throw new InvalidOperationException("No connection string configured. Set CONNECTION_STRING environment variable or configure DefaultConnection in appsettings.json");
+            }
+            
+            _logger.LogInformation("Successfully initialized ReportsController with connection string");
         }
 
         [HttpGet("kills")]
