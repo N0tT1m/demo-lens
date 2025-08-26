@@ -138,43 +138,27 @@ namespace CS2DemoParserWeb.Controllers
                     _logger.LogInformation("Database connection test successful");
                 }
                 var sql = @"
-                    SELECT 
+                    SELECT TOP 1000
                         p.PlayerName,
                         p.Team,
                         d.MapName,
                         d.FileName as DemoFile,
-                        ISNULL(kills.KillCount, 0) as Kills,
-                        ISNULL(deaths.DeathCount, 0) as Deaths,
+                        COUNT(DISTINCT k.Id) as Kills,
+                        COUNT(DISTINCT kv.Id) as Deaths,
                         CASE 
-                            WHEN ISNULL(deaths.DeathCount, 0) = 0 THEN CAST(ISNULL(kills.KillCount, 0) AS FLOAT)
-                            ELSE CAST(ISNULL(kills.KillCount, 0) AS FLOAT) / CAST(deaths.DeathCount AS FLOAT)
+                            WHEN COUNT(DISTINCT kv.Id) = 0 THEN CAST(COUNT(DISTINCT k.Id) AS FLOAT)
+                            ELSE CAST(COUNT(DISTINCT k.Id) AS FLOAT) / CAST(COUNT(DISTINCT kv.Id) AS FLOAT)
                         END as KDRatio,
-                        ISNULL(kills.Headshots, 0) as Headshots,
-                        ISNULL(shots.ShotsFired, 0) as ShotsFired,
-                        ISNULL(damages.TotalDamage, 0) as TotalDamage,
-                        ISNULL(damages.AvgDamagePerHit, 0.0) as AvgDamagePerHit
+                        SUM(CASE WHEN k.IsHeadshot = 1 THEN 1 ELSE 0 END) as Headshots,
+                        COUNT(DISTINCT wf.Id) as ShotsFired,
+                        COALESCE(SUM(dm.DamageAmount), 0) as TotalDamage,
+                        COALESCE(AVG(CAST(dm.DamageAmount AS FLOAT)), 0.0) as AvgDamagePerHit
                     FROM Players p
                     INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                    LEFT JOIN (
-                        SELECT KillerId, COUNT(*) as KillCount, SUM(CASE WHEN IsHeadshot = 1 THEN 1 ELSE 0 END) as Headshots
-                        FROM Kills 
-                        GROUP BY KillerId
-                    ) kills ON p.Id = kills.KillerId
-                    LEFT JOIN (
-                        SELECT VictimId, COUNT(*) as DeathCount
-                        FROM Kills 
-                        GROUP BY VictimId
-                    ) deaths ON p.Id = deaths.VictimId
-                    LEFT JOIN (
-                        SELECT PlayerId, COUNT(*) as ShotsFired
-                        FROM WeaponFires 
-                        GROUP BY PlayerId
-                    ) shots ON p.Id = shots.PlayerId
-                    LEFT JOIN (
-                        SELECT AttackerId, SUM(DamageAmount) as TotalDamage, AVG(CAST(DamageAmount AS FLOAT)) as AvgDamagePerHit
-                        FROM Damages 
-                        GROUP BY AttackerId
-                    ) damages ON p.Id = damages.AttackerId
+                    LEFT JOIN Kills k ON p.Id = k.KillerId
+                    LEFT JOIN Kills kv ON p.Id = kv.VictimId
+                    LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
+                    LEFT JOIN Damages dm ON p.Id = dm.AttackerId
                     WHERE 1=1
                         AND (@DemoId IS NULL OR d.Id = @DemoId)
                         AND (@MapName IS NULL OR d.MapName = @MapName)
@@ -182,7 +166,12 @@ namespace CS2DemoParserWeb.Controllers
                         AND (@Team IS NULL OR p.Team = @Team)
                         AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
                         AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
-                    ORDER BY Kills DESC, KDRatio DESC";
+                    GROUP BY p.Id, p.PlayerName, p.Team, d.MapName, d.FileName
+                    ORDER BY COUNT(DISTINCT k.Id) DESC, 
+                        CASE 
+                            WHEN COUNT(DISTINCT kv.Id) = 0 THEN CAST(COUNT(DISTINCT k.Id) AS FLOAT)
+                            ELSE CAST(COUNT(DISTINCT k.Id) AS FLOAT) / CAST(COUNT(DISTINCT kv.Id) AS FLOAT)
+                        END DESC";
 
                 var data = await ExecuteReportQuery(sql, query);
                 
@@ -337,7 +326,7 @@ namespace CS2DemoParserWeb.Controllers
             await connection.OpenAsync();
             
             using var command = new SqlCommand(sql, connection);
-            command.CommandTimeout = 300; // Set 5 minute timeout
+            command.CommandTimeout = 120; // Reduce to 2 minutes - should be enough with optimization
             AddReportParameters(command, query);
             
             using var reader = await command.ExecuteReaderAsync();
@@ -373,7 +362,7 @@ namespace CS2DemoParserWeb.Controllers
             await connection.OpenAsync();
             
             using var command = new SqlCommand(sql, connection);
-            command.CommandTimeout = 300; // Set 5 minute timeout
+            command.CommandTimeout = 120; // Reduce to 2 minutes
             AddReportParameters(command, query);
             
             var result = await command.ExecuteScalarAsync();
