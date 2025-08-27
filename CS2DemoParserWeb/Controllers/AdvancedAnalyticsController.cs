@@ -3369,7 +3369,7 @@ namespace CS2DemoParserWeb.Controllers
                             -- UTILITY SITUATION
                             CASE 
                                 WHEN fe.FlashDuration > 1.0 THEN 'Flashed'
-                                WHEN EXISTS (SELECT 1 FROM Damages dm WHERE dm.VictimId = p.Id AND dm.ThroughSmoke = 1 AND ABS(dm.GameTime - r.StartTime) < 5) THEN 'In_Smoke'
+                                WHEN EXISTS (SELECT 1 FROM Damages dm WHERE dm.VictimId = p.Id AND dm.ThroughSmoke = 1 AND dm.GameTime < 30) THEN 'In_Smoke'
                                 ELSE 'Clear'
                             END as UtilityState,
                             
@@ -3406,8 +3406,8 @@ namespace CS2DemoParserWeb.Controllers
                             
                             -- TIME CONTEXT
                             CASE 
-                                WHEN r.Duration - (k.GameTime - r.StartTime) < 10 THEN 'Late_Round'
-                                WHEN (k.GameTime - r.StartTime) < 15 THEN 'Early_Round'
+                                WHEN k.GameTime > (r.Duration - 10) THEN 'Late_Round'
+                                WHEN k.GameTime < 15 THEN 'Early_Round'
                                 ELSE 'Mid_Round'
                             END as TimePhase
                             
