@@ -3,11 +3,12 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 using System.Text;
 using System.Text.Json;
+using CS2DemoParserWeb.Models;
 
 namespace CS2DemoParserWeb.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/advanced-analytics")]
     public class AdvancedAnalyticsController : ControllerBase
     {
         private readonly string _connectionString;
