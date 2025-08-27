@@ -349,7 +349,7 @@ async function loadPositionAnalysis(filters) {
 function displayClutchResults(response) {
     const container = document.getElementById('clutchResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No clutch data found for the selected filters.</div>';
         return;
     }
@@ -372,8 +372,8 @@ function displayClutchResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
-        const successRate = parseFloat(row.ClutchSuccessRate || row.AvgSuccessRate || 0).toFixed(1);
+    response.data.forEach(row => {
+        const successRate = parseFloat(row.ClutchSuccessRate || 0).toFixed(1);
         const successClass = successRate > 50 ? 'bg-success' : successRate > 25 ? 'bg-warning' : 'bg-danger';
         
         html += `
@@ -397,7 +397,7 @@ function displayClutchResults(response) {
 function displayTradeKillResults(response) {
     const container = document.getElementById('tradeKillResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No trade kill data found for the selected filters.</div>';
         return;
     }
@@ -413,27 +413,28 @@ function displayTradeKillResults(response) {
                         <th>Total Trades</th>
                         <th>Avg Time (s)</th>
                         <th>Fastest (s)</th>
-                        <th>Success Rate (%)</th>
+                        <th>Fast Trade %</th>
                         <th>Avg Distance</th>
                     </tr>
                 </thead>
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const avgTime = parseFloat(row.AvgTradeTimeSeconds || 0).toFixed(2);
         const fastestTime = parseFloat(row.FastestTradeSeconds || 0).toFixed(2);
         const avgDistance = parseFloat(row.AvgTradeDistance || 0).toFixed(0);
+        const fastTradePercentage = parseFloat(row.FastTradePercentage || 0).toFixed(1);
         
         html += `
             <tr>
-                <td><strong>${row.TradeKiller}</strong></td>
-                <td><span class="badge ${row.TradeKillerTeam === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.TradeKillerTeam}</span></td>
+                <td><strong>${row.Player}</strong></td>
+                <td><span class="badge ${row.Team === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.Team}</span></td>
                 <td>${row.MapName}</td>
                 <td>${row.TotalTrades}</td>
                 <td>${avgTime}</td>
                 <td><span class="badge bg-success">${fastestTime}</span></td>
-                <td>${parseFloat(row.TradeSuccessRate || 0).toFixed(1)}%</td>
+                <td>${fastTradePercentage}%</td>
                 <td>${avgDistance} units</td>
             </tr>
         `;
@@ -446,8 +447,8 @@ function displayTradeKillResults(response) {
 function displayFirstKillResults(response) {
     const container = document.getElementById('firstKillResults');
     
-    if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No first kill data found for the selected filters.</div>';
+    if (!response.data || response.data.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No first kill data found for the selected filters. This endpoint may need configuration or data is not available.</div>';
         return;
     }
     
@@ -469,7 +470,7 @@ function displayFirstKillResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const winRate = parseFloat(row.FirstKillWinPercentage || 0).toFixed(1);
         const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
         const winRateClass = winRate > 60 ? 'bg-success' : winRate > 45 ? 'bg-warning' : 'bg-danger';
@@ -495,7 +496,7 @@ function displayFirstKillResults(response) {
 function displayPositionResults(response) {
     const container = document.getElementById('positionResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No position data found for the selected filters.</div>';
         return;
     }
@@ -511,27 +512,25 @@ function displayPositionResults(response) {
                         <th>Deaths</th>
                         <th>Avg Kill Distance</th>
                         <th>Headshot %</th>
-                        <th>Position (X,Y)</th>
+                        <th>Headshot Deaths</th>
                     </tr>
                 </thead>
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const avgDistance = parseFloat(row.AvgKillDistance || 0).toFixed(0);
         const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
-        const avgX = parseFloat(row.AvgDeathX || 0).toFixed(0);
-        const avgY = parseFloat(row.AvgDeathY || 0).toFixed(0);
         
         html += `
             <tr>
                 <td>${row.MapName}</td>
                 <td><span class="badge bg-secondary">${row.MapArea}</span></td>
-                <td><span class="badge ${row.VictimTeam === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.VictimTeam}</span></td>
+                <td><span class="badge ${row.Team === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.Team}</span></td>
                 <td><strong>${row.TotalDeaths}</strong></td>
                 <td>${avgDistance} units</td>
                 <td>${headshotRate}%</td>
-                <td>(${avgX}, ${avgY})</td>
+                <td>${row.HeadshotDeaths}</td>
             </tr>
         `;
     });
