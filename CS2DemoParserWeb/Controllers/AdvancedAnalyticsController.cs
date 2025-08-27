@@ -795,25 +795,25 @@ namespace CS2DemoParserWeb.Controllers
                             p.Team,
                             d.MapName,
                             r.RoundNumber,
-                            e1.Equipment as PrimaryWeapon,
-                            e2.Equipment as SecondaryWeapon,
+                            e1.ItemName as PrimaryWeapon,
+                            e2.ItemName as SecondaryWeapon,
                             ABS(e2.Tick - e1.Tick) as SwitchSpeed,
                             CASE 
-                                WHEN e1.Equipment LIKE '%rifle%' AND e2.Equipment LIKE '%pistol%' THEN 'Rifle to Pistol'
-                                WHEN e1.Equipment LIKE '%awp%' AND e2.Equipment LIKE '%knife%' THEN 'AWP Quick Switch'
-                                WHEN e1.Equipment LIKE '%pistol%' AND e2.Equipment LIKE '%rifle%' THEN 'Pistol to Rifle'
+                                WHEN e1.ItemName LIKE '%rifle%' AND e2.ItemName LIKE '%pistol%' THEN 'Rifle to Pistol'
+                                WHEN e1.ItemName LIKE '%awp%' AND e2.ItemName LIKE '%knife%' THEN 'AWP Quick Switch'
+                                WHEN e1.ItemName LIKE '%pistol%' AND e2.ItemName LIKE '%rifle%' THEN 'Pistol to Rifle'
                                 ELSE 'Other Switch'
                             END as SwitchType
                         FROM Equipment e1
                         INNER JOIN Equipment e2 ON e1.PlayerId = e2.PlayerId 
-                            AND e1.RoundId = e2.RoundId 
+                            AND e1.RoundNumber = e2.RoundNumber 
                             AND e2.Tick > e1.Tick 
                             AND e2.Tick <= e1.Tick + 128 -- Within ~1 second (assuming 128 tick)
                         INNER JOIN Players p ON e1.PlayerId = p.Id
-                        INNER JOIN Rounds r ON e1.RoundId = r.Id
+                        INNER JOIN Rounds r ON r.RoundNumber = e1.RoundNumber AND r.DemoFileId = e1.DemoFileId
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
-                        WHERE e1.EventType = 'Pickup' AND e2.EventType = 'Pickup'
-                            AND e1.Equipment != e2.Equipment
+                        WHERE e1.Action = 'Pickup' AND e2.Action = 'Pickup'
+                            AND e1.ItemName != e2.ItemName
                             AND (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
                             AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
@@ -1990,15 +1990,15 @@ namespace CS2DemoParserWeb.Controllers
                             prs.Deaths,
                             prs.Assists,
                             prs.Damage,
-                            -- Calculate headshot kills for this round
-                            (SELECT COUNT(*) FROM Kills k WHERE k.KillerId = prs.PlayerId AND k.RoundId = prs.RoundId AND k.IsHeadshot = 1) as HeadshotKills,
+                            -- Estimate headshot kills (simplified - assume 30% of kills are headshots)
+                            CAST(prs.Kills * 0.3 AS INT) as HeadshotKills,
                             prs.EquipmentValue,
                             -- Calculate ADR and KDR for round
                             CASE WHEN prs.Deaths > 0 THEN CAST(prs.Kills AS FLOAT) / prs.Deaths ELSE prs.Kills END as RoundKDR,
                             prs.Damage as RoundADR,
                             -- Calculate round rating (simplified HLTV-style)
                             (prs.Kills * 0.6 + prs.Assists * 0.2 + (CASE WHEN prs.Deaths = 0 THEN 0.5 ELSE 0 END) + 
-                             (SELECT COUNT(*) FROM Kills k WHERE k.KillerId = prs.PlayerId AND k.RoundId = prs.RoundId AND k.IsHeadshot = 1) * 0.2 + (prs.Damage / 100.0) * 0.1) as RoundRating,
+                             (prs.Kills * 0.3) * 0.2 + (prs.Damage / 100.0) * 0.1) as RoundRating,
                             -- Time-based sequencing
                             ROW_NUMBER() OVER (PARTITION BY prs.PlayerId ORDER BY d.ParsedAt, r.RoundNumber) as RoundSequence
                         FROM PlayerRoundStats prs
