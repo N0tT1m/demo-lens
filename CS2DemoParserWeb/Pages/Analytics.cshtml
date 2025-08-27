@@ -356,13 +356,59 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadDropdownData() {
     try {
         // Load demo files
-        const demosResponse = await fetch('/api/reports/summary');
+        const demosResponse = await fetch('/api/demo/demos');
         if (demosResponse.ok) {
-            // You can populate dropdowns with actual data from your database
-            console.log('Dropdown data loaded successfully');
+            const demos = await demosResponse.json();
+            const demoSelect = document.getElementById('demoSelect');
+            
+            // Clear existing options except "All Demos"
+            demoSelect.innerHTML = '<option value="">All Demos</option>';
+            
+            // Add demo options
+            demos.forEach(demo => {
+                const option = document.createElement('option');
+                option.value = demo.id;
+                option.textContent = `${demo.fileName} (${demo.mapName})`;
+                demoSelect.appendChild(option);
+            });
+            
+            console.log('Loaded', demos.length, 'demo files');
+            
+            // Also load unique players for player dropdown
+            await loadPlayersData();
+        } else {
+            console.error('Failed to load demos:', demosResponse.status);
         }
     } catch (error) {
         console.error('Error loading dropdown data:', error);
+    }
+}
+
+async function loadPlayersData() {
+    try {
+        const playersResponse = await fetch('/api/reports/player-stats?format=json');
+        if (playersResponse.ok) {
+            const playersData = await playersResponse.json();
+            const playerSelect = document.getElementById('playerSelect');
+            
+            // Clear existing options except "All Players"
+            playerSelect.innerHTML = '<option value="">All Players</option>';
+            
+            // Get unique player names
+            const uniquePlayers = [...new Set(playersData.map(p => p.PlayerName))].sort();
+            
+            // Add player options
+            uniquePlayers.forEach(playerName => {
+                const option = document.createElement('option');
+                option.value = playerName;
+                option.textContent = playerName;
+                playerSelect.appendChild(option);
+            });
+            
+            console.log('Loaded', uniquePlayers.length, 'unique players');
+        }
+    } catch (error) {
+        console.error('Error loading players data:', error);
     }
 }
 

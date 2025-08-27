@@ -152,39 +152,82 @@ namespace CS2DemoParserWeb.Controllers
                     _logger.LogInformation("Database connection test successful");
                 }
                 var sql = @"
+                    WITH PlayerStats AS (
+                        SELECT 
+                            p.Id as PlayerId,
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            d.FileName as DemoFile,
+                            d.Id as DemoFileId
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        WHERE 1=1
+                            AND (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                            AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
+                            AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
+                    ),
+                    PlayerKills AS (
+                        SELECT 
+                            ps.PlayerId,
+                            COUNT(k.Id) as Kills,
+                            SUM(CASE WHEN k.IsHeadshot = 1 THEN 1 ELSE 0 END) as Headshots
+                        FROM PlayerStats ps
+                        LEFT JOIN Kills k ON ps.PlayerId = k.KillerId
+                        GROUP BY ps.PlayerId
+                    ),
+                    PlayerDeaths AS (
+                        SELECT 
+                            ps.PlayerId,
+                            COUNT(k.Id) as Deaths
+                        FROM PlayerStats ps
+                        LEFT JOIN Kills k ON ps.PlayerId = k.VictimId
+                        GROUP BY ps.PlayerId
+                    ),
+                    PlayerShots AS (
+                        SELECT 
+                            ps.PlayerId,
+                            COUNT(wf.Id) as ShotsFired
+                        FROM PlayerStats ps
+                        LEFT JOIN WeaponFires wf ON ps.PlayerId = wf.PlayerId
+                        GROUP BY ps.PlayerId
+                    ),
+                    PlayerDamage AS (
+                        SELECT 
+                            ps.PlayerId,
+                            COALESCE(SUM(dm.DamageAmount), 0) as TotalDamage,
+                            COALESCE(AVG(CAST(dm.DamageAmount AS FLOAT)), 0.0) as AvgDamagePerHit
+                        FROM PlayerStats ps
+                        LEFT JOIN Damages dm ON ps.PlayerId = dm.AttackerId
+                        GROUP BY ps.PlayerId
+                    )
                     SELECT TOP 1000
-                        p.PlayerName,
-                        p.Team,
-                        d.MapName,
-                        d.FileName as DemoFile,
-                        COUNT(DISTINCT k.Id) as Kills,
-                        COUNT(DISTINCT kv.Id) as Deaths,
+                        ps.PlayerName,
+                        ps.Team,
+                        ps.MapName,
+                        ps.DemoFile,
+                        COALESCE(pk.Kills, 0) as Kills,
+                        COALESCE(pd.Deaths, 0) as Deaths,
                         CASE 
-                            WHEN COUNT(DISTINCT kv.Id) = 0 THEN CAST(COUNT(DISTINCT k.Id) AS FLOAT)
-                            ELSE CAST(COUNT(DISTINCT k.Id) AS FLOAT) / CAST(COUNT(DISTINCT kv.Id) AS FLOAT)
+                            WHEN COALESCE(pd.Deaths, 0) = 0 THEN CAST(COALESCE(pk.Kills, 0) AS FLOAT)
+                            ELSE CAST(COALESCE(pk.Kills, 0) AS FLOAT) / CAST(pd.Deaths AS FLOAT)
                         END as KDRatio,
-                        SUM(CASE WHEN k.IsHeadshot = 1 THEN 1 ELSE 0 END) as Headshots,
-                        COUNT(DISTINCT wf.Id) as ShotsFired,
-                        COALESCE(SUM(dm.DamageAmount), 0) as TotalDamage,
-                        COALESCE(AVG(CAST(dm.DamageAmount AS FLOAT)), 0.0) as AvgDamagePerHit
-                    FROM Players p
-                    INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                    LEFT JOIN Kills k ON p.Id = k.KillerId
-                    LEFT JOIN Kills kv ON p.Id = kv.VictimId
-                    LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
-                    LEFT JOIN Damages dm ON p.Id = dm.AttackerId
-                    WHERE 1=1
-                        AND (@DemoId IS NULL OR d.Id = @DemoId)
-                        AND (@MapName IS NULL OR d.MapName = @MapName)
-                        AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                        AND (@Team IS NULL OR p.Team = @Team)
-                        AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
-                        AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
-                    GROUP BY p.Id, p.PlayerName, p.Team, d.MapName, d.FileName
-                    ORDER BY COUNT(DISTINCT k.Id) DESC, 
+                        COALESCE(pk.Headshots, 0) as Headshots,
+                        COALESCE(psh.ShotsFired, 0) as ShotsFired,
+                        COALESCE(pdm.TotalDamage, 0) as TotalDamage,
+                        COALESCE(pdm.AvgDamagePerHit, 0.0) as AvgDamagePerHit
+                    FROM PlayerStats ps
+                    LEFT JOIN PlayerKills pk ON ps.PlayerId = pk.PlayerId
+                    LEFT JOIN PlayerDeaths pd ON ps.PlayerId = pd.PlayerId
+                    LEFT JOIN PlayerShots psh ON ps.PlayerId = psh.PlayerId
+                    LEFT JOIN PlayerDamage pdm ON ps.PlayerId = pdm.PlayerId
+                    ORDER BY COALESCE(pk.Kills, 0) DESC, 
                         CASE 
-                            WHEN COUNT(DISTINCT kv.Id) = 0 THEN CAST(COUNT(DISTINCT k.Id) AS FLOAT)
-                            ELSE CAST(COUNT(DISTINCT k.Id) AS FLOAT) / CAST(COUNT(DISTINCT kv.Id) AS FLOAT)
+                            WHEN COALESCE(pd.Deaths, 0) = 0 THEN CAST(COALESCE(pk.Kills, 0) AS FLOAT)
+                            ELSE CAST(COALESCE(pk.Kills, 0) AS FLOAT) / CAST(pd.Deaths AS FLOAT)
                         END DESC";
 
                 var data = await ExecuteReportQuery(sql, query);
