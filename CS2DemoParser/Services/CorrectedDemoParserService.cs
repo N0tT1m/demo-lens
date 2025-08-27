@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using CS2DemoParser.Data;
 using CS2DemoParser.Models;
 using System.Collections.Concurrent;
+using System.Numerics;
 
 namespace CS2DemoParser.Services;
 
@@ -1311,9 +1312,207 @@ public class CorrectedDemoParserService
                     };
 
                     _playerPositions.Add(position);
+                    
+                    // Also create enhanced player position with advanced analytics
+                    if (_currentRound != null)
+                    {
+                        var enhancedPosition = CreateEnhancedPlayerPosition(player, playerModel, playerPos, eyeAngles, velocity);
+                        _enhancedPlayerPositions.Add(enhancedPosition);
+                    }
                 }
             }
         }
+    }
+
+    private Models.EnhancedPlayerPosition CreateEnhancedPlayerPosition(CCSPlayerController player, Models.Player playerModel, Vector playerPos, QAngle eyeAngles, Vector velocity)
+    {
+        if (_demo == null || _currentDemoFile == null || _currentRound == null) 
+            return null!;
+
+        // Calculate enhanced metrics
+        var speed = (float)Math.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y);
+        var mapArea = DetermineMapArea(_currentDemoFile.MapName, playerPos);
+        
+        // Calculate distances to other players
+        var (nearestEnemyDistance, nearestTeammateDistance, visibleEnemies, visibleTeammates, teammatesNearby) = 
+            CalculatePlayerProximityMetrics(player, playerPos);
+
+        // Determine player state and movement patterns
+        var positionType = DeterminePositionType(player, velocity, speed);
+        var isCounterStrafing = DetectCounterStrafing(velocity);
+        var isPeeking = DetectPeeking(player, eyeAngles);
+        
+        return new Models.EnhancedPlayerPosition
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound.Id,
+            PlayerId = playerModel.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            
+            // Position data
+            PositionX = (decimal)playerPos.X,
+            PositionY = (decimal)playerPos.Y,
+            PositionZ = (decimal)playerPos.Z,
+            ViewAngleX = (decimal)eyeAngles.Pitch,
+            ViewAngleY = (decimal)eyeAngles.Yaw,
+            
+            // Velocity data
+            VelocityX = velocity.X,
+            VelocityY = velocity.Y,
+            VelocityZ = velocity.Z,
+            Speed = speed,
+            
+            // Player state
+            Health = player.PlayerPawn?.Health ?? 0,
+            Armor = player.PlayerPawn?.ArmorValue ?? 0,
+            HasHelmet = player.PlayerPawn?.ItemServices?.HasHelmet ?? false,
+            IsAlive = (player.PlayerPawn?.Health ?? 0) > 0,
+            IsDefusing = false, // Would need additional tracking
+            IsPlanting = false, // Would need additional tracking
+            IsReloading = false, // Would need weapon state tracking
+            IsScoped = player.PlayerPawn?.IsScoped ?? false,
+            IsWalking = speed < 100, // Approximate walking detection
+            IsDucking = (player.PlayerPawn?.MovementServices as CCSPlayer_MovementServices)?.Ducking ?? false,
+            IsBlinded = (player.PlayerPawn?.FlashDuration ?? 0) > 0,
+            
+            // Weapon information
+            ActiveWeapon = player.PlayerPawn?.ActiveWeapon?.GetType().Name,
+            ActiveWeaponClass = DetermineWeaponClass(player.PlayerPawn?.ActiveWeapon?.GetType().Name),
+            AmmoClip = 0, // Would need weapon property tracking
+            AmmoReserve = 0, // Would need weapon property tracking
+            
+            // Economic data
+            Money = player.InGameMoneyServices?.Account ?? 0,
+            EquipmentValue = CalculateEquipmentValue(player),
+            
+            // Advanced positional analysis
+            MapArea = mapArea,
+            PositionType = positionType,
+            DistanceToNearestEnemy = nearestEnemyDistance,
+            DistanceToNearestTeammate = nearestTeammateDistance,
+            
+            // Line of sight
+            VisibleEnemies = visibleEnemies,
+            VisibleTeammates = visibleTeammates,
+            
+            // Tactical state (simplified for now)
+            IsInSmokeArea = false, // Would need smoke tracking
+            IsInFlashArea = false, // Would need flash tracking
+            IsInFireArea = false, // Would need fire tracking
+            HasLineOfSightToBomb = false, // Would need bomb position tracking
+            
+            // Movement analysis
+            MovementAcceleration = 0, // Would need previous velocity tracking
+            ViewAngleChangeRate = 0, // Would need previous angle tracking
+            IsCounterStrafing = isCounterStrafing,
+            IsPeeking = isPeeking,
+            
+            // Team coordination
+            IsWithTeammates = nearestTeammateDistance < 500,
+            TeammatesNearby = teammatesNearby
+        };
+    }
+
+    private string DetermineMapArea(string? mapName, Vector position)
+    {
+        // Simplified map area detection - would need more sophisticated logic
+        if (mapName == "de_mirage")
+        {
+            if (position.X > 1000) return "A Site";
+            if (position.X < -1000) return "B Site";
+            if (Math.Abs(position.X) < 500) return "Mid";
+            return "Connector";
+        }
+        if (mapName == "de_dust2")
+        {
+            if (position.Y > 1000) return "A Site";
+            if (position.Y < -1000) return "B Site";
+            if (position.X > 0) return "Upper Tunnels";
+            return "Mid/Lower";
+        }
+        return "Unknown Area";
+    }
+
+    private (float nearestEnemy, float nearestTeammate, int visibleEnemies, int visibleTeammates, int teammatesNearby) 
+        CalculatePlayerProximityMetrics(CCSPlayerController player, Vector playerPos)
+    {
+        float nearestEnemyDistance = float.MaxValue;
+        float nearestTeammateDistance = float.MaxValue;
+        int visibleEnemies = 0;
+        int visibleTeammates = 0;
+        int teammatesNearby = 0;
+
+        foreach (var otherPlayer in _demo?.Players ?? Enumerable.Empty<CCSPlayerController>())
+        {
+            if (otherPlayer == player || otherPlayer.PlayerPawn?.Origin == null) continue;
+
+            var distance = (float)Math.Sqrt(
+                Math.Pow(playerPos.X - otherPlayer.PlayerPawn.Origin.Value.X, 2) +
+                Math.Pow(playerPos.Y - otherPlayer.PlayerPawn.Origin.Value.Y, 2) +
+                Math.Pow(playerPos.Z - otherPlayer.PlayerPawn.Origin.Value.Z, 2));
+            
+            if (otherPlayer.TeamNum == player.TeamNum)
+            {
+                if (distance < nearestTeammateDistance)
+                    nearestTeammateDistance = distance;
+                if (distance < 1000)
+                    teammatesNearby++;
+                if (distance < 2000) // Simplified visibility check
+                    visibleTeammates++;
+            }
+            else
+            {
+                if (distance < nearestEnemyDistance)
+                    nearestEnemyDistance = distance;
+                if (distance < 2000) // Simplified visibility check
+                    visibleEnemies++;
+            }
+        }
+
+        return (nearestEnemyDistance == float.MaxValue ? 0 : nearestEnemyDistance,
+                nearestTeammateDistance == float.MaxValue ? 0 : nearestTeammateDistance,
+                visibleEnemies, visibleTeammates, teammatesNearby);
+    }
+
+    private string DeterminePositionType(CCSPlayerController player, Vector velocity, float speed)
+    {
+        if (speed < 10) return "Holding";
+        if (speed > 200) return "Running";
+        if (speed > 100) return "Walking";
+        return "Stationary";
+    }
+
+    private bool DetectCounterStrafing(Vector velocity)
+    {
+        // Simplified counter-strafing detection - would need previous velocity data
+        return Math.Abs(velocity.X) > 50 && Math.Abs(velocity.Y) > 50;
+    }
+
+    private bool DetectPeeking(CCSPlayerController player, QAngle eyeAngles)
+    {
+        // Simplified peeking detection - would need angle change rate analysis
+        return Math.Abs(eyeAngles.Yaw) > 45; // If looking significantly left/right
+    }
+
+    private string? DetermineWeaponClass(string? weaponName)
+    {
+        if (weaponName == null) return null;
+        if (weaponName.Contains("ak47") || weaponName.Contains("m4")) return "Rifle";
+        if (weaponName.Contains("awp") || weaponName.Contains("ssg08")) return "Sniper";
+        if (weaponName.Contains("glock") || weaponName.Contains("usp") || weaponName.Contains("deagle")) return "Pistol";
+        if (weaponName.Contains("mp") || weaponName.Contains("ump")) return "SMG";
+        return "Other";
+    }
+
+    private int CalculateEquipmentValue(CCSPlayerController player)
+    {
+        // Simplified equipment value calculation - would need actual item values
+        int value = 0;
+        if (player.PlayerPawn?.ItemServices?.HasHelmet == true) value += 350;
+        if (player.PlayerPawn?.ItemServices?.HasDefuser == true) value += 400;
+        // Would add weapon values, grenade values, etc.
+        return value;
     }
 
     private Models.Player GetOrCreatePlayer(CCSPlayerController playerController)

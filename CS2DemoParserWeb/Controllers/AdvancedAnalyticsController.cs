@@ -28,53 +28,67 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
+                    WITH RoundPlayerCounts AS (
+                        SELECT 
+                            r.Id as RoundId,
+                            r.RoundNumber,
+                            r.WinnerTeam,
+                            d.FileName,
+                            d.MapName,
+                            r.CTLivePlayers,
+                            r.TLivePlayers,
+                            -- Calculate remaining players at round end from kills
+                            5 - COUNT(CASE WHEN vic.Team = 'CT' THEN 1 END) as CTRemainingAtEnd,
+                            5 - COUNT(CASE WHEN vic.Team = 'TERRORIST' THEN 1 END) as TRemainingAtEnd
+                        FROM Rounds r
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        LEFT JOIN Kills k ON k.RoundId = r.Id
+                        LEFT JOIN Players vic ON k.VictimId = vic.Id
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                        GROUP BY r.Id, r.RoundNumber, r.WinnerTeam, d.FileName, d.MapName, r.CTLivePlayers, r.TLivePlayers
+                    ),
+                    ClutchSituations AS (
+                        SELECT 
+                            killer.PlayerName as ClutchPlayer,
+                            killer.Team as ClutchTeam,
+                            rpc.MapName,
+                            CASE 
+                                WHEN killer.Team = 'CT' AND rpc.TRemainingAtEnd >= 2 AND rpc.CTRemainingAtEnd = 1
+                                    THEN CONCAT('1v', rpc.TRemainingAtEnd)
+                                WHEN killer.Team = 'TERRORIST' AND rpc.CTRemainingAtEnd >= 2 AND rpc.TRemainingAtEnd = 1  
+                                    THEN CONCAT('1v', rpc.CTRemainingAtEnd)
+                                ELSE NULL
+                            END as ClutchType,
+                            CASE WHEN killer.Team = rpc.WinnerTeam THEN 1 ELSE 0 END as ClutchSuccess,
+                            COUNT(DISTINCT rpc.FileName) as DemosPlayed
+                        FROM Kills k
+                        INNER JOIN RoundPlayerCounts rpc ON k.RoundId = rpc.RoundId
+                        INNER JOIN Players killer ON k.KillerId = killer.Id
+                        WHERE (@PlayerName IS NULL OR killer.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR killer.Team = @Team)
+                        GROUP BY killer.PlayerName, killer.Team, rpc.MapName, rpc.WinnerTeam, rpc.TRemainingAtEnd, rpc.CTRemainingAtEnd
+                        HAVING CASE 
+                            WHEN killer.Team = 'CT' AND rpc.TRemainingAtEnd >= 2 AND rpc.CTRemainingAtEnd = 1
+                                THEN CONCAT('1v', rpc.TRemainingAtEnd)
+                            WHEN killer.Team = 'TERRORIST' AND rpc.CTRemainingAtEnd >= 2 AND rpc.TRemainingAtEnd = 1  
+                                THEN CONCAT('1v', rpc.CTRemainingAtEnd)
+                            ELSE NULL
+                        END IS NOT NULL
+                    )
                     SELECT 
-                        'DemoFiles' as TableName,
-                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
-                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
-                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
-                        CAST('Total demo files in database' AS VARCHAR) as Description
-                    FROM DemoFiles
-                    
-                    UNION ALL
-                    
-                    SELECT 
-                        'Rounds' as TableName,
-                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
-                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
-                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
-                        CAST('Total rounds parsed' AS VARCHAR) as Description
-                    FROM Rounds
-                    
-                    UNION ALL
-                    
-                    SELECT 
-                        'Players' as TableName,
-                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
-                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
-                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
-                        CAST('Total players found' AS VARCHAR) as Description
-                    FROM Players
-                    
-                    UNION ALL
-                    
-                    SELECT 
-                        'Kills' as TableName,
-                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
-                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
-                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
-                        CAST('Total kills recorded' AS VARCHAR) as Description
-                    FROM Kills
-                    
-                    UNION ALL
-                    
-                    SELECT 
-                        'PlayerRoundStats' as TableName,
-                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
-                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
-                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
-                        CAST('Total player round statistics' AS VARCHAR) as Description
-                    FROM PlayerRoundStats"; 
+                        ClutchPlayer,
+                        ClutchTeam,
+                        MapName,
+                        ClutchType,
+                        COUNT(*) as ClutchAttempts,
+                        SUM(ClutchSuccess) as ClutchWins,
+                        CAST(SUM(ClutchSuccess) AS FLOAT) / COUNT(*) * 100 as ClutchSuccessRate,
+                        MAX(DemosPlayed) as DemosPlayed
+                    FROM ClutchSituations
+                    WHERE ClutchType IS NOT NULL
+                    GROUP BY ClutchPlayer, ClutchTeam, MapName, ClutchType
+                    ORDER BY ClutchSuccessRate DESC, ClutchAttempts DESC"; 
                 
                 /*
                     WITH RoundPlayerCounts AS (
@@ -2337,14 +2351,14 @@ namespace CS2DemoParserWeb.Controllers
                             k.GameTime,
                             clutch_player.PlayerName as ClutchPlayer,
                             clutch_player.Team as ClutchTeam,
-                            k.ClutchSize,
-                            k.KillerHealth,
-                            k.KillerArmor,
+                            prs.Kills as ClutchSize,  -- Use kills from PlayerRoundStats as proxy for clutch size
+                            100 as KillerHealth,  -- Default health values since not available
+                            0 as KillerArmor,
                             k.Weapon,
-                            k.Distance,
+                            SQRT(POWER(CAST(k.KillerPositionX - k.VictimPositionX AS FLOAT), 2) + POWER(CAST(k.KillerPositionY - k.VictimPositionY AS FLOAT), 2)) as Distance,
                             k.KillerPositionX,
                             k.KillerPositionY,
-                            k.KillerPositionZ,
+                            0.0 as KillerPositionZ,  -- Z position not available
                             d.MapName,
                             d.FileName,
                             r.RoundNumber,
@@ -2391,8 +2405,12 @@ namespace CS2DemoParserWeb.Controllers
                         INNER JOIN Rounds r ON k.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
                         LEFT JOIN PlayerRoundStats prs ON prs.PlayerId = clutch_player.Id AND prs.RoundId = r.Id
-                        WHERE k.IsClutch = 1
-                            AND k.ClutchSize >= 2  -- Focus on 1v2+ situations
+                        WHERE EXISTS (
+                            SELECT 1 FROM PlayerRoundStats prs2 
+                            WHERE prs2.RoundId = r.Id 
+                            AND prs2.PlayerId = clutch_player.Id 
+                            AND prs2.Kills >= 2  -- Focus on multi-kill scenarios as proxy for clutch situations
+                        )
                             AND (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
                             AND (@PlayerName IS NULL OR clutch_player.PlayerName = @PlayerName)
