@@ -524,6 +524,7 @@ namespace CS2DemoParserWeb.Controllers
                             d.FileName,
                             d.MapName,
                             r.RoundNumber,
+                            r.Id as RoundId,
                             -- Calculate distances
                             SQRT(
                                 POWER(CAST(k2.KillerPositionX - k1.VictimPositionX AS FLOAT), 2) +
@@ -591,7 +592,7 @@ namespace CS2DemoParserWeb.Controllers
                             AND t2.TradeKillTime <= t1.TradeKillTime + 3.0
                         GROUP BY t1.TradeKillId, t1.InitialKillId, t1.InitialKillTime, t1.InitialKiller, t1.InitialKillerTeam,
                                  t1.InitialVictim, t1.InitialVictimTeam, t1.TradeKiller, t1.TradeKillerTeam, t1.TradeKillTime,
-                                 t1.TradeTimeSeconds, t1.TradeDistance, t1.TraderMovementDistance, t1.MapName, t1.TradeArea, t1.TradeQuality
+                                 t1.TradeTimeSeconds, t1.TradeDistance, t1.TraderMovementDistance, t1.MapName, t1.TradeArea, t1.TradeQuality, t1.RoundId
                     ),
                     FailedTradeOpportunities AS (
                         -- Identify situations where trades could have happened but didn't
