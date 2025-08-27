@@ -28,53 +28,45 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH RoundPlayerCounts AS (
+                    WITH LastKillsPerRound AS (
                         SELECT 
-                            r.Id as RoundId,
-                            r.RoundNumber,
-                            r.WinnerTeam,
-                            d.FileName,
+                            k.RoundId,
+                            k.KillerId,
+                            k.VictimId,
+                            killer.PlayerName as KillerName,
+                            killer.Team as KillerTeam,
+                            victim.PlayerName as VictimName,
+                            victim.Team as VictimTeam,
                             d.MapName,
-                            r.CTLivePlayers,
-                            r.TLivePlayers,
-                            -- Calculate remaining players at round end from kills
-                            5 - COUNT(CASE WHEN vic.Team = 'CT' THEN 1 END) as CTRemainingAtEnd,
-                            5 - COUNT(CASE WHEN vic.Team = 'TERRORIST' THEN 1 END) as TRemainingAtEnd
-                        FROM Rounds r
+                            r.WinnerTeam,
+                            ROW_NUMBER() OVER (PARTITION BY k.RoundId ORDER BY k.GameTime DESC) as KillOrder
+                        FROM Kills k
+                        INNER JOIN Players killer ON k.KillerId = killer.Id
+                        INNER JOIN Players victim ON k.VictimId = victim.Id
+                        INNER JOIN Rounds r ON k.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
-                        LEFT JOIN Kills k ON k.RoundId = r.Id
-                        LEFT JOIN Players vic ON k.VictimId = vic.Id
                         WHERE (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
-                        GROUP BY r.Id, r.RoundNumber, r.WinnerTeam, d.FileName, d.MapName, r.CTLivePlayers, r.TLivePlayers
                     ),
-                    ClutchSituations AS (
+                    PotentialClutches AS (
                         SELECT 
-                            killer.PlayerName as ClutchPlayer,
-                            killer.Team as ClutchTeam,
-                            rpc.MapName,
+                            RoundId,
+                            KillerName as ClutchPlayer,
+                            KillerTeam as ClutchTeam,
+                            MapName,
+                            WinnerTeam,
+                            COUNT(*) as FinalKills,
                             CASE 
-                                WHEN killer.Team = 'CT' AND rpc.TRemainingAtEnd >= 2 AND rpc.CTRemainingAtEnd = 1
-                                    THEN CONCAT('1v', rpc.TRemainingAtEnd)
-                                WHEN killer.Team = 'TERRORIST' AND rpc.CTRemainingAtEnd >= 2 AND rpc.TRemainingAtEnd = 1  
-                                    THEN CONCAT('1v', rpc.CTRemainingAtEnd)
-                                ELSE NULL
-                            END as ClutchType,
-                            CASE WHEN killer.Team = rpc.WinnerTeam THEN 1 ELSE 0 END as ClutchSuccess,
-                            COUNT(DISTINCT rpc.FileName) as DemosPlayed
-                        FROM Kills k
-                        INNER JOIN RoundPlayerCounts rpc ON k.RoundId = rpc.RoundId
-                        INNER JOIN Players killer ON k.KillerId = killer.Id
-                        WHERE (@PlayerName IS NULL OR killer.PlayerName = @PlayerName)
-                            AND (@Team IS NULL OR killer.Team = @Team)
-                        GROUP BY killer.PlayerName, killer.Team, rpc.MapName, rpc.WinnerTeam, rpc.TRemainingAtEnd, rpc.CTRemainingAtEnd
-                        HAVING CASE 
-                            WHEN killer.Team = 'CT' AND rpc.TRemainingAtEnd >= 2 AND rpc.CTRemainingAtEnd = 1
-                                THEN CONCAT('1v', rpc.TRemainingAtEnd)
-                            WHEN killer.Team = 'TERRORIST' AND rpc.CTRemainingAtEnd >= 2 AND rpc.TRemainingAtEnd = 1  
-                                THEN CONCAT('1v', rpc.CTRemainingAtEnd)
-                            ELSE NULL
-                        END IS NOT NULL
+                                WHEN COUNT(*) = 2 THEN '1v2'
+                                WHEN COUNT(*) = 3 THEN '1v3' 
+                                WHEN COUNT(*) = 4 THEN '1v4'
+                                WHEN COUNT(*) >= 5 THEN '1v5'
+                                ELSE '1v1'
+                            END as ClutchType
+                        FROM LastKillsPerRound
+                        WHERE KillOrder <= 4 -- Last few kills of the round
+                        GROUP BY RoundId, KillerName, KillerTeam, MapName, WinnerTeam
+                        HAVING COUNT(*) >= 2 -- At least 2 kills in final moments
                     )
                     SELECT 
                         ClutchPlayer,
@@ -82,11 +74,12 @@ namespace CS2DemoParserWeb.Controllers
                         MapName,
                         ClutchType,
                         COUNT(*) as ClutchAttempts,
-                        SUM(ClutchSuccess) as ClutchWins,
-                        CAST(SUM(ClutchSuccess) AS FLOAT) / COUNT(*) * 100 as ClutchSuccessRate,
-                        MAX(DemosPlayed) as DemosPlayed
-                    FROM ClutchSituations
-                    WHERE ClutchType IS NOT NULL
+                        SUM(CASE WHEN ClutchTeam = WinnerTeam THEN 1 ELSE 0 END) as ClutchWins,
+                        CAST(SUM(CASE WHEN ClutchTeam = WinnerTeam THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as ClutchSuccessRate,
+                        COUNT(DISTINCT RoundId) as DemosPlayed
+                    FROM PotentialClutches
+                    WHERE (@PlayerName IS NULL OR ClutchPlayer = @PlayerName)
+                        AND (@Team IS NULL OR ClutchTeam = @Team)
                     GROUP BY ClutchPlayer, ClutchTeam, MapName, ClutchType
                     ORDER BY ClutchSuccessRate DESC, ClutchAttempts DESC"; 
                 
