@@ -5,7 +5,10 @@ services:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${SQL_PASSWORD}
       - MSSQL_PID=Express
-      - MSSQL_MEMORY_LIMIT_MB=2048
+      - MSSQL_MEMORY_LIMIT_MB=4096
+      - MSSQL_TELEMETRY_OPTOUT=1
+      - MSSQL_LCID=1033
+      - MSSQL_COLLATION=SQL_Latin1_General_CP1_CI_AS
     ports:
       - "1433:1433"
     volumes:
