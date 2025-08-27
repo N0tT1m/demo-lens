@@ -2639,7 +2639,27 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH EconomyPerformance AS (
+                    WITH PlayerOverallStats AS (
+                        -- Get overall player performance stats
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            AVG(CAST(prs.Kills AS FLOAT)) as OverallAvgKills,
+                            AVG(CAST(prs.Deaths AS FLOAT)) as OverallAvgDeaths,
+                            AVG(CAST(prs.Damage AS FLOAT)) as OverallAvgDamage,
+                            AVG(prs.Rating) as OverallAvgRating
+                        FROM PlayerRoundStats prs
+                        INNER JOIN Players p ON prs.PlayerId = p.Id
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                        GROUP BY p.PlayerName, p.Team, d.MapName
+                    ),
+                    EconomyPerformance AS (
                         SELECT 
                             p.PlayerName,
                             p.Team,
@@ -2701,46 +2721,69 @@ namespace CS2DemoParserWeb.Controllers
                         GROUP BY PlayerName, Team, MapName, RoundNumber, MoneyState
                     )
                     SELECT 
-                        PlayerName,
-                        Team,
-                        MapName,
-                        MoneyState as EconomyState,
+                        res.PlayerName,
+                        res.Team,
+                        res.MapName,
+                        res.MoneyState as EconomyState,
                         COUNT(*) as TotalRounds,
-                        SUM(RoundWon) as RoundsWon,
-                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as WinPercentage,
-                        AVG(CAST(RoundStartMoney AS FLOAT)) as AvgStartMoney,
-                        AVG(CAST(RoundEndMoney AS FLOAT)) as AvgEndMoney,
-                        AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) as AvgMoneySpent,
-                        AVG(CAST(ItemsEquipped AS FLOAT)) as AvgItemsEquipped,
-                        AVG(CAST(ItemsPickedUp AS FLOAT)) as AvgItemsPickedUp,
-                        SUM(HasRifle) as RoundsWithRifle,
-                        CAST(SUM(HasRifle) AS FLOAT) / COUNT(*) * 100 as RifleUsageRate,
-                        SUM(HasArmor) as RoundsWithArmor,
-                        CAST(SUM(HasArmor) AS FLOAT) / COUNT(*) * 100 as ArmorUsageRate,
-                        AVG(CAST(GrenadeCount AS FLOAT)) as AvgGrenadesPerRound,
+                        SUM(res.RoundWon) as RoundsWon,
+                        CAST(SUM(res.RoundWon) AS FLOAT) / COUNT(*) * 100 as WinPercentage,
+                        AVG(CAST(res.RoundStartMoney AS FLOAT)) as AvgStartMoney,
+                        AVG(CAST(res.RoundEndMoney AS FLOAT)) as AvgEndMoney,
+                        AVG(CAST(res.RoundStartMoney - res.RoundEndMoney AS FLOAT)) as AvgMoneySpent,
+                        AVG(CAST(res.ItemsEquipped AS FLOAT)) as AvgItemsEquipped,
+                        AVG(CAST(res.ItemsPickedUp AS FLOAT)) as AvgItemsPickedUp,
+                        SUM(res.HasRifle) as RoundsWithRifle,
+                        CAST(SUM(res.HasRifle) AS FLOAT) / COUNT(*) * 100 as RifleUsageRate,
+                        SUM(res.HasArmor) as RoundsWithArmor,
+                        CAST(SUM(res.HasArmor) AS FLOAT) / COUNT(*) * 100 as ArmorUsageRate,
+                        AVG(CAST(res.GrenadeCount AS FLOAT)) as AvgGrenadesPerRound,
                         -- Economic efficiency metrics
                         CASE 
                             WHEN COUNT(*) > 0 THEN 
-                                CAST(SUM(RoundWon) AS FLOAT) / AVG(CAST(RoundStartMoney AS FLOAT)) * 1000 
+                                CAST(SUM(res.RoundWon) AS FLOAT) / AVG(CAST(res.RoundStartMoney AS FLOAT)) * 1000 
                             ELSE 0 
                         END as EconomicEfficiency, -- Wins per $1000 invested
                         -- Money management rating
                         CASE 
-                            WHEN AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) > 0 AND COUNT(*) > 0 THEN
-                                CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) / (AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) / 1000)
+                            WHEN AVG(CAST(res.RoundStartMoney - res.RoundEndMoney AS FLOAT)) > 0 AND COUNT(*) > 0 THEN
+                                CAST(SUM(res.RoundWon) AS FLOAT) / COUNT(*) / (AVG(CAST(res.RoundStartMoney - res.RoundEndMoney AS FLOAT)) / 1000)
                             ELSE 0
                         END as MoneyManagementScore,
-                        -- Add compatibility fields for existing frontend
-                        0 as AvgEquipmentValue,
-                        0 as AvgDamagePerDollar, 
-                        0 as AvgEquipmentROI,
-                        0 as AvgKills,
-                        0 as AvgDamage,
-                        0 as AvgRating,
-                        0 as LowMoneyRounds,
-                        0 as LowMoneyRate
-                    FROM RoundEconomyStats
-                    GROUP BY PlayerName, Team, MapName, MoneyState
+                        -- Performance metrics from PlayerOverallStats
+                        pos.OverallAvgDamage as AvgDamage,
+                        pos.OverallAvgKills as AvgKills, 
+                        pos.OverallAvgRating as AvgRating,
+                        -- Equipment value approximation (rifle=2700, armor=1000, etc.)
+                        CASE 
+                            WHEN COUNT(*) > 0 THEN 
+                                (SUM(res.HasRifle) * 2700.0 + SUM(res.HasArmor) * 1000.0 + AVG(CAST(res.GrenadeCount AS FLOAT)) * 300.0) / COUNT(*)
+                            ELSE 0 
+                        END as AvgEquipmentValue,
+                        -- Damage per dollar efficiency
+                        CASE 
+                            WHEN AVG(CAST(res.RoundStartMoney AS FLOAT)) > 0 AND pos.OverallAvgDamage > 0 THEN
+                                pos.OverallAvgDamage / AVG(CAST(res.RoundStartMoney AS FLOAT)) * 100
+                            ELSE 0
+                        END as AvgDamagePerDollar,
+                        -- Equipment ROI (wins per equipment investment ratio)
+                        CASE 
+                            WHEN (SUM(res.HasRifle) * 2700.0 + SUM(res.HasArmor) * 1000.0) > 0 THEN
+                                CAST(SUM(res.RoundWon) AS FLOAT) / (SUM(res.HasRifle) * 2700.0 + SUM(res.HasArmor) * 1000.0) * 100000
+                            ELSE 0
+                        END as AvgEquipmentROI,
+                        -- Low money analysis
+                        SUM(CASE WHEN res.RoundStartMoney < 1500 THEN 1 ELSE 0 END) as LowMoneyRounds,
+                        CASE 
+                            WHEN COUNT(*) > 0 THEN 
+                                CAST(SUM(CASE WHEN res.RoundStartMoney < 1500 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100
+                            ELSE 0 
+                        END as LowMoneyRate
+                    FROM RoundEconomyStats res
+                    LEFT JOIN PlayerOverallStats pos ON res.PlayerName = pos.PlayerName 
+                        AND res.Team = pos.Team 
+                        AND res.MapName = pos.MapName
+                    GROUP BY res.PlayerName, res.Team, res.MapName, res.MoneyState, pos.OverallAvgKills, pos.OverallAvgDamage, pos.OverallAvgRating
                     HAVING COUNT(*) >= 3 -- At least 3 rounds in this money state for meaningful analysis
                     ORDER BY EconomicEfficiency DESC, WinPercentage DESC";
 
