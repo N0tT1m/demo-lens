@@ -1260,7 +1260,8 @@ namespace CS2DemoParserWeb.Controllers
                             d.FileName,
                             prs.EquipmentValue,
                             prs.MoneySpent,
-                            prs.KillReward,
+                            -- Calculate estimated kill reward (standard CS2 kill rewards)
+                            (prs.Kills * 300) as KillReward,
                             prs.Kills,
                             prs.Deaths,
                             prs.Assists,
@@ -1992,14 +1993,15 @@ namespace CS2DemoParserWeb.Controllers
                             prs.Deaths,
                             prs.Assists,
                             prs.Damage,
-                            prs.HeadshotKills,
+                            -- Calculate headshot kills for this round
+                            (SELECT COUNT(*) FROM Kills k WHERE k.KillerId = prs.PlayerId AND k.RoundId = prs.RoundId AND k.IsHeadshot = 1) as HeadshotKills,
                             prs.EquipmentValue,
                             -- Calculate ADR and KDR for round
                             CASE WHEN prs.Deaths > 0 THEN CAST(prs.Kills AS FLOAT) / prs.Deaths ELSE prs.Kills END as RoundKDR,
                             prs.Damage as RoundADR,
                             -- Calculate round rating (simplified HLTV-style)
                             (prs.Kills * 0.6 + prs.Assists * 0.2 + (CASE WHEN prs.Deaths = 0 THEN 0.5 ELSE 0 END) + 
-                             prs.HeadshotKills * 0.2 + (prs.Damage / 100.0) * 0.1) as RoundRating,
+                             (SELECT COUNT(*) FROM Kills k WHERE k.KillerId = prs.PlayerId AND k.RoundId = prs.RoundId AND k.IsHeadshot = 1) * 0.2 + (prs.Damage / 100.0) * 0.1) as RoundRating,
                             -- Time-based sequencing
                             ROW_NUMBER() OVER (PARTITION BY prs.PlayerId ORDER BY d.ParsedAt, r.RoundNumber) as RoundSequence
                         FROM PlayerRoundStats prs

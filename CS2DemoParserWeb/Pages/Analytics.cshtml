@@ -492,7 +492,7 @@ async function loadClutchAnalysis(filters) {
 
 async function loadTradeAnalysis(filters) {
     const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/trade-kill-optimization?${params}`);
+    const response = await fetch(`/api/advanced-analytics/enhanced-trade-kill-optimization?${params}`);
     
     if (response.ok) {
         const data = await response.json();
@@ -1024,7 +1024,7 @@ async function exportAnalysis(analysisType) {
     
     const endpoints = {
         'clutch': 'comprehensive-clutch-analysis',
-        'trade': 'trade-kill-optimization',
+        'trade': 'enhanced-trade-kill-optimization',
         'first-kill': 'first-blood-impact-analysis',
         'economy': 'economic-efficiency-analysis',
         'position': 'positioning-intelligence',
