@@ -9,5 +9,6 @@ namespace CS2DemoParserWeb.Models
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public string? Format { get; set; }
+        public int? RoundNumber { get; set; }
     }
 }

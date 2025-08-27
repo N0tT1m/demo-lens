@@ -2603,6 +2603,7 @@ namespace CS2DemoParserWeb.Controllers
             command.Parameters.AddWithValue("@Team", !string.IsNullOrEmpty(query.Team) ? (object)query.Team : DBNull.Value);
             command.Parameters.AddWithValue("@StartDate", query.StartDate.HasValue ? (object)query.StartDate.Value : DBNull.Value);
             command.Parameters.AddWithValue("@EndDate", query.EndDate.HasValue ? (object)query.EndDate.Value : DBNull.Value);
+            command.Parameters.AddWithValue("@RoundNumber", query.RoundNumber.HasValue ? (object)query.RoundNumber.Value : DBNull.Value);
         }
 
         private string ConvertToCsv(List<Dictionary<string, object>> data)
@@ -2908,6 +2909,162 @@ namespace CS2DemoParserWeb.Controllers
             {
                 _logger.LogError(ex, "Error generating advanced player performance");
                 return StatusCode(500, $"Error generating advanced player performance: {ex.Message}");
+            }
+        }
+
+        [HttpGet("player-inventory")]
+        public async Task<IActionResult> GetPlayerInventory([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PlayerInventory AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            e.RoundNumber,
+                            e.EventType,
+                            e.ItemName,
+                            e.MoneyBefore,
+                            e.MoneyAfter,
+                            -- Categorize equipment types
+                            CASE 
+                                WHEN e.ItemName IN ('ak47', 'aug', 'awp', 'm4a1_silencer', 'm4a4', 'krieg', 'ssg08', 'g3sg1', 'scar20') THEN 'Primary'
+                                WHEN e.ItemName IN ('deagle', 'glock', 'usp_silencer', 'hkp2000', 'p250', 'tec9', 'fiveseven', 'cz75a', 'dualberettas', 'revolver') THEN 'Pistol'
+                                WHEN e.ItemName IN ('mp9', 'mac10', 'mp7', 'ump45', 'bizon', 'p90', 'mp5sd') THEN 'SMG'
+                                WHEN e.ItemName IN ('nova', 'xm1014', 'mag7', 'sawedoff') THEN 'Shotgun'
+                                WHEN e.ItemName IN ('vesthelm', 'vest') THEN 'Armor'
+                                WHEN e.ItemName IN ('flashbang', 'hegrenade', 'smokegrenade', 'molotov', 'incgrenade', 'decoy') THEN 'Grenade'
+                                WHEN e.ItemName IN ('defusekit', 'c4') THEN 'Utility'
+                                WHEN e.ItemName = 'knife' THEN 'Melee'
+                                ELSE 'Other'
+                            END as EquipmentType,
+                            -- Calculate estimated item value
+                            CASE e.ItemName
+                                WHEN 'ak47' THEN 2700
+                                WHEN 'm4a1_silencer' THEN 3100
+                                WHEN 'm4a4' THEN 3100
+                                WHEN 'awp' THEN 4750
+                                WHEN 'aug' THEN 3300
+                                WHEN 'krieg' THEN 2750
+                                WHEN 'deagle' THEN 700
+                                WHEN 'vesthelm' THEN 1000
+                                WHEN 'vest' THEN 650
+                                WHEN 'flashbang' THEN 200
+                                WHEN 'hegrenade' THEN 300
+                                WHEN 'smokegrenade' THEN 300
+                                WHEN 'molotov' THEN 400
+                                WHEN 'incgrenade' THEN 600
+                                WHEN 'defusekit' THEN 400
+                                ELSE 0
+                            END as EstimatedValue,
+                            ROW_NUMBER() OVER (PARTITION BY p.PlayerName, e.RoundNumber, e.ItemName ORDER BY e.Id DESC) as ItemRank
+                        FROM EconomyEvents e
+                        INNER JOIN Players p ON e.PlayerId = p.Id
+                        INNER JOIN DemoFiles d ON e.DemoFileId = d.Id
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                            AND e.RoundNumber >= 0 -- Valid rounds only
+                            AND e.EventType IN ('equip', 'pickup') -- Focus on equipment acquisition
+                    ),
+                    LatestInventory AS (
+                        SELECT 
+                            PlayerName,
+                            Team,
+                            MapName,
+                            RoundNumber,
+                            ItemName,
+                            EquipmentType,
+                            EstimatedValue,
+                            MoneyBefore,
+                            MoneyAfter,
+                            CASE WHEN EventType = 'pickup' THEN 1 ELSE 0 END as WasPurchased
+                        FROM PlayerInventory 
+                        WHERE ItemRank = 1 -- Latest event for each item per round
+                    ),
+                    RoundInventorySummary AS (
+                        SELECT 
+                            PlayerName,
+                            Team,
+                            MapName,
+                            RoundNumber,
+                            MAX(MoneyBefore) as RoundStartMoney,
+                            MIN(MoneyAfter) as RoundEndMoney,
+                            SUM(EstimatedValue) as TotalEquipmentValue,
+                            SUM(WasPurchased * EstimatedValue) as MoneySpentOnEquipment,
+                            COUNT(DISTINCT ItemName) as UniqueItemsCarried,
+                            COUNT(CASE WHEN EquipmentType = 'Primary' THEN 1 END) as HasPrimaryWeapon,
+                            COUNT(CASE WHEN EquipmentType = 'Armor' THEN 1 END) as HasArmor,
+                            COUNT(CASE WHEN EquipmentType = 'Grenade' THEN 1 END) as GrenadeCount,
+                            STRING_AGG(
+                                CASE WHEN EquipmentType IN ('Primary', 'Pistol', 'SMG', 'Shotgun') THEN ItemName END, 
+                                ', '
+                            ) as WeaponsCarried,
+                            STRING_AGG(
+                                CASE WHEN EquipmentType = 'Grenade' THEN ItemName END, 
+                                ', '
+                            ) as GrenadesCarried
+                        FROM LatestInventory
+                        GROUP BY PlayerName, Team, MapName, RoundNumber
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        RoundNumber,
+                        RoundStartMoney,
+                        RoundEndMoney,
+                        TotalEquipmentValue,
+                        MoneySpentOnEquipment,
+                        UniqueItemsCarried,
+                        CASE WHEN HasPrimaryWeapon > 0 THEN 'Yes' ELSE 'No' END as HasPrimary,
+                        CASE WHEN HasArmor > 0 THEN 'Yes' ELSE 'No' END as HasArmor,
+                        GrenadeCount,
+                        WeaponsCarried,
+                        GrenadesCarried,
+                        -- Economic efficiency for this round
+                        CASE 
+                            WHEN TotalEquipmentValue > 0 THEN 
+                                CAST(RoundStartMoney AS FLOAT) / TotalEquipmentValue 
+                            ELSE 0 
+                        END as MoneyToEquipmentRatio,
+                        -- Loadout categorization
+                        CASE 
+                            WHEN TotalEquipmentValue >= 6000 THEN 'Full Buy'
+                            WHEN TotalEquipmentValue >= 3000 THEN 'Buy Round'
+                            WHEN TotalEquipmentValue >= 1500 THEN 'Force Buy'
+                            WHEN TotalEquipmentValue >= 500 THEN 'Eco Round'
+                            ELSE 'Save Round'
+                        END as LoadoutCategory
+                    FROM RoundInventorySummary
+                    WHERE (@RoundNumber IS NULL OR RoundNumber = @RoundNumber)
+                    ORDER BY PlayerName, RoundNumber DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"player_inventory_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Player Inventory Analysis",
+                    Description = "Detailed round-by-round player equipment, economy, and loadout analysis",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating player inventory analysis");
+                return StatusCode(500, $"Error generating player inventory analysis: {ex.Message}");
             }
         }
     }
