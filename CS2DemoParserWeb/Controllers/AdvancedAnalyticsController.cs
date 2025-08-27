@@ -2691,8 +2691,8 @@ namespace CS2DemoParserWeb.Controllers
                         
                         -- WEAPON USAGE METRICS
                         COUNT(*) as KillsWithWeapon,
-                        SUM(IsHeadshot) as HeadshotKills,
-                        ROUND((SUM(IsHeadshot) * 100.0 / COUNT(*)), 2) as HeadshotRate,
+                        SUM(CAST(IsHeadshot AS INT)) as HeadshotKills,
+                        ROUND((SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*)), 2) as HeadshotRate,
                         
                         -- DISTANCE ANALYSIS
                         ROUND(AVG(Distance), 2) as AvgKillDistance,
@@ -2706,8 +2706,8 @@ namespace CS2DemoParserWeb.Controllers
                         
                         -- WEAPON PROFICIENCY SCORE (0-100)
                         CASE 
-                            WHEN ROUND((SUM(IsHeadshot) * 100.0 / COUNT(*)), 2) >= 60 AND COUNT(*) >= 10 THEN 95
-                            WHEN ROUND((SUM(IsHeadshot) * 100.0 / COUNT(*)), 2) >= 40 AND COUNT(*) >= 5 THEN 80
+                            WHEN ROUND((SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*)), 2) >= 60 AND COUNT(*) >= 10 THEN 95
+                            WHEN ROUND((SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*)), 2) >= 40 AND COUNT(*) >= 5 THEN 80
                             WHEN ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) >= 70 THEN 75
                             WHEN COUNT(*) >= 10 THEN 60
                             ELSE 40
@@ -2812,8 +2812,8 @@ namespace CS2DemoParserWeb.Controllers
                         
                         -- WEAPON EFFECTIVENESS IN CONDITIONS
                         COUNT(DISTINCT Weapon) as WeaponsUsedInCondition,
-                        SUM(IsHeadshot) as HeadshotKillsInCondition,
-                        ROUND(SUM(IsHeadshot) * 100.0 / NULLIF(SUM(KillSuccess), 0), 2) as HeadshotRateInCondition,
+                        SUM(CAST(IsHeadshot AS INT)) as HeadshotKillsInCondition,
+                        ROUND(SUM(CAST(IsHeadshot AS INT)) * 100.0 / NULLIF(SUM(KillSuccess), 0), 2) as HeadshotRateInCondition,
                         
                         -- DISTANCE EXPERTISE  
                         COUNT(CASE WHEN KillDistance > 1000 THEN 1 END) as LongRangeKills,
