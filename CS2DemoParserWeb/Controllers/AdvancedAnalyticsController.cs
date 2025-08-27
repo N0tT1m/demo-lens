@@ -2639,74 +2639,101 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH EconomyRounds AS (
+                    WITH EconomyPerformance AS (
                         SELECT 
-                            prs.PlayerId,
                             p.PlayerName,
                             p.Team,
                             d.MapName,
-                            r.RoundNumber,
+                            e.RoundNumber,
+                            e.MoneyBefore,
+                            e.MoneyAfter,
+                            e.ItemName,
+                            e.EventType,
                             r.WinnerTeam,
-                            prs.StartMoney,
-                            prs.MoneySpent,
-                            prs.EndMoney,
-                            prs.EquipmentValue,
-                            prs.Kills,
-                            prs.Deaths,
-                            prs.Assists,
-                            prs.Damage,
-                            prs.Rating,
                             CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
-                            -- Categorize economy state
+                            -- Enhanced money state categorization using actual money data
                             CASE 
-                                WHEN prs.EquipmentValue >= 4000 THEN 'Full Buy'
-                                WHEN prs.EquipmentValue >= 2000 THEN 'Half Buy'
-                                WHEN prs.EquipmentValue >= 1000 THEN 'Force Buy'
-                                ELSE 'Eco'
-                            END as EconomyState,
-                            -- Calculate money efficiency
+                                WHEN e.MoneyBefore >= 5000 THEN 'Rich ($5000+)'
+                                WHEN e.MoneyBefore >= 3000 THEN 'Full Buy ($3000-5000)'
+                                WHEN e.MoneyBefore >= 1900 THEN 'Force Buy ($1900-3000)'
+                                WHEN e.MoneyBefore >= 800 THEN 'Eco ($800-1900)'
+                                ELSE 'Broke (<$800)'
+                            END as MoneyState,
+                            -- Money efficiency (money difference)
+                            (e.MoneyAfter - e.MoneyBefore) as MoneyDelta,
+                            -- Equipment tracking
                             CASE 
-                                WHEN prs.MoneySpent > 0 THEN CAST(prs.Damage AS FLOAT) / prs.MoneySpent
-                                ELSE 0
-                            END as DamagePerDollar,
-                            -- Equipment ROI
-                            CASE 
-                                WHEN prs.EquipmentValue > 0 THEN CAST((prs.Kills * 300 + prs.Assists * 100) AS FLOAT) / prs.EquipmentValue
-                                ELSE 0
-                            END as EquipmentROI
-                        FROM PlayerRoundStats prs
-                        INNER JOIN Players p ON prs.PlayerId = p.Id
-                        INNER JOIN Rounds r ON prs.RoundId = r.Id
-                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                                WHEN e.ItemName IN ('ak47', 'aug', 'awp', 'm4a1_silencer', 'm4a4', 'krieg') THEN 'Rifle'
+                                WHEN e.ItemName IN ('deagle', 'glock', 'usp_silencer', 'p250', 'tec9', 'fiveseven', 'cz75a', 'dualberettas') THEN 'Pistol'
+                                WHEN e.ItemName IN ('mp9', 'mac10', 'mp7', 'ump45', 'bizon', 'p90') THEN 'SMG'
+                                WHEN e.ItemName IN ('nova', 'xm1014', 'mag7', 'sawedoff') THEN 'Shotgun'
+                                WHEN e.ItemName IN ('vesthelm', 'vest') THEN 'Armor'
+                                WHEN e.ItemName IN ('flashbang', 'hegrenade', 'smokegrenade', 'molotov', 'incgrenade', 'decoy') THEN 'Grenade'
+                                WHEN e.ItemName IN ('defusekit') THEN 'Utility'
+                                ELSE 'Other'
+                            END as EquipmentCategory
+                        FROM EconomyEvents e
+                        INNER JOIN Players p ON e.PlayerId = p.Id
+                        INNER JOIN DemoFiles d ON e.DemoFileId = d.Id
+                        LEFT JOIN Rounds r ON e.RoundNumber = r.RoundNumber AND r.DemoFileId = d.Id
                         WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)  
                             AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
                             AND (@Team IS NULL OR p.Team = @Team)
+                            AND e.RoundNumber >= 0 -- Valid rounds only
+                    ),
+                    RoundEconomyStats AS (
+                        SELECT 
+                            PlayerName,
+                            Team,
+                            MapName,
+                            RoundNumber,
+                            MoneyState,
+                            MAX(MoneyBefore) as RoundStartMoney,
+                            MIN(MoneyAfter) as RoundEndMoney,
+                            COUNT(CASE WHEN EventType = 'equip' THEN 1 END) as ItemsEquipped,
+                            COUNT(CASE WHEN EventType = 'pickup' THEN 1 END) as ItemsPickedUp,
+                            COUNT(CASE WHEN EquipmentCategory = 'Rifle' THEN 1 END) as HasRifle,
+                            COUNT(CASE WHEN EquipmentCategory = 'Armor' THEN 1 END) as HasArmor,
+                            COUNT(CASE WHEN EquipmentCategory = 'Grenade' THEN 1 END) as GrenadeCount,
+                            MAX(RoundWon) as RoundWon
+                        FROM EconomyPerformance 
+                        GROUP BY PlayerName, Team, MapName, RoundNumber, MoneyState
                     )
                     SELECT 
                         PlayerName,
                         Team,
                         MapName,
-                        EconomyState,
+                        MoneyState,
                         COUNT(*) as TotalRounds,
                         SUM(RoundWon) as RoundsWon,
                         CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as WinPercentage,
-                        AVG(CAST(StartMoney AS FLOAT)) as AvgStartMoney,
-                        AVG(CAST(MoneySpent AS FLOAT)) as AvgMoneySpent,
-                        AVG(CAST(EquipmentValue AS FLOAT)) as AvgEquipmentValue,
-                        AVG(DamagePerDollar) as AvgDamagePerDollar,
-                        AVG(EquipmentROI) as AvgEquipmentROI,
-                        AVG(CAST(Kills AS FLOAT)) as AvgKills,
-                        AVG(CAST(Damage AS FLOAT)) as AvgDamage,
-                        AVG(Rating) as AvgRating,
-                        -- Money management metrics
-                        AVG(CAST(EndMoney AS FLOAT)) as AvgEndMoney,
-                        SUM(CASE WHEN EndMoney < 1000 THEN 1 ELSE 0 END) as LowMoneyRounds,
-                        CAST(SUM(CASE WHEN EndMoney < 1000 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as LowMoneyRate
-                    FROM EconomyRounds
-                    GROUP BY PlayerName, Team, MapName, EconomyState
-                    HAVING COUNT(*) >= 3 -- At least 3 rounds in this economy state
-                    ORDER BY AvgEquipmentROI DESC, WinPercentage DESC";
+                        AVG(CAST(RoundStartMoney AS FLOAT)) as AvgStartMoney,
+                        AVG(CAST(RoundEndMoney AS FLOAT)) as AvgEndMoney,
+                        AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) as AvgMoneySpent,
+                        AVG(CAST(ItemsEquipped AS FLOAT)) as AvgItemsEquipped,
+                        AVG(CAST(ItemsPickedUp AS FLOAT)) as AvgItemsPickedUp,
+                        SUM(HasRifle) as RoundsWithRifle,
+                        CAST(SUM(HasRifle) AS FLOAT) / COUNT(*) * 100 as RifleUsageRate,
+                        SUM(HasArmor) as RoundsWithArmor,
+                        CAST(SUM(HasArmor) AS FLOAT) / COUNT(*) * 100 as ArmorUsageRate,
+                        AVG(CAST(GrenadeCount AS FLOAT)) as AvgGrenadesPerRound,
+                        -- Economic efficiency metrics
+                        CASE 
+                            WHEN COUNT(*) > 0 THEN 
+                                CAST(SUM(RoundWon) AS FLOAT) / AVG(CAST(RoundStartMoney AS FLOAT)) * 1000 
+                            ELSE 0 
+                        END as EconomicEfficiency, -- Wins per $1000 invested
+                        -- Money management rating
+                        CASE 
+                            WHEN AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) > 0 AND COUNT(*) > 0 THEN
+                                CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) / (AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) / 1000)
+                            ELSE 0
+                        END as MoneyManagementScore
+                    FROM RoundEconomyStats
+                    GROUP BY PlayerName, Team, MapName, MoneyState
+                    HAVING COUNT(*) >= 3 -- At least 3 rounds in this money state for meaningful analysis
+                    ORDER BY EconomicEfficiency DESC, WinPercentage DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
