@@ -1886,10 +1886,18 @@ public class CorrectedDemoParserService
 
         for (int i = 0; i < validItems.Count; i += batchSize)
         {
-            var batch = validItems.Skip(i).Take(batchSize).ToList();
-            _context.Set<T>().AddRange(batch);
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("Saved batch of {Count} {ItemType} (Total: {Total})", batch.Count, itemType, Math.Min(i + batchSize, validItems.Count));
+            try
+            {
+                var batch = validItems.Skip(i).Take(batchSize).ToList();
+                _context.Set<T>().AddRange(batch);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Saved batch of {Count} {ItemType} (Total: {Total})", batch.Count, itemType, Math.Min(i + batchSize, validItems.Count));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save batch {BatchIndex} of {ItemType}. Inner exception: {InnerException}", i / batchSize + 1, itemType, ex.InnerException?.Message ?? "None");
+                throw;
+            }
         }
 
         _logger.LogInformation("Saved {Count} {ItemType}", validItems.Count, itemType);
