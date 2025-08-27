@@ -365,69 +365,96 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH RoundEconomics AS (
+                    WITH EconomicData AS (
                         SELECT 
-                            r.Id as RoundId,
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
                             r.RoundNumber,
                             r.WinnerTeam,
-                            r.CTStartMoney,
-                            r.TStartMoney,
-                            r.CTEquipmentValue,
-                            r.TEquipmentValue,
-                            r.IsEcoRound,
-                            r.IsForceBuyRound,
-                            r.IsAntiEcoRound,
-                            r.IsPistolRound,
-                            d.FileName,
-                            d.MapName,
-                            -- Calculate economic advantage
-                            (r.CTStartMoney + r.CTEquipmentValue) - (r.TStartMoney + r.TEquipmentValue) as CTEconomicAdvantage,
-                            -- Categorize round type by economy
+                            
+                            -- WEAPON ECONOMY ANALYSIS BASED ON KILLS
+                            k.WeaponName,
                             CASE 
-                                WHEN r.IsPistolRound = 1 THEN 'Pistol Round'
-                                WHEN r.IsEcoRound = 1 THEN 'Eco Round'
-                                WHEN r.IsForceBuyRound = 1 THEN 'Force Buy'
-                                WHEN r.IsAntiEcoRound = 1 THEN 'Anti-Eco'
-                                WHEN (r.CTEquipmentValue + r.TEquipmentValue) > 30000 THEN 'Full Buy Both'
-                                ELSE 'Mixed Economy'
-                            END as EconomyType
-                        FROM Rounds r
+                                WHEN k.WeaponName LIKE '%ak47%' OR k.WeaponName LIKE '%m4a%' THEN 'High_Value_Rifle'
+                                WHEN k.WeaponName LIKE '%awp%' OR k.WeaponName LIKE '%ssg08%' THEN 'Sniper_Investment'
+                                WHEN k.WeaponName LIKE '%glock%' OR k.WeaponName LIKE '%usp%' OR k.WeaponName LIKE '%p250%' THEN 'Pistol_Economy'
+                                WHEN k.WeaponName LIKE '%mp%' OR k.WeaponName LIKE '%mac10%' OR k.WeaponName LIKE '%ump%' THEN 'SMG_Force'
+                                WHEN k.WeaponName LIKE '%deagle%' OR k.WeaponName LIKE '%r8%' THEN 'Pistol_Force'
+                                ELSE 'Other_Equipment'
+                            END as EconomyType,
+                            
+                            -- ROUND TYPE CLASSIFICATION
+                            CASE 
+                                WHEN r.RoundNumber <= 3 OR r.RoundNumber = 16 OR r.RoundNumber = 19 THEN 'Pistol_Round'
+                                WHEN r.RoundNumber BETWEEN 4 AND 6 OR r.RoundNumber BETWEEN 20 AND 22 THEN 'Anti_Eco_Round'
+                                WHEN r.RoundNumber BETWEEN 13 AND 15 OR r.RoundNumber BETWEEN 28 AND 30 THEN 'Late_Round'
+                                ELSE 'Buy_Round'
+                            END as RoundType,
+                            
+                            -- PERFORMANCE METRICS
+                            prs.Damage as RoundDamage,
+                            prs.Kills as RoundKills,
+                            prs.Deaths as RoundDeaths,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            
+                            -- ECONOMY EFFECTIVENESS
+                            CASE WHEN k.Id IS NOT NULL THEN 1 ELSE 0 END as KillMade,
+                            k.Distance as KillDistance
+                            
+                        FROM Players p
+                        INNER JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
-                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
-                            AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
+                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
                     )
                     SELECT 
+                        PlayerName,
+                        Team,
                         MapName,
                         EconomyType,
-                        COUNT(*) as TotalRounds,
-                        -- Win rates by economy type
-                        COUNT(CASE WHEN WinnerTeam = 'TERRORIST' THEN 1 END) as TWins,
-                        COUNT(CASE WHEN WinnerTeam = 'CT' THEN 1 END) as CTWins,
-                        COUNT(CASE WHEN WinnerTeam = 'TERRORIST' THEN 1 END) * 100.0 / COUNT(*) as TWinPercentage,
-                        COUNT(CASE WHEN WinnerTeam = 'CT' THEN 1 END) * 100.0 / COUNT(*) as CTWinPercentage,
-                        -- Economic metrics
-                        AVG(CTStartMoney) as AvgCTStartMoney,
-                        AVG(TStartMoney) as AvgTStartMoney,
-                        AVG(CTEquipmentValue) as AvgCTEquipmentValue,
-                        AVG(TEquipmentValue) as AvgTEquipmentValue,
-                        AVG(CTEconomicAdvantage) as AvgCTEconomicAdvantage,
-                        -- Economic efficiency
-                        AVG(CASE WHEN WinnerTeam = 'CT' THEN CTEquipmentValue ELSE NULL END) as AvgCTEquipmentWhenWon,
-                        AVG(CASE WHEN WinnerTeam = 'TERRORIST' THEN TEquipmentValue ELSE NULL END) as AvgTEquipmentWhenWon
-                    FROM RoundEconomics
-                    GROUP BY MapName, EconomyType
-                    ORDER BY MapName, 
-                        CASE EconomyType 
-                            WHEN 'Pistol Round' THEN 1
-                            WHEN 'Eco Round' THEN 2
-                            WHEN 'Force Buy' THEN 3
-                            WHEN 'Anti-Eco' THEN 4
-                            WHEN 'Mixed Economy' THEN 5
-                            WHEN 'Full Buy Both' THEN 6
-                            ELSE 7
-                        END";
+                        RoundType,
+                        
+                        -- ECONOMIC PERFORMANCE METRICS
+                        COUNT(*) as RoundsWithEconomyType,
+                        SUM(KillMade) as KillsWithEconomyType,
+                        ROUND(SUM(KillMade) * 100.0 / COUNT(*), 2) as KillRateWithEconomyType,
+                        ROUND(AVG(RoundDamage), 2) as AvgDamageWithEconomyType,
+                        
+                        -- ECONOMIC SUCCESS METRICS
+                        SUM(RoundWon) as RoundsWonWithEconomyType,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRateWithEconomyType,
+                        
+                        -- WEAPON EFFECTIVENESS
+                        COUNT(DISTINCT WeaponName) as WeaponVariety,
+                        ROUND(AVG(KillDistance), 2) as AvgKillDistanceWithEconomy,
+                        
+                        -- ECONOMIC INTELLIGENCE SCORE
+                        CASE 
+                            WHEN EconomyType = 'High_Value_Rifle' AND ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 70 THEN 95
+                            WHEN EconomyType = 'Pistol_Economy' AND ROUND(SUM(KillMade) * 100.0 / COUNT(*), 2) >= 40 THEN 85
+                            WHEN EconomyType = 'SMG_Force' AND ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 60 THEN 80
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 60 THEN 75
+                            WHEN ROUND(SUM(KillMade) * 100.0 / COUNT(*), 2) >= 30 THEN 60
+                            ELSE 40
+                        END as EconomicIntelligenceScore
+                        
+                    FROM EconomicData
+                    GROUP BY PlayerName, Team, MapName, EconomyType, RoundType
+                    HAVING COUNT(*) >= 2
+                    ORDER BY EconomicIntelligenceScore DESC, WinRateWithEconomyType DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
@@ -2616,85 +2643,80 @@ namespace CS2DemoParserWeb.Controllers
                             p.PlayerName,
                             p.Team,
                             d.MapName,
-                            wf.Weapon,
-                            wf.WeaponClass,
+                            r.RoundNumber,
                             
-                            -- AMMO MANAGEMENT
-                            wf.Ammo,
-                            wf.AmmoReserve,
-                            wf.Velocity,
-                            wf.RecoilIndex,
-                            wf.Accuracy,
-                            wf.IsScoped,
-                            wf.IsSilenced,
+                            -- WEAPON ANALYSIS BASED ON KILLS
+                            k.WeaponName,
+                            CASE 
+                                WHEN k.WeaponName LIKE '%ak47%' OR k.WeaponName LIKE '%m4a%' THEN 'Rifle'
+                                WHEN k.WeaponName LIKE '%awp%' OR k.WeaponName LIKE '%ssg08%' THEN 'Sniper'
+                                WHEN k.WeaponName LIKE '%glock%' OR k.WeaponName LIKE '%usp%' OR k.WeaponName LIKE '%p250%' THEN 'Pistol'
+                                WHEN k.WeaponName LIKE '%mp%' OR k.WeaponName LIKE '%mac10%' OR k.WeaponName LIKE '%ump%' THEN 'SMG'
+                                ELSE 'Other'
+                            END as WeaponClass,
                             
-                            -- SHOT CONTEXT
-                            wf.ThroughSmoke,
-                            wf.IsBlind,
+                            -- KILL METRICS
+                            CASE WHEN k.IsHeadshot = 1 THEN 1 ELSE 0 END as IsHeadshot,
+                            k.Distance,
                             
-                            -- KILL CORRELATION
-                            CASE WHEN k.Id IS NOT NULL THEN 1 ELSE 0 END as ShotResultedInKill
+                            -- ROUND CONTEXT
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            prs.Damage as RoundDamage
                             
                         FROM Players p
-                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
-                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.Weapon = wf.Weapon 
-                            AND ABS(k.GameTime - wf.GameTime) < 1.0
-                        
-                        WHERE wf.Weapon IS NOT NULL
-                            AND (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                            AND (@Team IS NULL OR p.Team = @Team)
+                        INNER JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
+                        WHERE k.WeaponName IS NOT NULL";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
                     )
                     SELECT 
                         PlayerName,
                         Team,
                         MapName,
-                        Weapon,
+                        WeaponName,
                         WeaponClass,
                         
-                        -- USAGE STATISTICS
-                        COUNT(*) as ShotsFired,
-                        SUM(ShotResultedInKill) as KillShots,
-                        CAST(SUM(ShotResultedInKill) AS FLOAT) / COUNT(*) * 100 as KillShotPercentage,
+                        -- WEAPON USAGE METRICS
+                        COUNT(*) as KillsWithWeapon,
+                        SUM(IsHeadshot) as HeadshotKills,
+                        ROUND((SUM(IsHeadshot) * 100.0 / COUNT(*)), 2) as HeadshotRate,
                         
-                        -- AMMO EFFICIENCY
-                        AVG(CAST(Ammo AS FLOAT)) as AvgAmmoPerShot,
-                        AVG(CAST(AmmoReserve AS FLOAT)) as AvgReserveAmmo,
-                        CASE WHEN AVG(CAST(Ammo AS FLOAT)) > 0 THEN 
-                            SUM(ShotResultedInKill) / AVG(CAST(Ammo AS FLOAT)) 
-                            ELSE 0 END as AmmoEfficiencyRatio,
+                        -- DISTANCE ANALYSIS
+                        ROUND(AVG(Distance), 2) as AvgKillDistance,
+                        ROUND(MIN(Distance), 2) as MinKillDistance,
+                        ROUND(MAX(Distance), 2) as MaxKillDistance,
                         
-                        -- RECOIL CONTROL
-                        AVG(RecoilIndex) as AvgRecoilIndex,
-                        AVG(Accuracy) as AvgWeaponAccuracy,
+                        -- ROUND IMPACT
+                        SUM(RoundWon) as RoundsWonWithWeapon,
+                        ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) as WinRateWithWeapon,
+                        ROUND(AVG(RoundDamage), 2) as AvgRoundDamage,
                         
-                        -- MOVEMENT SHOOTING
-                        AVG(Velocity) as AvgVelocityWhenShooting,
-                        COUNT(CASE WHEN Velocity > 50 THEN 1 END) as MovementShots,
-                        COUNT(CASE WHEN Velocity <= 50 THEN 1 END) as StaticShots,
-                        
-                        -- CONFIGURATION USAGE
-                        COUNT(CASE WHEN IsScoped = 1 THEN 1 END) as ScopedShots,
-                        COUNT(CASE WHEN IsSilenced = 1 THEN 1 END) as SilencedShots,
-                        CAST(COUNT(CASE WHEN IsScoped = 1 THEN 1 END) AS FLOAT) / COUNT(*) * 100 as ScopeUsagePercentage,
-                        
-                        -- HANDICAPPED PERFORMANCE  
-                        COUNT(CASE WHEN ThroughSmoke = 1 THEN 1 END) as SmokeShots,
-                        COUNT(CASE WHEN IsBlind = 1 THEN 1 END) as BlindShots,
-                        SUM(CASE WHEN ThroughSmoke = 1 AND ShotResultedInKill = 1 THEN 1 ELSE 0 END) as SmokeKills,
-                        SUM(CASE WHEN IsBlind = 1 AND ShotResultedInKill = 1 THEN 1 ELSE 0 END) as BlindKills,
-                        
-                        -- SPRAY TRANSFER SUCCESS
-                        CASE WHEN AVG(RecoilIndex) > 0 THEN
-                            AVG(Accuracy) / AVG(RecoilIndex) * 100
-                            ELSE AVG(Accuracy) END as SprayControlRating
+                        -- WEAPON PROFICIENCY SCORE (0-100)
+                        CASE 
+                            WHEN ROUND((SUM(IsHeadshot) * 100.0 / COUNT(*)), 2) >= 60 AND COUNT(*) >= 10 THEN 95
+                            WHEN ROUND((SUM(IsHeadshot) * 100.0 / COUNT(*)), 2) >= 40 AND COUNT(*) >= 5 THEN 80
+                            WHEN ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) >= 70 THEN 75
+                            WHEN COUNT(*) >= 10 THEN 60
+                            ELSE 40
+                        END as WeaponProficiencyScore
                         
                     FROM WeaponData  
-                    GROUP BY PlayerName, Team, MapName, Weapon, WeaponClass
-                    HAVING COUNT(*) >= 5
-                    ORDER BY KillShotPercentage DESC, SprayControlRating DESC";
+                    GROUP BY PlayerName, Team, MapName, WeaponName, WeaponClass
+                    HAVING COUNT(*) >= 2
+                    ORDER BY WeaponProficiencyScore DESC, HeadshotRate DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
@@ -2732,51 +2754,51 @@ namespace CS2DemoParserWeb.Controllers
                             p.PlayerName,
                             p.Team,
                             d.MapName,
+                            r.RoundNumber,
                             
-                            -- MULTI-HANDICAP CONDITIONS
+                            -- COMBAT CONDITIONS BASED ON AVAILABLE DATA
                             CASE 
-                                WHEN k.ThroughSmoke = 1 AND k.IsBlind = 1 THEN 'Smoke_And_Blind'
-                                WHEN k.ThroughSmoke = 1 AND wf.Velocity > 50 THEN 'Smoke_And_Moving' 
-                                WHEN k.IsBlind = 1 AND wf.Velocity > 50 THEN 'Blind_And_Moving'
+                                WHEN k.ThroughSmoke = 1 AND k.IsWallbang = 1 THEN 'Smoke_And_Wallbang'
+                                WHEN k.ThroughSmoke = 1 AND k.Distance > 800 THEN 'Smoke_And_LongRange'
+                                WHEN k.IsWallbang = 1 AND k.Distance > 600 THEN 'Wallbang_And_LongRange'
                                 WHEN k.ThroughSmoke = 1 THEN 'Through_Smoke'
-                                WHEN k.IsBlind = 1 THEN 'While_Blind'
-                                WHEN wf.Velocity > 50 THEN 'While_Moving'
+                                WHEN k.IsWallbang = 1 THEN 'Wallbang'
+                                WHEN k.Distance > 1000 THEN 'Long_Range'
+                                WHEN k.IsHeadshot = 1 THEN 'Precision'
                                 ELSE 'Standard'
                             END as CombatCondition,
                             
-                            -- FLASH COORDINATION
-                            fe.FlashDuration,
-                            fe.Distance as FlashDistance,
-                            fe.FlasherPlayerId,
-                            CASE WHEN fe.FlasherPlayerId != p.Id AND fe.IsTeamFlash = 0 THEN 1 ELSE 0 END as FlashAssistedKill,
-                            
-                            -- WALLBANG MASTERY
-                            dm.Penetration,
-                            dm.IsWallbang,
-                            k.IsWallbang as WallbangKill,
-                            
-                            -- KILL SUCCESS
+                            -- KILL METRICS
                             CASE WHEN k.Id IS NOT NULL THEN 1 ELSE 0 END as KillSuccess,
                             k.Distance as KillDistance,
+                            k.IsHeadshot,
+                            k.IsWallbang as WallbangKill,
+                            k.ThroughSmoke,
+                            k.WeaponName,
                             
-                            -- DAMAGE EFFECTIVENESS
-                            dm.DamageAmount,
-                            dm.AttackerBlind,
-                            dm.ThroughSmoke as DamageThroughSmoke
+                            -- ROUND CONTEXT
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            prs.Kills as RoundKills,
+                            prs.Deaths as RoundDeaths,
+                            prs.Damage as RoundDamage
                             
                         FROM Players p
-                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        LEFT JOIN Kills k ON p.Id = k.KillerId
-                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId 
-                            AND ABS(wf.GameTime - k.GameTime) < 1.0
-                        LEFT JOIN Damages dm ON p.Id = dm.AttackerId
-                        LEFT JOIN FlashEvents fe ON p.Id = fe.FlashedPlayerId 
-                            AND ABS(fe.GameTime - k.GameTime) < 3.0
-                        
-                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                            AND (@Team IS NULL OR p.Team = @Team)
+                        INNER JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
                     )
                     SELECT 
                         PlayerName,
@@ -2784,40 +2806,40 @@ namespace CS2DemoParserWeb.Controllers
                         MapName,
                         CombatCondition,
                         
-                        -- HANDICAP PERFORMANCE
+                        -- CIRCUMSTANTIAL PERFORMANCE
                         COUNT(*) as EngagementsInCondition,
                         SUM(KillSuccess) as KillsInCondition,
-                        CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100 as ConditionKillPercentage,
-                        AVG(KillDistance) as AvgKillDistanceInCondition,
+                        ROUND(CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100, 2) as ConditionKillPercentage,
+                        ROUND(AVG(KillDistance), 2) as AvgKillDistanceInCondition,
                         
-                        -- FLASH COORDINATION
-                        SUM(FlashAssistedKill) as FlashAssistedKills,
-                        AVG(FlashDistance) as AvgFlashDistance,
-                        AVG(FlashDuration) as AvgFlashDuration,
+                        -- WEAPON EFFECTIVENESS IN CONDITIONS
+                        COUNT(DISTINCT WeaponName) as WeaponsUsedInCondition,
+                        SUM(IsHeadshot) as HeadshotKillsInCondition,
+                        ROUND(SUM(IsHeadshot) * 100.0 / NULLIF(SUM(KillSuccess), 0), 2) as HeadshotRateInCondition,
                         
-                        -- WALLBANG EXPERTISE  
-                        COUNT(CASE WHEN WallbangKill = 1 THEN 1 END) as WallbangKills,
-                        AVG(Penetration) as AvgPenetrationDepth,
-                        COUNT(CASE WHEN IsWallbang = 1 THEN 1 END) as WallbangDamageInstances,
+                        -- WALLBANG & SMOKE EXPERTISE  
+                        SUM(WallbangKill) as WallbangKills,
+                        SUM(ThroughSmoke) as ThroughSmokeKills,
+                        ROUND(SUM(WallbangKill) * 100.0 / NULLIF(COUNT(*), 0), 2) as WallbangRate,
                         
-                        -- DAMAGE UNDER PRESSURE
-                        AVG(DamageAmount) as AvgDamageInCondition,
-                        COUNT(CASE WHEN AttackerBlind = 1 THEN 1 END) as DamageWhileBlinded,
-                        COUNT(CASE WHEN DamageThroughSmoke = 1 THEN 1 END) as DamageThroughSmokeCount,
+                        -- ROUND IMPACT IN CONDITIONS
+                        SUM(RoundWon) as RoundsWonInCondition,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRateInCondition,
+                        ROUND(AVG(RoundDamage), 2) as AvgDamageInCondition,
                         
-                        -- MULTI-HANDICAP MASTERY SCORE
+                        -- CIRCUMSTANTIAL MASTERY SCORE
                         CASE 
                             WHEN CombatCondition LIKE '%_And_%' THEN 
-                                (CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 2.0
+                                ROUND((CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 2.0, 2)
                             WHEN CombatCondition != 'Standard' THEN 
-                                (CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 1.5
-                            ELSE CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100
-                        END as HandicapMasteryScore
+                                ROUND((CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 1.5, 2)
+                            ELSE ROUND(CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100, 2)
+                        END as CircumstantialMasteryScore
                         
                     FROM CircumstantialData
                     GROUP BY PlayerName, Team, MapName, CombatCondition
-                    HAVING COUNT(*) >= 3
-                    ORDER BY HandicapMasteryScore DESC, ConditionKillPercentage DESC";
+                    HAVING COUNT(*) >= 2
+                    ORDER BY CircumstantialMasteryScore DESC, ConditionKillPercentage DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
@@ -2857,93 +2879,98 @@ namespace CS2DemoParserWeb.Controllers
                             d.MapName,
                             r.RoundNumber,
                             
-                            -- FLASH COORDINATION
-                            fe_give.Id as FlashGiven,
-                            fe_give.FlashedPlayerId as TeammateFlashed,
-                            fe_give.FlashDuration as FlashDurationGiven,
-                            fe_give.IsTeamFlash,
+                            -- TEAM KILL COORDINATION
+                            k.GameTime as PlayerKillTime,
+                            k.WeaponName as PlayerWeapon,
+                            teammate_k.GameTime as TeammateKillTime,
+                            teammate_k.WeaponName as TeammateWeapon,
+                            teammate.PlayerName as TeammateName,
+                            ABS(k.GameTime - teammate_k.GameTime) as KillTimeDiff,
                             
-                            -- UTILITY TEAMWORK
-                            g.TeammatesAffected,
-                            g.EnemiesAffected,
-                            g.GrenadeType,
-                            
-                            -- SITE SUPPORT  
-                            b.CTPlayersInRange,
-                            b.TPlayersInRange,
-                            b.EventType as BombEvent,
-                            
-                            -- COORDINATED KILLS
-                            k.GameTime as KillTime,
-                            teammate_kills.GameTime as TeammateKillTime,
-                            ABS(k.GameTime - teammate_kills.GameTime) as KillTimeDiff,
+                            -- TEAM PERFORMANCE METRICS  
+                            prs.Kills as PlayerKills,
+                            prs.Deaths as PlayerDeaths,
+                            prs.Assists as PlayerAssists,
+                            prs.Damage as PlayerDamage,
+                            teammate_prs.Kills as TeammateKills,
+                            teammate_prs.Deaths as TeammateDeaths,
+                            teammate_prs.Damage as TeammateDamage,
                             
                             -- ROUND SUCCESS
                             CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
                             
                         FROM Players p
-                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
-                        LEFT JOIN FlashEvents fe_give ON p.Id = fe_give.FlasherPlayerId AND fe_give.RoundId = r.Id
-                        LEFT JOIN Grenades g ON p.Id = g.PlayerId AND g.RoundId = r.Id
-                        LEFT JOIN Bombs b ON b.RoundId = r.Id
+                        INNER JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
                         LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
-                        LEFT JOIN Kills teammate_kills ON k.RoundId = teammate_kills.RoundId 
-                            AND k.KillerId != teammate_kills.KillerId
-                            AND ABS(k.GameTime - teammate_kills.GameTime) < 5.0
-                        LEFT JOIN Players teammate ON teammate_kills.KillerId = teammate.Id 
-                            AND teammate.Team = p.Team
                         
-                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                            AND (@Team IS NULL OR p.Team = @Team)
+                        -- Join with teammates in same round
+                        LEFT JOIN PlayerRoundStats teammate_prs ON r.Id = teammate_prs.RoundId 
+                            AND teammate_prs.PlayerId != prs.PlayerId
+                        LEFT JOIN Players teammate ON teammate_prs.PlayerId = teammate.Id
+                            AND teammate.Team = p.Team
+                        LEFT JOIN Kills teammate_k ON teammate.Id = teammate_k.KillerId 
+                            AND teammate_k.RoundId = r.Id
+                            AND k.Id IS NOT NULL
+                            AND ABS(k.GameTime - teammate_k.GameTime) <= 5.0";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
                     )
                     SELECT 
                         PlayerName,
                         Team,
                         MapName,
                         
-                        -- FLASH COORDINATION METRICS
-                        COUNT(FlashGiven) as FlashesGivenToTeam,
-                        AVG(FlashDurationGiven) as AvgFlashDurationGiven,
-                        COUNT(CASE WHEN IsTeamFlash = 1 THEN 1 END) as AccidentalTeamFlashes,
-                        COUNT(CASE WHEN IsTeamFlash = 0 AND FlashGiven IS NOT NULL THEN 1 END) as IntentionalFlashes,
-                        
-                        -- UTILITY TEAMWORK ANALYSIS
-                        COUNT(DISTINCT GrenadeType) as UtilityVariety,
-                        AVG(CAST(TeammatesAffected AS FLOAT)) as AvgTeammatesAffected,
-                        AVG(CAST(EnemiesAffected AS FLOAT)) as AvgEnemiesAffected,
-                        CASE WHEN AVG(CAST(TeammatesAffected AS FLOAT)) > 0 THEN
-                            AVG(CAST(EnemiesAffected AS FLOAT)) / AVG(CAST(TeammatesAffected AS FLOAT))
-                            ELSE AVG(CAST(EnemiesAffected AS FLOAT)) END as UtilityTeamworkRatio,
-                        
-                        -- SITE SUPPORT METRICS
-                        COUNT(CASE WHEN BombEvent = 'plant' THEN 1 END) as PlantSupport,
-                        COUNT(CASE WHEN BombEvent = 'defuse' THEN 1 END) as DefuseSupport,
-                        AVG(CASE WHEN Team = 'CT' THEN CAST(CTPlayersInRange AS FLOAT) ELSE CAST(TPlayersInRange AS FLOAT) END) as AvgTeammatesInSupport,
-                        
-                        -- COORDINATED KILL ANALYSIS
-                        COUNT(CASE WHEN KillTimeDiff <= 2.0 THEN 1 END) as CoordinatedKills,
-                        COUNT(CASE WHEN KillTimeDiff <= 5.0 THEN 1 END) as SupportKills,
-                        AVG(KillTimeDiff) as AvgKillCoordinationTime,
-                        
-                        -- TEAMWORK SUCCESS RATE
-                        SUM(RoundWon) as RoundsWon,
+                        -- TEAM COORDINATION METRICS
+                        COUNT(DISTINCT TeammateName) as TeammatesPlayedWith,
                         COUNT(DISTINCT RoundNumber) as RoundsPlayed,
-                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(DISTINCT RoundNumber) * 100 as TeamworkWinPercentage,
+                        COUNT(CASE WHEN PlayerKillTime IS NOT NULL THEN 1 END) as TotalKills,
                         
-                        -- OVERALL TEAMWORK SCORE
-                        ((COUNT(CASE WHEN IsTeamFlash = 0 AND FlashGiven IS NOT NULL THEN 1 END) * 2) + 
-                         (COUNT(CASE WHEN KillTimeDiff <= 2.0 THEN 1 END) * 3) +
-                         (CASE WHEN AVG(CAST(TeammatesAffected AS FLOAT)) > 0 THEN
-                            AVG(CAST(EnemiesAffected AS FLOAT)) / AVG(CAST(TeammatesAffected AS FLOAT)) * 10
-                            ELSE AVG(CAST(EnemiesAffected AS FLOAT)) END)) as TeamworkScore
+                        -- KILL COORDINATION ANALYSIS
+                        COUNT(CASE WHEN KillTimeDiff IS NOT NULL AND KillTimeDiff <= 2.0 THEN 1 END) as CoordinatedKills,
+                        COUNT(CASE WHEN KillTimeDiff IS NOT NULL AND KillTimeDiff <= 5.0 THEN 1 END) as SupportKills,
+                        ROUND(AVG(KillTimeDiff), 2) as AvgKillCoordinationTime,
+                        
+                        -- WEAPON COORDINATION
+                        COUNT(DISTINCT PlayerWeapon) as WeaponVariety,
+                        COUNT(CASE WHEN PlayerWeapon != TeammateWeapon AND KillTimeDiff <= 3.0 THEN 1 END) as ComplementaryWeaponKills,
+                        
+                        -- TEAM PERFORMANCE METRICS
+                        ROUND(AVG(CAST(PlayerKills AS FLOAT)), 2) as AvgKillsPerRound,
+                        ROUND(AVG(CAST(PlayerAssists AS FLOAT)), 2) as AvgAssistsPerRound,
+                        ROUND(AVG(CAST(PlayerDamage AS FLOAT)), 2) as AvgDamagePerRound,
+                        ROUND(AVG(CAST(TeammateKills AS FLOAT)), 2) as AvgTeammateKillsPerRound,
+                        ROUND(AVG(CAST(TeammateDamage AS FLOAT)), 2) as AvgTeammateDamagePerRound,
+                        
+                        -- TEAM SUCCESS METRICS
+                        SUM(RoundWon) as RoundsWon,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(DISTINCT RoundNumber), 2) as TeamWinRate,
+                        
+                        -- COORDINATION EFFECTIVENESS SCORE
+                        CASE 
+                            WHEN COUNT(CASE WHEN KillTimeDiff IS NOT NULL AND KillTimeDiff <= 2.0 THEN 1 END) > 0 
+                            THEN ROUND(
+                                (COUNT(CASE WHEN KillTimeDiff IS NOT NULL AND KillTimeDiff <= 2.0 THEN 1 END) * 100.0 / 
+                                 NULLIF(COUNT(CASE WHEN PlayerKillTime IS NOT NULL THEN 1 END), 0)) * 
+                                (SUM(RoundWon) * 100.0 / COUNT(DISTINCT RoundNumber)) / 100.0, 2)
+                            ELSE 0
+                        END as CoordinationEffectivenessScore
                         
                     FROM TeamData
                     GROUP BY PlayerName, Team, MapName
-                    HAVING COUNT(DISTINCT RoundNumber) >= 5
-                    ORDER BY TeamworkScore DESC, TeamworkWinPercentage DESC";
+                    HAVING COUNT(DISTINCT RoundNumber) >= 3
+                    ORDER BY CoordinationEffectivenessScore DESC, TeamWinRate DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
