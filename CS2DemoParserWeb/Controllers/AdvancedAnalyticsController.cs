@@ -2533,9 +2533,9 @@ namespace CS2DemoParserWeb.Controllers
                             prs.IsAlive
                             
                         FROM Players p
-                        INNER JOIN PlayerRoundStats prs ON p.PlayerId = prs.PlayerId
-                        INNER JOIN Rounds r ON prs.RoundId = r.RoundId
-                        INNER JOIN DemoFiles d ON r.DemoFileId = d.DemoFileId
+                        INNER JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
                         WHERE 1=1";
 
                 // Apply filters
@@ -3011,9 +3011,9 @@ namespace CS2DemoParserWeb.Controllers
                             CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
                             
                         FROM Players p
-                        INNER JOIN PlayerRoundStats prs ON p.PlayerId = prs.PlayerId
-                        INNER JOIN Rounds r ON prs.RoundId = r.RoundId
-                        INNER JOIN DemoFiles d ON r.DemoFileId = d.DemoFileId
+                        INNER JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
                         WHERE 1=1";
 
                 // Apply filters
