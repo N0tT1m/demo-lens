@@ -2512,6 +2512,72 @@ namespace CS2DemoParserWeb.Controllers
             return results;
         }
 
+        [HttpGet("database-diagnostic")]
+        public async Task<IActionResult> GetDatabaseDiagnostic()
+        {
+            try
+            {
+                var sql = @"
+                    SELECT 
+                        'DemoFiles' as TableName,
+                        COUNT(*) as RecordCount,
+                        MAX(Id) as MaxId,
+                        MIN(Id) as MinId
+                    FROM DemoFiles
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        'Rounds' as TableName,
+                        COUNT(*) as RecordCount,
+                        MAX(Id) as MaxId,
+                        MIN(Id) as MinId
+                    FROM Rounds
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        'Players' as TableName,
+                        COUNT(*) as RecordCount,
+                        MAX(Id) as MaxId,
+                        MIN(Id) as MinId
+                    FROM Players
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        'Kills' as TableName,
+                        COUNT(*) as RecordCount,
+                        MAX(Id) as MaxId,
+                        MIN(Id) as MinId
+                    FROM Kills
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        'PlayerRoundStats' as TableName,
+                        COUNT(*) as RecordCount,
+                        MAX(Id) as MaxId,
+                        MIN(Id) as MinId
+                    FROM PlayerRoundStats";
+
+                var data = await ExecuteAnalyticsQuery(sql, new AnalyticsQuery());
+
+                return Ok(new
+                {
+                    Title = "Database Diagnostic",
+                    Description = "Basic table counts and ranges",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating database diagnostic");
+                return StatusCode(500, new { Error = "Database diagnostic failed", Details = ex.Message });
+            }
+        }
+
         private void AddAnalyticsParameters(SqlCommand command, AnalyticsQuery query)
         {
             command.Parameters.AddWithValue("@DemoId", query.DemoId.HasValue ? (object)query.DemoId.Value : DBNull.Value);
