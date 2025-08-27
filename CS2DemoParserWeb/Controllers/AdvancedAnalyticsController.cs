@@ -2635,6 +2635,386 @@ namespace CS2DemoParserWeb.Controllers
             
             return csv.ToString();
         }
+
+        // TIER 1: HIGH-IMPACT ANALYTICS IMPLEMENTATION
+
+        [HttpGet("detailed-clutch-intelligence")]
+        public async Task<IActionResult> GetDetailedClutchIntelligence([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH ClutchSituations AS (
+                        SELECT 
+                            k.KillerId,
+                            killer.PlayerName as ClutchPlayer,
+                            killer.Team as ClutchTeam,
+                            d.MapName,
+                            k.ClutchSize,
+                            CASE WHEN killer.Team = r.WinnerTeam THEN 1 ELSE 0 END as ClutchWon,
+                            k.KillerHealth,
+                            k.KillerArmor,
+                            k.Weapon,
+                            k.Distance,
+                            k.KillerPositionX,
+                            k.KillerPositionY,
+                            -- Determine area based on position (simplified)
+                            CASE 
+                                WHEN d.MapName = 'de_mirage' THEN
+                                    CASE 
+                                        WHEN k.KillerPositionX > 1000 THEN 'A Site'
+                                        WHEN k.KillerPositionX < -1000 THEN 'B Site'
+                                        WHEN ABS(k.KillerPositionX) < 500 THEN 'Mid'
+                                        ELSE 'Connector'
+                                    END
+                                WHEN d.MapName = 'de_dust2' THEN
+                                    CASE 
+                                        WHEN k.KillerPositionY > 1000 THEN 'A Site'
+                                        WHEN k.KillerPositionY < -1000 THEN 'B Site'
+                                        ELSE 'Mid'
+                                    END
+                                ELSE 'Unknown'
+                            END as ClutchArea,
+                            -- Health condition
+                            CASE 
+                                WHEN k.KillerHealth > 75 THEN 'Healthy'
+                                WHEN k.KillerHealth > 25 THEN 'Damaged' 
+                                ELSE 'Low Health'
+                            END as HealthCondition,
+                            r.RoundNumber,
+                            d.FileName
+                        FROM Kills k
+                        INNER JOIN Players killer ON k.KillerId = killer.Id
+                        INNER JOIN Rounds r ON k.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE k.IsClutch = 1
+                            AND k.ClutchSize >= 2
+                            AND (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR killer.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR killer.Team = @Team)
+                    )
+                    SELECT 
+                        ClutchPlayer,
+                        ClutchTeam,
+                        MapName,
+                        COUNT(*) as TotalClutchAttempts,
+                        SUM(ClutchWon) as ClutchWins,
+                        CAST(SUM(ClutchWon) AS FLOAT) / COUNT(*) * 100 as ClutchSuccessRate,
+                        -- By clutch size
+                        COUNT(CASE WHEN ClutchSize = 2 THEN 1 END) as Clutch1v2Count,
+                        SUM(CASE WHEN ClutchSize = 2 AND ClutchWon = 1 THEN 1 ELSE 0 END) as Clutch1v2Wins,
+                        CASE WHEN COUNT(CASE WHEN ClutchSize = 2 THEN 1 END) > 0 THEN CAST(SUM(CASE WHEN ClutchSize = 2 AND ClutchWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(CASE WHEN ClutchSize = 2 THEN 1 END) * 100 ELSE 0 END as Clutch1v2Rate,
+                        COUNT(CASE WHEN ClutchSize = 3 THEN 1 END) as Clutch1v3Count,
+                        SUM(CASE WHEN ClutchSize = 3 AND ClutchWon = 1 THEN 1 ELSE 0 END) as Clutch1v3Wins,
+                        CASE WHEN COUNT(CASE WHEN ClutchSize = 3 THEN 1 END) > 0 THEN CAST(SUM(CASE WHEN ClutchSize = 3 AND ClutchWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(CASE WHEN ClutchSize = 3 THEN 1 END) * 100 ELSE 0 END as Clutch1v3Rate,
+                        COUNT(CASE WHEN ClutchSize >= 4 THEN 1 END) as Clutch1v4PlusCount,
+                        SUM(CASE WHEN ClutchSize >= 4 AND ClutchWon = 1 THEN 1 ELSE 0 END) as Clutch1v4PlusWins,
+                        CASE WHEN COUNT(CASE WHEN ClutchSize >= 4 THEN 1 END) > 0 THEN CAST(SUM(CASE WHEN ClutchSize >= 4 AND ClutchWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(CASE WHEN ClutchSize >= 4 THEN 1 END) * 100 ELSE 0 END as Clutch1v4PlusRate,
+                        -- Positioning analysis
+                        COUNT(DISTINCT ClutchArea) as UniqueClutchAreas,
+                        -- Health condition analysis
+                        AVG(CASE WHEN HealthCondition = 'Healthy' THEN CAST(ClutchWon AS FLOAT) ELSE NULL END) * 100 as HealthyClutchRate,
+                        AVG(CASE WHEN HealthCondition = 'Low Health' THEN CAST(ClutchWon AS FLOAT) ELSE NULL END) * 100 as LowHealthClutchRate,
+                        -- Performance metrics
+                        AVG(CAST(KillerHealth AS FLOAT)) as AvgHealthDuringClutch,
+                        AVG(Distance) as AvgClutchKillDistance,
+                        COUNT(DISTINCT FileName) as DemosWithClutches
+                    FROM ClutchSituations
+                    GROUP BY ClutchPlayer, ClutchTeam, MapName
+                    HAVING COUNT(*) >= 2  -- At least 2 clutch attempts
+                    ORDER BY ClutchSuccessRate DESC, TotalClutchAttempts DESC";
+
+                var data = await ExecuteSqlQuery(sql, query);
+
+                return Ok(new
+                {
+                    title = "Detailed Clutch Intelligence",
+                    description = "Advanced clutch situation analysis including positioning heatmaps, health condition impact, and clutch size mastery",
+                    data = data,
+                    totalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetDetailedClutchIntelligence");
+                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            }
+        }
+
+        [HttpGet("flash-usage-analytics")]
+        public async Task<IActionResult> GetFlashUsageAnalytics([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH FlashEffectiveness AS (
+                        SELECT 
+                            fp.PlayerName as FlasherName,
+                            fp.Team as FlasherTeam,
+                            d.MapName,
+                            f.FlashDuration,
+                            f.Distance,
+                            f.IsTeamFlash,
+                            f.IsSelfFlash,
+                            -- Check for kills within flash duration window
+                            (SELECT COUNT(*) FROM Kills k 
+                             WHERE k.KillerId = f.FlasherPlayerId 
+                             AND k.RoundId = f.RoundId 
+                             AND k.GameTime BETWEEN f.GameTime AND (f.GameTime + f.FlashDuration)) as KillsDuringFlash,
+                            -- Check if victim was flashed when killed
+                            (SELECT COUNT(*) FROM Kills k 
+                             WHERE k.VictimId = f.FlashedPlayerId 
+                             AND k.RoundId = f.RoundId 
+                             AND k.GameTime BETWEEN f.GameTime AND (f.GameTime + f.FlashDuration)) as VictimKilledWhileFlashed,
+                            r.WinnerTeam,
+                            CASE WHEN fp.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                        FROM FlashEvents f
+                        INNER JOIN Players fp ON f.FlasherPlayerId = fp.Id
+                        INNER JOIN Rounds r ON f.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE f.FlasherPlayerId IS NOT NULL
+                            AND (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR fp.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR fp.Team = @Team)
+                    )
+                    SELECT 
+                        FlasherName,
+                        FlasherTeam,
+                        MapName,
+                        COUNT(*) as TotalFlashes,
+                        SUM(KillsDuringFlash) as FlashAssists,
+                        CAST(SUM(KillsDuringFlash) AS FLOAT) / COUNT(*) * 100 as FlashEfficiencyRate,
+                        SUM(VictimKilledWhileFlashed) as EnemiesKilledWhileFlashed,
+                        COUNT(CASE WHEN IsTeamFlash = 1 THEN 1 END) as TeamFlashCount,
+                        COUNT(CASE WHEN IsSelfFlash = 1 THEN 1 END) as SelfFlashCount,
+                        CAST(COUNT(CASE WHEN IsTeamFlash = 1 THEN 1 END) AS FLOAT) / COUNT(*) * 100 as TeamFlashRate,
+                        AVG(FlashDuration) as AvgFlashDuration,
+                        AVG(Distance) as AvgFlashDistance,
+                        AVG(CAST(RoundWon AS FLOAT)) * 100 as RoundWinRateWithFlashes,
+                        -- Flash timing analysis
+                        COUNT(CASE WHEN KillsDuringFlash > 0 THEN 1 END) as SuccessfulFlashRounds,
+                        CAST(COUNT(CASE WHEN KillsDuringFlash > 0 THEN 1 END) AS FLOAT) / COUNT(*) * 100 as FlashSuccessRate
+                    FROM FlashEffectiveness
+                    GROUP BY FlasherName, FlasherTeam, MapName
+                    HAVING COUNT(*) >= 3  -- At least 3 flashes thrown
+                    ORDER BY FlashEfficiencyRate DESC, TotalFlashes DESC";
+
+                var data = await ExecuteSqlQuery(sql, query);
+
+                return Ok(new
+                {
+                    title = "Flash Usage Analytics",
+                    description = "Flash effectiveness analysis including assist rates, team flash penalties, and optimal flash timing",
+                    data = data,
+                    totalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetFlashUsageAnalytics");
+                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            }
+        }
+
+        [HttpGet("enhanced-weapon-performance")]
+        public async Task<IActionResult> GetEnhancedWeaponPerformance([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH WeaponUsage AS (
+                        SELECT 
+                            wf.PlayerId,
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            wf.Weapon,
+                            wf.WeaponClass,
+                            wf.IsScoped,
+                            wf.ThroughSmoke,
+                            wf.IsBlind,
+                            wf.RecoilIndex,
+                            wf.Accuracy,
+                            wf.Ammo,
+                            wf.AmmoReserve,
+                            -- Check if this shot resulted in a kill
+                            (SELECT COUNT(*) FROM Kills k 
+                             WHERE k.KillerId = wf.PlayerId 
+                             AND k.RoundId = wf.RoundId 
+                             AND k.Weapon = wf.Weapon
+                             AND ABS(k.GameTime - wf.GameTime) < 0.5) as ShotResultedInKill,
+                            wf.GameTime
+                        FROM WeaponFires wf
+                        INNER JOIN Players p ON wf.PlayerId = p.Id
+                        INNER JOIN Rounds r ON wf.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        Weapon,
+                        WeaponClass,
+                        COUNT(*) as TotalShots,
+                        SUM(ShotResultedInKill) as KillShots,
+                        CAST(SUM(ShotResultedInKill) AS FLOAT) / COUNT(*) * 100 as ShotAccuracyRate,
+                        -- Situational performance
+                        COUNT(CASE WHEN IsScoped = 1 THEN 1 END) as ScopedShots,
+                        SUM(CASE WHEN IsScoped = 1 THEN ShotResultedInKill ELSE 0 END) as ScopedKills,
+                        CASE WHEN COUNT(CASE WHEN IsScoped = 1 THEN 1 END) > 0 THEN CAST(SUM(CASE WHEN IsScoped = 1 THEN ShotResultedInKill ELSE 0 END) AS FLOAT) / COUNT(CASE WHEN IsScoped = 1 THEN 1 END) * 100 ELSE 0 END as ScopedAccuracy,
+                        COUNT(CASE WHEN ThroughSmoke = 1 THEN 1 END) as ThroughSmokeShots,
+                        SUM(CASE WHEN ThroughSmoke = 1 THEN ShotResultedInKill ELSE 0 END) as ThroughSmokeKills,
+                        CASE WHEN COUNT(CASE WHEN ThroughSmoke = 1 THEN 1 END) > 0 THEN CAST(SUM(CASE WHEN ThroughSmoke = 1 THEN ShotResultedInKill ELSE 0 END) AS FLOAT) / COUNT(CASE WHEN ThroughSmoke = 1 THEN 1 END) * 100 ELSE 0 END as ThroughSmokeAccuracy,
+                        COUNT(CASE WHEN IsBlind = 1 THEN 1 END) as BlindFireShots,
+                        SUM(CASE WHEN IsBlind = 1 THEN ShotResultedInKill ELSE 0 END) as BlindFireKills,
+                        -- Spray control analysis
+                        AVG(RecoilIndex) as AvgRecoilIndex,
+                        AVG(Accuracy) as AvgAccuracy,
+                        -- Ammo management
+                        AVG(CAST(Ammo AS FLOAT)) as AvgAmmoWhenFiring,
+                        COUNT(CASE WHEN Ammo <= 5 THEN 1 END) as LowAmmoShots,
+                        SUM(CASE WHEN Ammo <= 5 THEN ShotResultedInKill ELSE 0 END) as LowAmmoKills
+                    FROM WeaponUsage
+                    GROUP BY PlayerName, Team, MapName, Weapon, WeaponClass
+                    HAVING COUNT(*) >= 10  -- At least 10 shots with weapon
+                    ORDER BY ShotAccuracyRate DESC, TotalShots DESC";
+
+                var data = await ExecuteSqlQuery(sql, query);
+
+                return Ok(new
+                {
+                    title = "Enhanced Weapon Performance",
+                    description = "Advanced weapon performance analysis including spray control, situational accuracy, and ammo management",
+                    data = data,
+                    totalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetEnhancedWeaponPerformance");
+                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            }
+        }
+
+        [HttpGet("advanced-positioning-intelligence")]
+        public async Task<IActionResult> GetAdvancedPositioningIntelligence([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PositionalData AS (
+                        SELECT 
+                            pp.PlayerId,
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            pp.PositionX,
+                            pp.PositionY,
+                            pp.PositionZ,
+                            pp.ViewAngleX,
+                            pp.ViewAngleY,
+                            pp.Speed,
+                            pp.IsAlive,
+                            pp.Health,
+                            pp.Armor,
+                            pp.IsScoped,
+                            pp.IsCrouching,
+                            pp.IsWalking,
+                            pp.ActiveWeapon,
+                            pp.StaminaPercentage,
+                            -- Determine map area
+                            CASE 
+                                WHEN d.MapName = 'de_mirage' THEN
+                                    CASE 
+                                        WHEN pp.PositionX > 1000 THEN 'A Site'
+                                        WHEN pp.PositionX < -1000 THEN 'B Site'
+                                        WHEN ABS(pp.PositionX) < 500 THEN 'Mid'
+                                        ELSE 'Connector'
+                                    END
+                                WHEN d.MapName = 'de_dust2' THEN
+                                    CASE 
+                                        WHEN pp.PositionY > 1000 THEN 'A Site'
+                                        WHEN pp.PositionY < -1000 THEN 'B Site'
+                                        ELSE 'Mid'
+                                    END
+                                ELSE 'Unknown'
+                            END as PositionArea,
+                            -- Check if killed within 5 seconds of this position
+                            (SELECT COUNT(*) FROM Kills k 
+                             WHERE k.VictimId = pp.PlayerId 
+                             AND ABS(k.GameTime - pp.GameTime) < 5 
+                             AND ABS(k.VictimPositionX - pp.PositionX) < 100 
+                             AND ABS(k.VictimPositionY - pp.PositionY) < 100) as KilledFromPosition,
+                            -- Check if got kill from this position
+                            (SELECT COUNT(*) FROM Kills k 
+                             WHERE k.KillerId = pp.PlayerId 
+                             AND ABS(k.GameTime - pp.GameTime) < 5
+                             AND ABS(k.KillerPositionX - pp.PositionX) < 100 
+                             AND ABS(k.KillerPositionY - pp.PositionY) < 100) as KillFromPosition,
+                            r.WinnerTeam,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                        FROM PlayerPositions pp
+                        INNER JOIN Players p ON pp.PlayerId = p.Id
+                        INNER JOIN Rounds r ON pp.DemoFileId = r.DemoFileId
+                        INNER JOIN DemoFiles d ON pp.DemoFileId = d.Id
+                        WHERE pp.IsAlive = 1
+                            AND (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        PositionArea,
+                        COUNT(*) as TotalPositions,
+                        SUM(KillFromPosition) as KillsFromArea,
+                        SUM(KilledFromPosition) as DeathsFromArea,
+                        CAST(SUM(KillFromPosition) AS FLOAT) / NULLIF(SUM(KilledFromPosition), 0) as KDRatioInArea,
+                        CAST(SUM(KillFromPosition) AS FLOAT) / COUNT(*) * 100 as KillEfficiencyRate,
+                        CAST(SUM(KilledFromPosition) AS FLOAT) / COUNT(*) * 100 as DeathRiskRate,
+                        -- Movement analysis
+                        AVG(Speed) as AvgMovementSpeed,
+                        COUNT(CASE WHEN Speed < 10 THEN 1 END) as StationaryPositions,
+                        COUNT(CASE WHEN Speed > 200 THEN 1 END) as RunningPositions,
+                        CAST(COUNT(CASE WHEN Speed < 10 THEN 1 END) AS FLOAT) / COUNT(*) * 100 as StationaryPercentage,
+                        -- Tactical positioning
+                        COUNT(CASE WHEN IsScoped = 1 THEN 1 END) as ScopedPositions,
+                        COUNT(CASE WHEN IsCrouching = 1 THEN 1 END) as CrouchPositions,
+                        COUNT(CASE WHEN IsWalking = 1 THEN 1 END) as WalkingPositions,
+                        -- Health management
+                        AVG(CAST(Health AS FLOAT)) as AvgHealthInArea,
+                        AVG(StaminaPercentage) as AvgStaminaInArea,
+                        -- Performance correlation
+                        AVG(CAST(RoundWon AS FLOAT)) * 100 as RoundWinRateFromArea
+                    FROM PositionalData
+                    GROUP BY PlayerName, Team, MapName, PositionArea
+                    HAVING COUNT(*) >= 50  -- At least 50 position samples
+                    ORDER BY KillEfficiencyRate DESC, TotalPositions DESC";
+
+                var data = await ExecuteSqlQuery(sql, query);
+
+                return Ok(new
+                {
+                    title = "Advanced Positioning Intelligence",
+                    description = "Detailed positioning analysis including movement patterns, area effectiveness, and tactical positioning insights",
+                    data = data,
+                    totalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetAdvancedPositioningIntelligence");
+                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            }
+        }
     }
 
     public class AnalyticsQuery
