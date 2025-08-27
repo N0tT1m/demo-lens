@@ -39,9 +39,10 @@ RUN mkdir -p /app/uploads
 # Copy published app
 COPY --from=build /app/publish .
 
-# Copy the startup script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copy the startup script and fix line endings
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 
 # Set environment variables
 ENV ASPNETCORE_ENVIRONMENT=Production
