@@ -3359,57 +3359,27 @@ namespace CS2DemoParserWeb.Controllers
                             
                             -- ECONOMIC SITUATION
                             CASE 
-                                WHEN ee.MoneyBefore >= 5000 THEN 'Rich'
-                                WHEN ee.MoneyBefore >= 3000 THEN 'Full_Buy'
-                                WHEN ee.MoneyBefore >= 1500 THEN 'Force'
-                                WHEN ee.MoneyBefore >= 500 THEN 'Eco'
+                                WHEN COALESCE(ee.MoneyBefore, 0) >= 5000 THEN 'Rich'
+                                WHEN COALESCE(ee.MoneyBefore, 0) >= 3000 THEN 'Full_Buy'
+                                WHEN COALESCE(ee.MoneyBefore, 0) >= 1500 THEN 'Force'
+                                WHEN COALESCE(ee.MoneyBefore, 0) >= 500 THEN 'Eco'
                                 ELSE 'Save'
                             END as EconomyState,
                             
                             -- UTILITY SITUATION
                             CASE 
-                                WHEN fe.FlashDuration > 1.0 THEN 'Flashed'
-                                WHEN EXISTS (SELECT 1 FROM Damages dm WHERE dm.VictimId = p.Id AND dm.ThroughSmoke = 1 AND dm.GameTime < 30) THEN 'In_Smoke'
+                                WHEN COALESCE(fe.FlashDuration, 0) > 1.0 THEN 'Flashed'
                                 ELSE 'Clear'
                             END as UtilityState,
                             
                             -- PERFORMANCE METRICS PER SITUATION
-                            prs.Kills,
-                            prs.Deaths,
-                            prs.Assists,
-                            prs.Damage,
-                            prs.Rating,
-                            prs.IsAlive,
-                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
-                            
-                            -- WEAPON PERFORMANCE IN SITUATION
-                            COUNT(wf.Id) as ShotsFiredInSituation,
-                            AVG(wf.Accuracy) as AccuracyInSituation,
-                            COUNT(k.Id) as KillsInSituation,
-                            
-                            -- DAMAGE CONTEXT
-                            dm.DamageAmount as DamageDealt,
-                            dm.ThroughSmoke as DamageThroughSmoke,
-                            dm.AttackerBlind as DamageWhileBlind,
-                            dm.Distance as DamageDistance,
-                            
-                            -- UTILITY USAGE IN SITUATION
-                            COUNT(g.Id) as GrenadesUsed,
-                            g.TotalDamage as GrenadeImpact,
-                            g.EnemiesAffected as EnemiesAffectedByUtility,
-                            
-                            -- BOMB CONTEXT
-                            b.EventType as BombAction,
-                            b.IsClutch as BombInClutch,
-                            b.HasKit,
-                            b.UnderFire as BombUnderPressure,
-                            
-                            -- TIME CONTEXT
-                            CASE 
-                                WHEN k.GameTime > (r.Duration - 10) THEN 'Late_Round'
-                                WHEN k.GameTime < 15 THEN 'Early_Round'
-                                ELSE 'Mid_Round'
-                            END as TimePhase
+                            COALESCE(prs.Kills, 0) as Kills,
+                            COALESCE(prs.Deaths, 0) as Deaths,
+                            COALESCE(prs.Assists, 0) as Assists,
+                            COALESCE(prs.Damage, 0) as Damage,
+                            COALESCE(prs.Rating, 0.0) as Rating,
+                            COALESCE(prs.IsAlive, 0) as IsAlive,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
                             
                         FROM Players p
                         INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
@@ -3418,11 +3388,6 @@ namespace CS2DemoParserWeb.Controllers
                         
                         LEFT JOIN EconomyEvents ee ON p.Id = ee.PlayerId AND ee.RoundNumber = r.RoundNumber
                         LEFT JOIN FlashEvents fe ON p.Id = fe.FlashedPlayerId AND fe.RoundId = r.Id
-                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId AND wf.RoundId = r.Id
-                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
-                        LEFT JOIN Damages dm ON p.Id = dm.AttackerId AND dm.RoundId = r.Id
-                        LEFT JOIN Grenades g ON p.Id = g.PlayerId AND g.RoundId = r.Id
-                        LEFT JOIN Bombs b ON p.Id = b.PlayerId AND b.RoundId = r.Id
                         
                         WHERE (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
@@ -3436,7 +3401,6 @@ namespace CS2DemoParserWeb.Controllers
                         SituationType,
                         EconomyState,
                         UtilityState,
-                        TimePhase,
                         
                         -- SITUATION FREQUENCY
                         COUNT(*) as TimesInSituation,
@@ -3460,28 +3424,6 @@ namespace CS2DemoParserWeb.Controllers
                             ELSE AVG(CAST(Kills AS FLOAT))
                         END as KDRatioInSituation,
                         
-                        -- ACCURACY IN SITUATION
-                        AVG(AccuracyInSituation) as AvgAccuracyInSituation,
-                        CASE 
-                            WHEN SUM(ShotsFiredInSituation) > 0 THEN CAST(SUM(KillsInSituation) AS FLOAT) / SUM(ShotsFiredInSituation) * 100
-                            ELSE 0
-                        END as KillsPerShotInSituation,
-                        
-                        -- DAMAGE EFFECTIVENESS IN SITUATION
-                        AVG(DamageDealt) as AvgDamagePerHitInSituation,
-                        COUNT(CASE WHEN DamageThroughSmoke = 1 THEN 1 END) as DamageThroughSmokeCount,
-                        COUNT(CASE WHEN DamageWhileBlind = 1 THEN 1 END) as DamageWhileBlindCount,
-                        AVG(DamageDistance) as AvgDamageDistanceInSituation,
-                        
-                        -- UTILITY EFFECTIVENESS IN SITUATION
-                        AVG(CAST(GrenadesUsed AS FLOAT)) as AvgGrenadesPerSituation,
-                        AVG(GrenadeImpact) as AvgGrenadeImpactInSituation,
-                        AVG(CAST(EnemiesAffectedByUtility AS FLOAT)) as AvgEnemiesAffectedInSituation,
-                        
-                        -- CLUTCH PERFORMANCE (for clutch situations)
-                        COUNT(CASE WHEN BombInClutch = 1 THEN 1 END) as ClutchBombActions,
-                        COUNT(CASE WHEN BombUnderPressure = 1 THEN 1 END) as HighPressureBombActions,
-                        
                         -- SITUATIONAL DIFFICULTY SCORE (0-10)
                         CASE 
                             WHEN SituationType LIKE '1vX_%' THEN 9.0
@@ -3490,7 +3432,6 @@ namespace CS2DemoParserWeb.Controllers
                             WHEN EconomyState = 'Save' THEN 8.0
                             WHEN EconomyState = 'Eco' THEN 6.0
                             WHEN UtilityState = 'Flashed' THEN 7.0
-                            WHEN UtilityState = 'In_Smoke' THEN 5.0
                             ELSE 3.0
                         END as DifficultyScore,
                         
@@ -3504,7 +3445,7 @@ namespace CS2DemoParserWeb.Controllers
                         END as PressurePerformanceScore
                         
                     FROM SituationalPerformance
-                    GROUP BY PlayerName, Team, MapName, SituationType, EconomyState, UtilityState, TimePhase
+                    GROUP BY PlayerName, Team, MapName, SituationType, EconomyState, UtilityState
                     HAVING COUNT(*) >= 2  -- At least 2 occurrences of this situation
                     ORDER BY PressurePerformanceScore DESC, WinPercentageInSituation DESC";
 
