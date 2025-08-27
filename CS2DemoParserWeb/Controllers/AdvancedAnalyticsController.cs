@@ -374,13 +374,13 @@ namespace CS2DemoParserWeb.Controllers
                             r.WinnerTeam,
                             
                             -- WEAPON ECONOMY ANALYSIS BASED ON KILLS
-                            k.WeaponName,
+                            k.Weapon,
                             CASE 
-                                WHEN k.WeaponName LIKE '%ak47%' OR k.WeaponName LIKE '%m4a%' THEN 'High_Value_Rifle'
-                                WHEN k.WeaponName LIKE '%awp%' OR k.WeaponName LIKE '%ssg08%' THEN 'Sniper_Investment'
-                                WHEN k.WeaponName LIKE '%glock%' OR k.WeaponName LIKE '%usp%' OR k.WeaponName LIKE '%p250%' THEN 'Pistol_Economy'
-                                WHEN k.WeaponName LIKE '%mp%' OR k.WeaponName LIKE '%mac10%' OR k.WeaponName LIKE '%ump%' THEN 'SMG_Force'
-                                WHEN k.WeaponName LIKE '%deagle%' OR k.WeaponName LIKE '%r8%' THEN 'Pistol_Force'
+                                WHEN k.Weapon LIKE '%ak47%' OR k.Weapon LIKE '%m4a%' THEN 'High_Value_Rifle'
+                                WHEN k.Weapon LIKE '%awp%' OR k.Weapon LIKE '%ssg08%' THEN 'Sniper_Investment'
+                                WHEN k.Weapon LIKE '%glock%' OR k.Weapon LIKE '%usp%' OR k.Weapon LIKE '%p250%' THEN 'Pistol_Economy'
+                                WHEN k.Weapon LIKE '%mp%' OR k.Weapon LIKE '%mac10%' OR k.Weapon LIKE '%ump%' THEN 'SMG_Force'
+                                WHEN k.Weapon LIKE '%deagle%' OR k.Weapon LIKE '%r8%' THEN 'Pistol_Force'
                                 ELSE 'Other_Equipment'
                             END as EconomyType,
                             
@@ -438,7 +438,7 @@ namespace CS2DemoParserWeb.Controllers
                         ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRateWithEconomyType,
                         
                         -- WEAPON EFFECTIVENESS
-                        COUNT(DISTINCT WeaponName) as WeaponVariety,
+                        COUNT(DISTINCT Weapon) as WeaponVariety,
                         ROUND(AVG(KillDistance), 2) as AvgKillDistanceWithEconomy,
                         
                         -- ECONOMIC INTELLIGENCE SCORE
@@ -2646,12 +2646,12 @@ namespace CS2DemoParserWeb.Controllers
                             r.RoundNumber,
                             
                             -- WEAPON ANALYSIS BASED ON KILLS
-                            k.WeaponName,
+                            k.Weapon,
                             CASE 
-                                WHEN k.WeaponName LIKE '%ak47%' OR k.WeaponName LIKE '%m4a%' THEN 'Rifle'
-                                WHEN k.WeaponName LIKE '%awp%' OR k.WeaponName LIKE '%ssg08%' THEN 'Sniper'
-                                WHEN k.WeaponName LIKE '%glock%' OR k.WeaponName LIKE '%usp%' OR k.WeaponName LIKE '%p250%' THEN 'Pistol'
-                                WHEN k.WeaponName LIKE '%mp%' OR k.WeaponName LIKE '%mac10%' OR k.WeaponName LIKE '%ump%' THEN 'SMG'
+                                WHEN k.Weapon LIKE '%ak47%' OR k.Weapon LIKE '%m4a%' THEN 'Rifle'
+                                WHEN k.Weapon LIKE '%awp%' OR k.Weapon LIKE '%ssg08%' THEN 'Sniper'
+                                WHEN k.Weapon LIKE '%glock%' OR k.Weapon LIKE '%usp%' OR k.Weapon LIKE '%p250%' THEN 'Pistol'
+                                WHEN k.Weapon LIKE '%mp%' OR k.Weapon LIKE '%mac10%' OR k.Weapon LIKE '%ump%' THEN 'SMG'
                                 ELSE 'Other'
                             END as WeaponClass,
                             
@@ -2668,7 +2668,7 @@ namespace CS2DemoParserWeb.Controllers
                         INNER JOIN Rounds r ON prs.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
                         LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
-                        WHERE k.WeaponName IS NOT NULL";
+                        WHERE k.Weapon IS NOT NULL";
 
                 // Apply filters
                 if (!string.IsNullOrEmpty(query.MapName))
@@ -2686,7 +2686,7 @@ namespace CS2DemoParserWeb.Controllers
                         PlayerName,
                         Team,
                         MapName,
-                        WeaponName,
+                        Weapon,
                         WeaponClass,
                         
                         -- WEAPON USAGE METRICS
@@ -2714,7 +2714,7 @@ namespace CS2DemoParserWeb.Controllers
                         END as WeaponProficiencyScore
                         
                     FROM WeaponData  
-                    GROUP BY PlayerName, Team, MapName, WeaponName, WeaponClass
+                    GROUP BY PlayerName, Team, MapName, Weapon, WeaponClass
                     HAVING COUNT(*) >= 2
                     ORDER BY WeaponProficiencyScore DESC, HeadshotRate DESC";
 
@@ -2774,7 +2774,7 @@ namespace CS2DemoParserWeb.Controllers
                             k.IsHeadshot,
                             k.IsWallbang as WallbangKill,
                             k.ThroughSmoke,
-                            k.WeaponName,
+                            k.Weapon,
                             
                             -- ROUND CONTEXT
                             CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
@@ -2813,7 +2813,7 @@ namespace CS2DemoParserWeb.Controllers
                         ROUND(AVG(KillDistance), 2) as AvgKillDistanceInCondition,
                         
                         -- WEAPON EFFECTIVENESS IN CONDITIONS
-                        COUNT(DISTINCT WeaponName) as WeaponsUsedInCondition,
+                        COUNT(DISTINCT Weapon) as WeaponsUsedInCondition,
                         SUM(IsHeadshot) as HeadshotKillsInCondition,
                         ROUND(SUM(IsHeadshot) * 100.0 / NULLIF(SUM(KillSuccess), 0), 2) as HeadshotRateInCondition,
                         
@@ -2881,9 +2881,9 @@ namespace CS2DemoParserWeb.Controllers
                             
                             -- TEAM KILL COORDINATION
                             k.GameTime as PlayerKillTime,
-                            k.WeaponName as PlayerWeapon,
+                            k.Weapon as PlayerWeapon,
                             teammate_k.GameTime as TeammateKillTime,
-                            teammate_k.WeaponName as TeammateWeapon,
+                            teammate_k.Weapon as TeammateWeapon,
                             teammate.PlayerName as TeammateName,
                             ABS(k.GameTime - teammate_k.GameTime) as KillTimeDiff,
                             
