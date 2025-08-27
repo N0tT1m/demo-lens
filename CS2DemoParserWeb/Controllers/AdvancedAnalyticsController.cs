@@ -2704,7 +2704,7 @@ namespace CS2DemoParserWeb.Controllers
                         PlayerName,
                         Team,
                         MapName,
-                        MoneyState,
+                        MoneyState as EconomyState,
                         COUNT(*) as TotalRounds,
                         SUM(RoundWon) as RoundsWon,
                         CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as WinPercentage,
@@ -2729,7 +2729,16 @@ namespace CS2DemoParserWeb.Controllers
                             WHEN AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) > 0 AND COUNT(*) > 0 THEN
                                 CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) / (AVG(CAST(RoundStartMoney - RoundEndMoney AS FLOAT)) / 1000)
                             ELSE 0
-                        END as MoneyManagementScore
+                        END as MoneyManagementScore,
+                        -- Add compatibility fields for existing frontend
+                        0 as AvgEquipmentValue,
+                        0 as AvgDamagePerDollar, 
+                        0 as AvgEquipmentROI,
+                        0 as AvgKills,
+                        0 as AvgDamage,
+                        0 as AvgRating,
+                        0 as LowMoneyRounds,
+                        0 as LowMoneyRate
                     FROM RoundEconomyStats
                     GROUP BY PlayerName, Team, MapName, MoneyState
                     HAVING COUNT(*) >= 3 -- At least 3 rounds in this money state for meaningful analysis
