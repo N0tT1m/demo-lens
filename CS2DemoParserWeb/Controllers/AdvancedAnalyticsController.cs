@@ -1669,7 +1669,7 @@ namespace CS2DemoParserWeb.Controllers
                             COUNT(CASE WHEN SQRT(POWER(pp.VelocityX, 2) + POWER(pp.VelocityY, 2)) < 10 THEN 1 END) as StationaryTicks,
                             CAST(COUNT(CASE WHEN SQRT(POWER(pp.VelocityX, 2) + POWER(pp.VelocityY, 2)) < 10 THEN 1 END) AS FLOAT) / 
                                 COUNT(*) * 100 as StationaryPercentage
-                        FROM PlayerPositions pp
+                        FROM EnhancedPlayerPositions pp
                         INNER JOIN Players p ON pp.PlayerId = p.Id
                         INNER JOIN Rounds r ON pp.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
@@ -1764,6 +1764,7 @@ namespace CS2DemoParserWeb.Controllers
         {
             try
             {
+                // Updated query using EnhancedPlayerPositions
                 var sql = @"
                     WITH RotationAnalysis AS (
                         SELECT 
@@ -1818,7 +1819,7 @@ namespace CS2DemoParserWeb.Controllers
                                     END
                                 ELSE 'Unknown'
                             END, 10) OVER (PARTITION BY pp.PlayerId, r.Id ORDER BY pp.Tick) as PreviousArea
-                        FROM PlayerPositions pp
+                        FROM EnhancedPlayerPositions pp
                         INNER JOIN Players p ON pp.PlayerId = p.Id
                         INNER JOIN Rounds r ON pp.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
@@ -1862,28 +1863,28 @@ namespace CS2DemoParserWeb.Controllers
                     ),
                     UtilityCoordinationAnalysis AS (
                         SELECT 
-                            ge.RoundId,
-                            thrower.Team,
-                            ge.MapName,
-                            ge.GameTime,
-                            ge.GrenadeType,
-                            ge.ThrowerPositionX,
-                            ge.ThrowerPositionY,
-                            COUNT(*) OVER (PARTITION BY ge.RoundId, thrower.Team, ge.GrenadeType 
-                                          ORDER BY ge.GameTime 
+                            g.RoundId,
+                            p.Team,
+                            d.MapName,
+                            g.ThrowTime as GameTime,
+                            g.GrenadeType,
+                            g.ThrowPositionX,
+                            g.ThrowPositionY,
+                            COUNT(*) OVER (PARTITION BY g.RoundId, p.Team, g.GrenadeType 
+                                          ORDER BY g.ThrowTime 
                                           RANGE BETWEEN 0 PRECEDING AND 3 FOLLOWING) as UtilityCombos,
                             -- Detect synchronized utility (multiple grenades within 3 seconds)
-                            CASE WHEN COUNT(*) OVER (PARTITION BY ge.RoundId, thrower.Team 
-                                                    ORDER BY ge.GameTime 
+                            CASE WHEN COUNT(*) OVER (PARTITION BY g.RoundId, p.Team 
+                                                    ORDER BY g.ThrowTime 
                                                     RANGE BETWEEN 0 PRECEDING AND 3 FOLLOWING) > 1 
                                  THEN 1 ELSE 0 END as IsSynchronizedUtility
-                        FROM GrenadeEvents ge
-                        INNER JOIN Players thrower ON ge.ThrowerId = thrower.Id
-                        INNER JOIN Rounds r ON ge.RoundId = r.Id
+                        FROM Grenades g
+                        INNER JOIN Players p ON g.PlayerId = p.Id
+                        INNER JOIN Rounds r ON g.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
                         WHERE (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@Team IS NULL OR thrower.Team = @Team)
+                            AND (@Team IS NULL OR p.Team = @Team)
                             AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
                             AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
                     )
