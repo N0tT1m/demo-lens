@@ -5,6 +5,7 @@ services:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${SQL_PASSWORD}
       - MSSQL_PID=Express
+      - MSSQL_MEMORY_LIMIT_MB=2048
     ports:
       - "1433:1433"
     volumes:
