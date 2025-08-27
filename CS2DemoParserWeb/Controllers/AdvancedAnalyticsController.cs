@@ -2632,5 +2632,204 @@ namespace CS2DemoParserWeb.Controllers
             
             return csv.ToString();
         }
+
+        [HttpGet("economy-intelligence-dashboard")]
+        public async Task<IActionResult> GetEconomyIntelligenceDashboard([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH EconomyRounds AS (
+                        SELECT 
+                            prs.PlayerId,
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            r.WinnerTeam,
+                            prs.StartMoney,
+                            prs.MoneySpent,
+                            prs.EndMoney,
+                            prs.EquipmentValue,
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Assists,
+                            prs.Damage,
+                            prs.Rating,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            -- Categorize economy state
+                            CASE 
+                                WHEN prs.EquipmentValue >= 4000 THEN 'Full Buy'
+                                WHEN prs.EquipmentValue >= 2000 THEN 'Half Buy'
+                                WHEN prs.EquipmentValue >= 1000 THEN 'Force Buy'
+                                ELSE 'Eco'
+                            END as EconomyState,
+                            -- Calculate money efficiency
+                            CASE 
+                                WHEN prs.MoneySpent > 0 THEN CAST(prs.Damage AS FLOAT) / prs.MoneySpent
+                                ELSE 0
+                            END as DamagePerDollar,
+                            -- Equipment ROI
+                            CASE 
+                                WHEN prs.EquipmentValue > 0 THEN CAST((prs.Kills * 300 + prs.Assists * 100) AS FLOAT) / prs.EquipmentValue
+                                ELSE 0
+                            END as EquipmentROI
+                        FROM PlayerRoundStats prs
+                        INNER JOIN Players p ON prs.PlayerId = p.Id
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        EconomyState,
+                        COUNT(*) as TotalRounds,
+                        SUM(RoundWon) as RoundsWon,
+                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as WinPercentage,
+                        AVG(CAST(StartMoney AS FLOAT)) as AvgStartMoney,
+                        AVG(CAST(MoneySpent AS FLOAT)) as AvgMoneySpent,
+                        AVG(CAST(EquipmentValue AS FLOAT)) as AvgEquipmentValue,
+                        AVG(DamagePerDollar) as AvgDamagePerDollar,
+                        AVG(EquipmentROI) as AvgEquipmentROI,
+                        AVG(CAST(Kills AS FLOAT)) as AvgKills,
+                        AVG(CAST(Damage AS FLOAT)) as AvgDamage,
+                        AVG(Rating) as AvgRating,
+                        -- Money management metrics
+                        AVG(CAST(EndMoney AS FLOAT)) as AvgEndMoney,
+                        SUM(CASE WHEN EndMoney < 1000 THEN 1 ELSE 0 END) as LowMoneyRounds,
+                        CAST(SUM(CASE WHEN EndMoney < 1000 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as LowMoneyRate
+                    FROM EconomyRounds
+                    GROUP BY PlayerName, Team, MapName, EconomyState
+                    HAVING COUNT(*) >= 3 -- At least 3 rounds in this economy state
+                    ORDER BY AvgEquipmentROI DESC, WinPercentage DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"economy_intelligence_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Economy Intelligence Dashboard",
+                    Description = "Advanced economy analysis including money efficiency, equipment ROI, and economic state performance correlation",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating economy intelligence dashboard");
+                return StatusCode(500, $"Error generating economy intelligence dashboard: {ex.Message}");
+            }
+        }
+
+        [HttpGet("advanced-player-performance")]
+        public async Task<IActionResult> GetAdvancedPlayerPerformance([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PlayerPerformance AS (
+                        SELECT 
+                            prs.PlayerId,
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Assists,
+                            prs.Damage,
+                            prs.Rating,
+                            prs.IsAlive,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            -- Multi-kill detection
+                            CASE 
+                                WHEN prs.Kills >= 4 THEN 'Quad Kill+'
+                                WHEN prs.Kills = 3 THEN 'Triple Kill'
+                                WHEN prs.Kills = 2 THEN 'Double Kill'
+                                WHEN prs.Kills = 1 THEN 'Single Kill'
+                                ELSE 'No Kills'
+                            END as KillType,
+                            -- Performance consistency
+                            prs.Rating - AVG(prs.Rating) OVER (PARTITION BY prs.PlayerId) as RatingDeviation,
+                            -- Impact rating (custom HLTV-style calculation)
+                            (prs.Kills * 0.679 + prs.Assists * 0.154 + prs.Damage * 0.0021 + 
+                             CASE WHEN prs.IsAlive = 1 THEN 0.15 ELSE 0 END) as ImpactRating
+                        FROM PlayerRoundStats prs
+                        INNER JOIN Players p ON prs.PlayerId = p.Id
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        COUNT(*) as TotalRounds,
+                        SUM(RoundWon) as RoundsWon,
+                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as WinRate,
+                        -- Performance metrics
+                        AVG(CAST(Kills AS FLOAT)) as AvgKills,
+                        AVG(CAST(Deaths AS FLOAT)) as AvgDeaths,
+                        AVG(CAST(Assists AS FLOAT)) as AvgAssists,
+                        AVG(CAST(Damage AS FLOAT)) as AvgDamage,
+                        AVG(Rating) as AvgRating,
+                        AVG(ImpactRating) as AvgImpactRating,
+                        -- Multi-kill performance
+                        COUNT(CASE WHEN KillType = 'Quad Kill+' THEN 1 END) as QuadKills,
+                        COUNT(CASE WHEN KillType = 'Triple Kill' THEN 1 END) as TripleKills,
+                        COUNT(CASE WHEN KillType = 'Double Kill' THEN 1 END) as DoubleKills,
+                        -- Consistency metrics
+                        STDEV(Rating) as RatingConsistency,
+                        MIN(Rating) as WorstRating,
+                        MAX(Rating) as BestRating,
+                        -- Survival and clutch potential
+                        SUM(CASE WHEN IsAlive = 1 THEN 1 ELSE 0 END) as RoundsSurvived,
+                        CAST(SUM(CASE WHEN IsAlive = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as SurvivalRate,
+                        -- Efficiency score
+                        (AVG(ImpactRating) * (1 - (STDEV(Rating) / NULLIF(AVG(Rating), 0)))) as EfficiencyScore
+                    FROM PlayerPerformance
+                    GROUP BY PlayerName, Team, MapName
+                    HAVING COUNT(*) >= 5 -- At least 5 rounds played
+                    ORDER BY EfficiencyScore DESC, AvgImpactRating DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"advanced_player_performance_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Advanced Player Performance Matrix",
+                    Description = "Comprehensive player analysis including HLTV-style ratings, consistency scoring, and multi-kill performance",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating advanced player performance");
+                return StatusCode(500, $"Error generating advanced player performance: {ex.Message}");
+            }
+        }
     }
 }
