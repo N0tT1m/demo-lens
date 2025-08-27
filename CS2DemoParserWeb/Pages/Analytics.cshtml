@@ -111,6 +111,36 @@
                     📦 Player Inventory
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="positioning-tab" data-bs-toggle="tab" data-bs-target="#positioning" type="button" role="tab">
+                    🗺️ Positioning Analysis
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="weapon-intelligence-tab" data-bs-toggle="tab" data-bs-target="#weapon-intelligence" type="button" role="tab">
+                    🔫 Weapon Intelligence
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="circumstantial-tab" data-bs-toggle="tab" data-bs-target="#circumstantial" type="button" role="tab">
+                    🌪️ Circumstantial Combat
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="team-coordination-tab" data-bs-toggle="tab" data-bs-target="#team-coordination" type="button" role="tab">
+                    🤝 Team Coordination
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="economic-intelligence-tab" data-bs-toggle="tab" data-bs-target="#economic-intelligence" type="button" role="tab">
+                    💡 Economic Intelligence
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="pressure-metrics-tab" data-bs-toggle="tab" data-bs-target="#pressure-metrics" type="button" role="tab">
+                    💪 Pressure Metrics
+                </button>
+            </li>
         </ul>
         
         <!-- Tab Content -->
@@ -312,9 +342,262 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Positioning Analysis -->
+            <div class="tab-pane fade" id="positioning" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">🗺️ Positioning & Movement Analysis</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('positioning')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Positioning Analysis:</strong> 
+                            Site control effectiveness, crossfire positioning, retake positioning success, and movement pattern analysis.
+                        </div>
+                        <div id="positioningResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
+                                <p>Tactical positioning and map control analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Weapon Intelligence -->
+            <div class="tab-pane fade" id="weapon-intelligence" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">🔫 Advanced Weapon Intelligence</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('weapon-intelligence')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Weapon Intelligence:</strong> 
+                            Ammo management efficiency, spray control mastery, movement shooting vs static accuracy, and weapon configuration optimization.
+                        </div>
+                        <div id="weaponIntelligenceResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-crosshairs fa-3x mb-3"></i>
+                                <p>Advanced weapon performance and efficiency analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Circumstantial Combat -->
+            <div class="tab-pane fade" id="circumstantial" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">🌪️ Advanced Circumstantial Combat</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('circumstantial')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Circumstantial Combat:</strong> 
+                            Multi-handicap performance (smoke + blind + movement), flash coordination effectiveness, and wallbang mastery analysis.
+                        </div>
+                        <div id="circumstantialResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-eye-slash fa-3x mb-3"></i>
+                                <p>Performance under adverse conditions and environmental challenges</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Team Coordination -->
+            <div class="tab-pane fade" id="team-coordination" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">🤝 Team Coordination Intelligence</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('team-coordination')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Team Coordination:</strong> 
+                            Flash coordination with teammates, utility teamwork ratios, site support effectiveness, and coordinated execution timing.
+                        </div>
+                        <div id="teamCoordinationResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-users fa-3x mb-3"></i>
+                                <p>Teamwork efficiency and coordination analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Economic Intelligence -->
+            <div class="tab-pane fade" id="economic-intelligence" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">💡 Economic Intelligence Enhancement</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('economic-intelligence')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Economic Intelligence:</strong> 
+                            Buy pattern analysis, eco performance effectiveness, investment ROI calculations, performance per dollar metrics, and economic IQ scoring.
+                        </div>
+                        <div id="economicIntelligenceResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-calculator fa-3x mb-3"></i>
+                                <p>Advanced economic decision making and investment efficiency</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pressure Metrics -->
+            <div class="tab-pane fade" id="pressure-metrics" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">💪 Psychological Pressure Metrics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('pressure-metrics')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Pressure Metrics:</strong> 
+                            High-pressure performance scaling, clutch success rates, objective completion under fire, mental resilience indicators, and comeback potential analysis.
+                        </div>
+                        <div id="pressureMetricsResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-heartbeat fa-3x mb-3"></i>
+                                <p>Performance under pressure and mental resilience analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Improved CSS for better readability and wider tables -->
+<style>
+.analytics-table {
+    width: 100%;
+    min-width: 1200px;
+    font-size: 0.9rem;
+}
+
+.analytics-table th,
+.analytics-table td {
+    white-space: nowrap;
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+}
+
+.table-responsive {
+    max-height: 600px;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.tab-content .card {
+    margin-top: 1rem;
+}
+
+.nav-tabs {
+    flex-wrap: wrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.nav-tabs .nav-item {
+    margin-bottom: 0;
+}
+
+.nav-tabs .nav-link {
+    padding: 10px 15px;
+    margin-right: 2px;
+    border: 1px solid transparent;
+    border-radius: 6px 6px 0 0;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+    border-width: 2px 1px 2px 1px;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem 1.5rem;
+    border-radius: 8px 8px 0 0;
+}
+
+.analytics-container {
+    max-width: 100%;
+    width: 100%;
+}
+
+/* Make the main container wider */
+.col-lg-9 {
+    flex: 0 0 auto;
+    width: 85%;
+}
+
+.col-lg-3 {
+    flex: 0 0 auto;
+    width: 15%;
+}
+
+/* Responsive improvements */
+@media (max-width: 1200px) {
+    .col-lg-9, .col-lg-3 {
+        width: 100%;
+    }
+}
+
+/* Better loading states */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.text-success { color: #28a745 !important; }
+.text-danger { color: #dc3545 !important; }
+.text-warning { color: #ffc107 !important; }
+.text-info { color: #17a2b8 !important; }
+
+/* Improved metric badges */
+.metric-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.metric-badge.high { background-color: #d4edda; color: #155724; }
+.metric-badge.medium { background-color: #fff3cd; color: #856404; }
+.metric-badge.low { background-color: #f8d7da; color: #721c24; }
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -387,7 +670,7 @@ async function refreshAnalytics() {
     showLoading();
     
     try {
-        // Load all 9 analytics in parallel
+        // Load all 15 analytics in parallel
         await Promise.all([
             loadClutchAnalysis(filters),
             loadTradeKillAnalysis(filters),
@@ -397,7 +680,13 @@ async function refreshAnalytics() {
             loadPositionAnalysis(filters),
             loadMasterAnalytics(filters),
             loadSituationAnalysis(filters),
-            loadInventoryAnalysis(filters)
+            loadInventoryAnalysis(filters),
+            loadPositioningAnalysis(filters),
+            loadWeaponIntelligence(filters),
+            loadCircumstantialCombat(filters),
+            loadTeamCoordination(filters),
+            loadEconomicIntelligence(filters),
+            loadPressureMetrics(filters)
         ]);
     } catch (error) {
         console.error('Error refreshing analytics:', error);
@@ -425,7 +714,7 @@ function buildQueryString(filters) {
 }
 
 function showLoading() {
-    const containers = ['clutchResults', 'tradeKillResults', 'firstKillResults', 'economyResults', 'performanceResults', 'positionResults', 'masterAnalyticsResults', 'situationResults', 'inventoryResults'];
+    const containers = ['clutchResults', 'tradeKillResults', 'firstKillResults', 'economyResults', 'performanceResults', 'positionResults', 'masterAnalyticsResults', 'situationResults', 'inventoryResults', 'positioningResults', 'weaponIntelligenceResults', 'circumstantialResults', 'teamCoordinationResults', 'economicIntelligenceResults', 'pressureMetricsResults'];
     containers.forEach(containerId => {
         document.getElementById(containerId).innerHTML = `
             <div class="text-center">
@@ -860,7 +1149,13 @@ async function exportAnalysis(analysisType) {
         'position': 'position-analysis',
         'master-analytics': 'master-analytics-dashboard',
         'situation-analysis': 'situation-analysis',
-        'inventory': 'player-inventory'
+        'inventory': 'player-inventory',
+        'positioning': 'positioning-analysis',
+        'weapon-intelligence': 'weapon-intelligence',
+        'circumstantial': 'circumstantial-combat',
+        'team-coordination': 'team-coordination',
+        'economic-intelligence': 'economic-intelligence',
+        'pressure-metrics': 'pressure-metrics'
     };
     
     const endpoint = endpoints[analysisType];
@@ -1073,8 +1368,148 @@ function displayInventoryResults(response) {
     container.innerHTML = html;
 }
 
+// New advanced analytics load functions
+async function loadPositioningAnalysis(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/positioning-analysis?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'positioningResults');
+    } else {
+        document.getElementById('positioningResults').innerHTML = '<div class="alert alert-danger">Failed to load positioning analysis</div>';
+    }
+}
+
+async function loadWeaponIntelligence(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/weapon-intelligence?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'weaponIntelligenceResults');
+    } else {
+        document.getElementById('weaponIntelligenceResults').innerHTML = '<div class="alert alert-danger">Failed to load weapon intelligence</div>';
+    }
+}
+
+async function loadCircumstantialCombat(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/circumstantial-combat?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'circumstantialResults');
+    } else {
+        document.getElementById('circumstantialResults').innerHTML = '<div class="alert alert-danger">Failed to load circumstantial combat analysis</div>';
+    }
+}
+
+async function loadTeamCoordination(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/team-coordination?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'teamCoordinationResults');
+    } else {
+        document.getElementById('teamCoordinationResults').innerHTML = '<div class="alert alert-danger">Failed to load team coordination analysis</div>';
+    }
+}
+
+async function loadEconomicIntelligence(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/economic-intelligence?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'economicIntelligenceResults');
+    } else {
+        document.getElementById('economicIntelligenceResults').innerHTML = '<div class="alert alert-danger">Failed to load economic intelligence analysis</div>';
+    }
+}
+
+async function loadPressureMetrics(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/pressure-metrics?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'pressureMetricsResults');
+    } else {
+        document.getElementById('pressureMetricsResults').innerHTML = '<div class="alert alert-danger">Failed to load pressure metrics analysis</div>';
+    }
+}
+
+// Generic display function for new analytics
+function displayGenericResults(response, containerId) {
+    const container = document.getElementById(containerId);
+    
+    if (!response.data || response.data.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No data found for the selected filters.</div>';
+        return;
+    }
+
+    // Create table with dynamic headers
+    const firstRow = response.data[0];
+    const headers = Object.keys(firstRow);
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover analytics-table">
+                <thead class="table-dark">
+                    <tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr>
+                </thead>
+                <tbody>`;
+    
+    response.data.forEach(row => {
+        html += '<tr>';
+        headers.forEach(header => {
+            let value = row[header];
+            let displayValue = value;
+            
+            // Format numeric values
+            if (typeof value === 'number') {
+                if (header.toLowerCase().includes('percentage') || header.toLowerCase().includes('rate')) {
+                    displayValue = `${value.toFixed(1)}%`;
+                } else if (header.toLowerCase().includes('score') || header.toLowerCase().includes('rating')) {
+                    displayValue = value.toFixed(2);
+                } else if (value > 1000) {
+                    displayValue = value.toLocaleString();
+                } else if (value % 1 !== 0) {
+                    displayValue = value.toFixed(2);
+                }
+            }
+            
+            // Add color coding for certain metrics
+            let cellClass = '';
+            if (header.toLowerCase().includes('percentage') || header.toLowerCase().includes('rate')) {
+                if (value > 70) cellClass = 'text-success fw-bold';
+                else if (value > 40) cellClass = 'text-warning';
+                else cellClass = 'text-danger';
+            }
+            
+            html += `<td class="${cellClass}">${displayValue}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            <small class="text-muted">
+                <strong>${response.title}</strong>: ${response.description} 
+                (${response.totalRecords} records found)
+            </small>
+        </div>`;
+    
+    container.innerHTML = html;
+}
+
 function showError(message) {
-    const containers = ['clutchResults', 'tradeKillResults', 'firstKillResults', 'economyResults', 'performanceResults', 'positionResults', 'masterAnalyticsResults', 'situationResults', 'inventoryResults'];
+    const containers = ['clutchResults', 'tradeKillResults', 'firstKillResults', 'economyResults', 'performanceResults', 'positionResults', 'masterAnalyticsResults', 'situationResults', 'inventoryResults', 'positioningResults', 'weaponIntelligenceResults', 'circumstantialResults', 'teamCoordinationResults', 'economicIntelligenceResults', 'pressureMetricsResults'];
     containers.forEach(containerId => {
         document.getElementById(containerId).innerHTML = `<div class="alert alert-danger">${message}</div>`;
     });

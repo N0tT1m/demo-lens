@@ -2503,6 +2503,753 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpGet("positioning-analysis")]
+        public async Task<IActionResult> GetPositioningAnalysis([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PositionData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            
+                            -- SITE CONTROL ANALYSIS
+                            CASE 
+                                WHEN b.Site = 'A' THEN 'A_Site'
+                                WHEN b.Site = 'B' THEN 'B_Site' 
+                                ELSE 'Mid_Map'
+                            END as LocationZone,
+                            
+                            -- BOMB POSITIONING
+                            CASE WHEN b.EventType = 'plant' THEN 1 ELSE 0 END as BombPlants,
+                            CASE WHEN b.EventType = 'defuse' THEN 1 ELSE 0 END as BombDefuses,
+                            b.PositionX as BombPositionX,
+                            b.PositionY as BombPositionY,
+                            
+                            -- KILL POSITIONING
+                            k.KillerPositionX,
+                            k.KillerPositionY,
+                            k.VictimPositionX, 
+                            k.VictimPositionY,
+                            k.Distance as KillDistance,
+                            
+                            -- WEAPON FIRE POSITIONING
+                            wf.PositionX as ShootPositionX,
+                            wf.PositionY as ShootPositionY,
+                            wf.ViewAngleX,
+                            wf.ViewAngleY,
+                            
+                            -- ROUND CONTEXT
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            r.CTLivePlayers,
+                            r.TLivePlayers
+                            
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
+                        LEFT JOIN Bombs b ON p.Id = b.PlayerId AND b.RoundId = r.Id
+                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
+                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId AND wf.RoundId = r.Id
+                        
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        LocationZone,
+                        
+                        -- SITE CONTROL METRICS
+                        COUNT(*) as PositionalActions,
+                        SUM(BombPlants) as PlantActions,
+                        SUM(BombDefuses) as DefuseActions,
+                        SUM(RoundWon) as RoundsWonAtLocation,
+                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as LocationWinPercentage,
+                        
+                        -- POSITIONING EFFECTIVENESS
+                        COUNT(CASE WHEN KillDistance IS NOT NULL THEN 1 END) as KillsFromPosition,
+                        AVG(KillDistance) as AvgKillDistanceFromPosition,
+                        
+                        -- CROSSFIRE & ANGLES
+                        COUNT(DISTINCT ViewAngleX) as AngleVariety,
+                        AVG(ABS(ViewAngleX)) as AvgViewAngleX,
+                        AVG(ABS(ViewAngleY)) as AvgViewAngleY,
+                        
+                        -- POSITION CLUSTERS (simplified coordinate grouping)
+                        ROUND(AVG(COALESCE(BombPositionX, ShootPositionX, KillerPositionX)), 0) as AvgPositionX,
+                        ROUND(AVG(COALESCE(BombPositionY, ShootPositionY, KillerPositionY)), 0) as AvgPositionY,
+                        
+                        -- RETAKE SUCCESS
+                        COUNT(CASE WHEN CTLivePlayers < TLivePlayers AND RoundWon = 1 AND Team = 'CT' THEN 1 END) as SuccessfulRetakes,
+                        COUNT(CASE WHEN TLivePlayers < CTLivePlayers AND RoundWon = 1 AND Team = 'T' THEN 1 END) as SuccessfulPostPlants
+                        
+                    FROM PositionData
+                    WHERE LocationZone IS NOT NULL
+                    GROUP BY PlayerName, Team, MapName, LocationZone
+                    HAVING COUNT(*) >= 3
+                    ORDER BY LocationWinPercentage DESC, KillsFromPosition DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"positioning_analysis_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Positioning & Movement Analysis",
+                    Description = "Site control, crossfire positioning, retake positioning, and movement pattern analysis",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating positioning analysis");
+                return StatusCode(500, $"Error generating positioning analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("weapon-intelligence")]
+        public async Task<IActionResult> GetWeaponIntelligence([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH WeaponData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            wf.Weapon,
+                            wf.WeaponClass,
+                            
+                            -- AMMO MANAGEMENT
+                            wf.Ammo,
+                            wf.AmmoReserve,
+                            wf.Velocity,
+                            wf.RecoilIndex,
+                            wf.Accuracy,
+                            wf.IsScoped,
+                            wf.IsSilenced,
+                            
+                            -- SHOT CONTEXT
+                            wf.ThroughSmoke,
+                            wf.IsBlind,
+                            
+                            -- KILL CORRELATION
+                            CASE WHEN k.Id IS NOT NULL THEN 1 ELSE 0 END as ShotResultedInKill
+                            
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
+                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.Weapon = wf.Weapon 
+                            AND ABS(k.GameTime - wf.GameTime) < 1.0
+                        
+                        WHERE wf.Weapon IS NOT NULL
+                            AND (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        Weapon,
+                        WeaponClass,
+                        
+                        -- USAGE STATISTICS
+                        COUNT(*) as ShotsFired,
+                        SUM(ShotResultedInKill) as KillShots,
+                        CAST(SUM(ShotResultedInKill) AS FLOAT) / COUNT(*) * 100 as KillShotPercentage,
+                        
+                        -- AMMO EFFICIENCY
+                        AVG(CAST(Ammo AS FLOAT)) as AvgAmmoPerShot,
+                        AVG(CAST(AmmoReserve AS FLOAT)) as AvgReserveAmmo,
+                        CASE WHEN AVG(CAST(Ammo AS FLOAT)) > 0 THEN 
+                            SUM(ShotResultedInKill) / AVG(CAST(Ammo AS FLOAT)) 
+                            ELSE 0 END as AmmoEfficiencyRatio,
+                        
+                        -- RECOIL CONTROL
+                        AVG(RecoilIndex) as AvgRecoilIndex,
+                        AVG(Accuracy) as AvgWeaponAccuracy,
+                        
+                        -- MOVEMENT SHOOTING
+                        AVG(Velocity) as AvgVelocityWhenShooting,
+                        COUNT(CASE WHEN Velocity > 50 THEN 1 END) as MovementShots,
+                        COUNT(CASE WHEN Velocity <= 50 THEN 1 END) as StaticShots,
+                        
+                        -- CONFIGURATION USAGE
+                        COUNT(CASE WHEN IsScoped = 1 THEN 1 END) as ScopedShots,
+                        COUNT(CASE WHEN IsSilenced = 1 THEN 1 END) as SilencedShots,
+                        CAST(COUNT(CASE WHEN IsScoped = 1 THEN 1 END) AS FLOAT) / COUNT(*) * 100 as ScopeUsagePercentage,
+                        
+                        -- HANDICAPPED PERFORMANCE  
+                        COUNT(CASE WHEN ThroughSmoke = 1 THEN 1 END) as SmokeShots,
+                        COUNT(CASE WHEN IsBlind = 1 THEN 1 END) as BlindShots,
+                        SUM(CASE WHEN ThroughSmoke = 1 AND ShotResultedInKill = 1 THEN 1 ELSE 0 END) as SmokeKills,
+                        SUM(CASE WHEN IsBlind = 1 AND ShotResultedInKill = 1 THEN 1 ELSE 0 END) as BlindKills,
+                        
+                        -- SPRAY TRANSFER SUCCESS
+                        CASE WHEN AVG(RecoilIndex) > 0 THEN
+                            AVG(Accuracy) / AVG(RecoilIndex) * 100
+                            ELSE AVG(Accuracy) END as SprayControlRating
+                        
+                    FROM WeaponData  
+                    GROUP BY PlayerName, Team, MapName, Weapon, WeaponClass
+                    HAVING COUNT(*) >= 5
+                    ORDER BY KillShotPercentage DESC, SprayControlRating DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"weapon_intelligence_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Advanced Weapon Intelligence",
+                    Description = "Ammo management, spray control, movement shooting, weapon configuration, and handicapped performance analysis",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating weapon intelligence");
+                return StatusCode(500, $"Error generating weapon intelligence: {ex.Message}");
+            }
+        }
+
+        [HttpGet("circumstantial-combat")]
+        public async Task<IActionResult> GetCircumstantialCombat([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH CircumstantialData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            
+                            -- MULTI-HANDICAP CONDITIONS
+                            CASE 
+                                WHEN k.ThroughSmoke = 1 AND k.IsBlind = 1 THEN 'Smoke_And_Blind'
+                                WHEN k.ThroughSmoke = 1 AND wf.Velocity > 50 THEN 'Smoke_And_Moving' 
+                                WHEN k.IsBlind = 1 AND wf.Velocity > 50 THEN 'Blind_And_Moving'
+                                WHEN k.ThroughSmoke = 1 THEN 'Through_Smoke'
+                                WHEN k.IsBlind = 1 THEN 'While_Blind'
+                                WHEN wf.Velocity > 50 THEN 'While_Moving'
+                                ELSE 'Standard'
+                            END as CombatCondition,
+                            
+                            -- FLASH COORDINATION
+                            fe.FlashDuration,
+                            fe.Distance as FlashDistance,
+                            fe.FlasherPlayerId,
+                            CASE WHEN fe.FlasherPlayerId != p.Id AND fe.IsTeamFlash = 0 THEN 1 ELSE 0 END as FlashAssistedKill,
+                            
+                            -- WALLBANG MASTERY
+                            dm.Penetration,
+                            dm.IsWallbang,
+                            k.IsWallbang as WallbangKill,
+                            
+                            -- KILL SUCCESS
+                            CASE WHEN k.Id IS NOT NULL THEN 1 ELSE 0 END as KillSuccess,
+                            k.Distance as KillDistance,
+                            
+                            -- DAMAGE EFFECTIVENESS
+                            dm.DamageAmount,
+                            dm.AttackerBlind,
+                            dm.ThroughSmoke as DamageThroughSmoke
+                            
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        LEFT JOIN Kills k ON p.Id = k.KillerId
+                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId 
+                            AND ABS(wf.GameTime - k.GameTime) < 1.0
+                        LEFT JOIN Damages dm ON p.Id = dm.AttackerId
+                        LEFT JOIN FlashEvents fe ON p.Id = fe.FlashedPlayerId 
+                            AND ABS(fe.GameTime - k.GameTime) < 3.0
+                        
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        CombatCondition,
+                        
+                        -- HANDICAP PERFORMANCE
+                        COUNT(*) as EngagementsInCondition,
+                        SUM(KillSuccess) as KillsInCondition,
+                        CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100 as ConditionKillPercentage,
+                        AVG(KillDistance) as AvgKillDistanceInCondition,
+                        
+                        -- FLASH COORDINATION
+                        SUM(FlashAssistedKill) as FlashAssistedKills,
+                        AVG(FlashDistance) as AvgFlashDistance,
+                        AVG(FlashDuration) as AvgFlashDuration,
+                        
+                        -- WALLBANG EXPERTISE  
+                        COUNT(CASE WHEN WallbangKill = 1 THEN 1 END) as WallbangKills,
+                        AVG(Penetration) as AvgPenetrationDepth,
+                        COUNT(CASE WHEN IsWallbang = 1 THEN 1 END) as WallbangDamageInstances,
+                        
+                        -- DAMAGE UNDER PRESSURE
+                        AVG(DamageAmount) as AvgDamageInCondition,
+                        COUNT(CASE WHEN AttackerBlind = 1 THEN 1 END) as DamageWhileBlinded,
+                        COUNT(CASE WHEN DamageThroughSmoke = 1 THEN 1 END) as DamageThroughSmokeCount,
+                        
+                        -- MULTI-HANDICAP MASTERY SCORE
+                        CASE 
+                            WHEN CombatCondition LIKE '%_And_%' THEN 
+                                (CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 2.0
+                            WHEN CombatCondition != 'Standard' THEN 
+                                (CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 1.5
+                            ELSE CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100
+                        END as HandicapMasteryScore
+                        
+                    FROM CircumstantialData
+                    GROUP BY PlayerName, Team, MapName, CombatCondition
+                    HAVING COUNT(*) >= 3
+                    ORDER BY HandicapMasteryScore DESC, ConditionKillPercentage DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"circumstantial_combat_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Advanced Circumstantial Combat",
+                    Description = "Multi-handicap performance, flash coordination, wallbang mastery, and environmental advantage analysis",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating circumstantial combat analysis");
+                return StatusCode(500, $"Error generating circumstantial combat analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("team-coordination")]
+        public async Task<IActionResult> GetTeamCoordination([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH TeamData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            
+                            -- FLASH COORDINATION
+                            fe_give.Id as FlashGiven,
+                            fe_give.FlashedPlayerId as TeammateFlashed,
+                            fe_give.FlashDuration as FlashDurationGiven,
+                            fe_give.IsTeamFlash,
+                            
+                            -- UTILITY TEAMWORK
+                            g.TeammatesAffected,
+                            g.EnemiesAffected,
+                            g.GrenadeType,
+                            
+                            -- SITE SUPPORT  
+                            b.CTPlayersInRange,
+                            b.TPlayersInRange,
+                            b.EventType as BombEvent,
+                            
+                            -- COORDINATED KILLS
+                            k.GameTime as KillTime,
+                            teammate_kills.GameTime as TeammateKillTime,
+                            ABS(k.GameTime - teammate_kills.GameTime) as KillTimeDiff,
+                            
+                            -- ROUND SUCCESS
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                            
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
+                        LEFT JOIN FlashEvents fe_give ON p.Id = fe_give.FlasherPlayerId AND fe_give.RoundId = r.Id
+                        LEFT JOIN Grenades g ON p.Id = g.PlayerId AND g.RoundId = r.Id
+                        LEFT JOIN Bombs b ON b.RoundId = r.Id
+                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
+                        LEFT JOIN Kills teammate_kills ON k.RoundId = teammate_kills.RoundId 
+                            AND k.KillerId != teammate_kills.KillerId
+                            AND ABS(k.GameTime - teammate_kills.GameTime) < 5.0
+                        LEFT JOIN Players teammate ON teammate_kills.KillerId = teammate.Id 
+                            AND teammate.Team = p.Team
+                        
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        
+                        -- FLASH COORDINATION METRICS
+                        COUNT(FlashGiven) as FlashesGivenToTeam,
+                        AVG(FlashDurationGiven) as AvgFlashDurationGiven,
+                        COUNT(CASE WHEN IsTeamFlash = 1 THEN 1 END) as AccidentalTeamFlashes,
+                        COUNT(CASE WHEN IsTeamFlash = 0 AND FlashGiven IS NOT NULL THEN 1 END) as IntentionalFlashes,
+                        
+                        -- UTILITY TEAMWORK ANALYSIS
+                        COUNT(DISTINCT GrenadeType) as UtilityVariety,
+                        AVG(CAST(TeammatesAffected AS FLOAT)) as AvgTeammatesAffected,
+                        AVG(CAST(EnemiesAffected AS FLOAT)) as AvgEnemiesAffected,
+                        CASE WHEN AVG(CAST(TeammatesAffected AS FLOAT)) > 0 THEN
+                            AVG(CAST(EnemiesAffected AS FLOAT)) / AVG(CAST(TeammatesAffected AS FLOAT))
+                            ELSE AVG(CAST(EnemiesAffected AS FLOAT)) END as UtilityTeamworkRatio,
+                        
+                        -- SITE SUPPORT METRICS
+                        COUNT(CASE WHEN BombEvent = 'plant' THEN 1 END) as PlantSupport,
+                        COUNT(CASE WHEN BombEvent = 'defuse' THEN 1 END) as DefuseSupport,
+                        AVG(CASE WHEN Team = 'CT' THEN CAST(CTPlayersInRange AS FLOAT) ELSE CAST(TPlayersInRange AS FLOAT) END) as AvgTeammatesInSupport,
+                        
+                        -- COORDINATED KILL ANALYSIS
+                        COUNT(CASE WHEN KillTimeDiff <= 2.0 THEN 1 END) as CoordinatedKills,
+                        COUNT(CASE WHEN KillTimeDiff <= 5.0 THEN 1 END) as SupportKills,
+                        AVG(KillTimeDiff) as AvgKillCoordinationTime,
+                        
+                        -- TEAMWORK SUCCESS RATE
+                        SUM(RoundWon) as RoundsWon,
+                        COUNT(DISTINCT RoundNumber) as RoundsPlayed,
+                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(DISTINCT RoundNumber) * 100 as TeamworkWinPercentage,
+                        
+                        -- OVERALL TEAMWORK SCORE
+                        ((COUNT(CASE WHEN IsTeamFlash = 0 AND FlashGiven IS NOT NULL THEN 1 END) * 2) + 
+                         (COUNT(CASE WHEN KillTimeDiff <= 2.0 THEN 1 END) * 3) +
+                         (CASE WHEN AVG(CAST(TeammatesAffected AS FLOAT)) > 0 THEN
+                            AVG(CAST(EnemiesAffected AS FLOAT)) / AVG(CAST(TeammatesAffected AS FLOAT)) * 10
+                            ELSE AVG(CAST(EnemiesAffected AS FLOAT)) END)) as TeamworkScore
+                        
+                    FROM TeamData
+                    GROUP BY PlayerName, Team, MapName
+                    HAVING COUNT(DISTINCT RoundNumber) >= 5
+                    ORDER BY TeamworkScore DESC, TeamworkWinPercentage DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"team_coordination_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Team Coordination Intelligence",
+                    Description = "Flash coordination, utility teamwork, site support, and coordinated execution analysis",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating team coordination analysis");
+                return StatusCode(500, $"Error generating team coordination analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("economic-intelligence")]
+        public async Task<IActionResult> GetEconomicIntelligence([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH EconomicData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            
+                            -- ECONOMY STATE
+                            ee.MoneyBefore,
+                            ee.MoneyAfter,
+                            ee.ItemName,
+                            ee.EventType,
+                            
+                            -- ROUND ECONOMY CONTEXT
+                            r.IsEcoRound,
+                            r.IsForceBuyRound,
+                            r.IsAntiEcoRound,
+                            r.CTStartMoney,
+                            r.TStartMoney,
+                            r.CTEquipmentValue,
+                            r.TEquipmentValue,
+                            
+                            -- PERFORMANCE CORRELATION
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Damage,
+                            prs.Rating,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                            
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
+                        LEFT JOIN EconomyEvents ee ON p.Id = ee.PlayerId AND ee.RoundNumber = r.RoundNumber
+                        LEFT JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId AND prs.RoundId = r.Id
+                        
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        
+                        -- BUY PATTERN ANALYSIS
+                        COUNT(CASE WHEN ItemName IN ('ak47', 'm4a1_silencer', 'm4a4', 'awp') THEN 1 END) as RifleBuys,
+                        COUNT(CASE WHEN ItemName IN ('vesthelm', 'vest') THEN 1 END) as ArmorBuys,
+                        COUNT(CASE WHEN ItemName = 'defusekit' THEN 1 END) as KitBuys,
+                        COUNT(CASE WHEN ItemName IN ('hegrenade', 'flashbang', 'smokegrenade', 'molotov') THEN 1 END) as UtilityBuys,
+                        
+                        -- ECONOMY STATE PERFORMANCE
+                        COUNT(CASE WHEN IsEcoRound = 1 THEN 1 END) as EcoRounds,
+                        COUNT(CASE WHEN IsForceBuyRound = 1 THEN 1 END) as ForceRounds,
+                        COUNT(CASE WHEN IsAntiEcoRound = 1 THEN 1 END) as AntiEcoRounds,
+                        
+                        -- ECO PERFORMANCE
+                        AVG(CASE WHEN IsEcoRound = 1 THEN CAST(Kills AS FLOAT) END) as AvgKillsOnEco,
+                        AVG(CASE WHEN IsEcoRound = 1 THEN CAST(Damage AS FLOAT) END) as AvgDamageOnEco,
+                        CAST(SUM(CASE WHEN IsEcoRound = 1 AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN IsEcoRound = 1 THEN 1 END), 0) * 100 as EcoWinPercentage,
+                        
+                        -- FORCE BUY ROI
+                        AVG(CASE WHEN IsForceBuyRound = 1 THEN CAST(Rating AS FLOAT) END) as ForceRoundRating,
+                        CAST(SUM(CASE WHEN IsForceBuyRound = 1 AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN IsForceBuyRound = 1 THEN 1 END), 0) * 100 as ForceWinPercentage,
+                        
+                        -- INVESTMENT EFFICIENCY
+                        AVG(MoneyBefore) as AvgStartMoney,
+                        AVG(MoneyAfter) as AvgEndMoney,
+                        AVG(MoneyBefore - MoneyAfter) as AvgMoneySpent,
+                        
+                        -- PERFORMANCE PER DOLLAR
+                        CASE WHEN AVG(MoneyBefore - MoneyAfter) > 0 THEN
+                            AVG(CAST(Kills AS FLOAT)) / AVG(MoneyBefore - MoneyAfter) * 1000
+                            ELSE 0 END as KillsPerThousandSpent,
+                        CASE WHEN AVG(MoneyBefore - MoneyAfter) > 0 THEN
+                            AVG(CAST(Damage AS FLOAT)) / AVG(MoneyBefore - MoneyAfter) * 100
+                            ELSE 0 END as DamagePerHundredSpent,
+                        
+                        -- ECONOMIC COMEBACK POTENTIAL
+                        COUNT(CASE WHEN MoneyBefore <= 2000 AND RoundWon = 1 THEN 1 END) as LowBudgetWins,
+                        COUNT(CASE WHEN MoneyBefore >= 5000 AND RoundWon = 0 THEN 1 END) as HighBudgetLosses,
+                        
+                        -- OVERALL ECONOMIC INTELLIGENCE SCORE
+                        (CAST(SUM(CASE WHEN IsEcoRound = 1 AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN IsEcoRound = 1 THEN 1 END), 0) * 30) +
+                        (CASE WHEN AVG(MoneyBefore - MoneyAfter) > 0 THEN
+                            AVG(CAST(Kills AS FLOAT)) / AVG(MoneyBefore - MoneyAfter) * 10000
+                            ELSE 0 END) +
+                        (COUNT(CASE WHEN MoneyBefore <= 2000 AND RoundWon = 1 THEN 1 END) * 5) as EconomicIQScore
+                        
+                    FROM EconomicData
+                    GROUP BY PlayerName, Team, MapName
+                    HAVING COUNT(DISTINCT RoundNumber) >= 10
+                    ORDER BY EconomicIQScore DESC, EcoWinPercentage DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"economic_intelligence_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Economic Intelligence Enhancement",
+                    Description = "Buy pattern analysis, eco performance, investment ROI, performance per dollar, and economic IQ scoring",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating economic intelligence analysis");
+                return StatusCode(500, $"Error generating economic intelligence analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("pressure-metrics")]
+        public async Task<IActionResult> GetPressureMetrics([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PressureData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            
+                            -- NUMERICAL DISADVANTAGE CONTEXT
+                            CASE 
+                                WHEN prs.IsAlive = 1 AND Team = 'CT' AND r.CTLivePlayers = 1 AND r.TLivePlayers >= 2 THEN '1vX_CT'
+                                WHEN prs.IsAlive = 1 AND Team = 'T' AND r.TLivePlayers = 1 AND r.CTLivePlayers >= 2 THEN '1vX_T'
+                                WHEN prs.IsAlive = 1 AND Team = 'CT' AND r.CTLivePlayers = 2 AND r.TLivePlayers >= 3 THEN '2vX_CT'
+                                WHEN prs.IsAlive = 1 AND Team = 'T' AND r.TLivePlayers = 2 AND r.CTLivePlayers >= 3 THEN '2vX_T'
+                                ELSE 'Neutral'
+                            END as NumericalSituation,
+                            
+                            -- PRESSURE LEVEL CALCULATION
+                            CASE 
+                                WHEN b.UnderFire = 1 AND b.DefuseProgress > 0 THEN 10  -- Defusing under fire
+                                WHEN prs.IsAlive = 1 AND r.CTLivePlayers = 1 AND r.TLivePlayers >= 3 THEN 9  -- 1v3+
+                                WHEN prs.IsAlive = 1 AND r.TLivePlayers = 1 AND r.CTLivePlayers >= 3 THEN 9  -- 1v3+
+                                WHEN b.UnderFire = 1 AND b.PlantProgress > 0 THEN 8  -- Planting under fire
+                                WHEN prs.IsAlive = 1 AND r.CTLivePlayers = 1 AND r.TLivePlayers = 2 THEN 7  -- 1v2
+                                WHEN prs.IsAlive = 1 AND r.TLivePlayers = 1 AND r.CTLivePlayers = 2 THEN 7  -- 1v2
+                                WHEN r.BombPlanted = 1 AND r.Duration - 35 < 10 THEN 6  -- Low time defuse
+                                ELSE 3  -- Standard pressure
+                            END as PressureLevel,
+                            
+                            -- PERFORMANCE UNDER PRESSURE
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Damage,
+                            prs.Rating,
+                            prs.IsAlive,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            
+                            -- OBJECTIVE PRESSURE
+                            b.DefuseProgress,
+                            b.PlantProgress,
+                            b.TimeRemaining,
+                            b.HasKit,
+                            b.IsClutch,
+                            b.ClutchSize
+                            
+                        FROM Players p
+                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
+                        LEFT JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId AND prs.RoundId = r.Id
+                        LEFT JOIN Bombs b ON p.Id = b.PlayerId AND b.RoundId = r.Id
+                        
+                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                            AND (@MapName IS NULL OR d.MapName = @MapName)
+                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
+                            AND (@Team IS NULL OR p.Team = @Team)
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        
+                        -- PRESSURE SITUATION ANALYSIS
+                        NumericalSituation,
+                        AVG(PressureLevel) as AvgPressureLevel,
+                        COUNT(CASE WHEN PressureLevel >= 8 THEN 1 END) as HighPressureSituations,
+                        COUNT(CASE WHEN PressureLevel <= 4 THEN 1 END) as LowPressureSituations,
+                        
+                        -- PERFORMANCE UNDER PRESSURE
+                        AVG(CASE WHEN PressureLevel >= 7 THEN CAST(Kills AS FLOAT) END) as AvgKillsHighPressure,
+                        AVG(CASE WHEN PressureLevel <= 4 THEN CAST(Kills AS FLOAT) END) as AvgKillsLowPressure,
+                        AVG(CASE WHEN PressureLevel >= 7 THEN CAST(Rating AS FLOAT) END) as HighPressureRating,
+                        AVG(CASE WHEN PressureLevel <= 4 THEN CAST(Rating AS FLOAT) END) as LowPressureRating,
+                        
+                        -- CLUTCH PERFORMANCE SCALING
+                        COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END) as ClutchAttempts,
+                        SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) as ClutchWins,
+                        CAST(SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END), 0) * 100 as ClutchSuccessRate,
+                        
+                        -- HIGH-STAKES OBJECTIVE PERFORMANCE
+                        COUNT(CASE WHEN DefuseProgress > 0 THEN 1 END) as DefuseAttempts,
+                        COUNT(CASE WHEN PlantProgress > 0 THEN 1 END) as PlantAttempts,
+                        COUNT(CASE WHEN DefuseProgress >= 0.8 THEN 1 END) as NearCompleteDefuses,
+                        COUNT(CASE WHEN PlantProgress >= 0.8 THEN 1 END) as NearCompletePlants,
+                        
+                        -- MENTAL RESILIENCE INDICATORS
+                        SUM(CASE WHEN PressureLevel >= 7 AND IsAlive = 1 THEN 1 ELSE 0 END) as SurvivedHighPressure,
+                        COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END) as TotalHighPressure,
+                        CAST(SUM(CASE WHEN PressureLevel >= 7 AND IsAlive = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END), 0) * 100 as HighPressureSurvivalRate,
+                        
+                        -- COMEBACK POTENTIAL
+                        COUNT(CASE WHEN PressureLevel >= 8 AND RoundWon = 1 THEN 1 END) as ExtremePressureWins,
+                        
+                        -- OVERALL PRESSURE PERFORMANCE SCORE
+                        (COALESCE(CAST(SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END), 0) * 40, 0)) +
+                        (COALESCE(AVG(CASE WHEN PressureLevel >= 7 THEN CAST(Rating AS FLOAT) END) * 30, 0)) +
+                        (COUNT(CASE WHEN PressureLevel >= 8 AND RoundWon = 1 THEN 1 END) * 10) +
+                        (COALESCE(CAST(SUM(CASE WHEN PressureLevel >= 7 AND IsAlive = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
+                            NULLIF(COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END), 0) * 20, 0)) as PressureResilienceScore
+                        
+                    FROM PressureData
+                    GROUP BY PlayerName, Team, MapName, NumericalSituation
+                    HAVING COUNT(*) >= 5
+                    ORDER BY PressureResilienceScore DESC, ClutchSuccessRate DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"pressure_metrics_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Psychological Pressure Metrics",
+                    Description = "High-pressure performance, clutch scaling, objective completion under fire, mental resilience, and comeback potential analysis",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating pressure metrics analysis");
+                return StatusCode(500, $"Error generating pressure metrics analysis: {ex.Message}");
+            }
+        }
+
         private async Task<List<Dictionary<string, object>>> ExecuteAnalyticsQuery(string sql, AnalyticsQuery query)
         {
             using var connection = new SqlConnection(_connectionString);
@@ -3081,128 +3828,43 @@ namespace CS2DemoParserWeb.Controllers
                             d.MapName,
                             COUNT(DISTINCT r.Id) as TotalRounds,
                             
-                            -- COMBAT ANALYTICS (Kills, Damages, WeaponFires)
-                            COUNT(k.Id) as TotalKills,
-                            COUNT(kv.Id) as TotalDeaths,
-                            COUNT(ka.Id) as TotalAssists,
-                            COALESCE(AVG(CAST(k.Distance AS FLOAT)), 0) as AvgKillDistance,
-                            COUNT(CASE WHEN k.IsHeadshot = 1 THEN 1 END) as Headshots,
-                            COUNT(CASE WHEN k.IsWallbang = 1 THEN 1 END) as WallbangKills,
-                            COUNT(CASE WHEN k.ThroughSmoke = 1 THEN 1 END) as SmokeKills,
-                            COUNT(CASE WHEN k.IsBlind = 1 THEN 1 END) as BlindKills,
-                            COUNT(CASE WHEN k.IsNoScope = 1 THEN 1 END) as NoScopeKills,
-                            COUNT(CASE WHEN k.IsCollateral = 1 THEN 1 END) as CollateralKills,
-                            
-                            -- DAMAGE ANALYTICS (Damages table)
-                            COALESCE(SUM(dm.DamageAmount), 0) as TotalDamageDealt,
-                            COALESCE(SUM(dmv.DamageAmount), 0) as TotalDamageReceived,
-                            COALESCE(AVG(CAST(dm.DamageAmount AS FLOAT)), 0) as AvgDamagePerHit,
-                            COUNT(CASE WHEN dm.ThroughSmoke = 1 THEN 1 END) as DamageThroughSmoke,
-                            COUNT(CASE WHEN dm.IsWallbang = 1 THEN 1 END) as WallbangDamage,
-                            COUNT(CASE WHEN dm.AttackerBlind = 1 THEN 1 END) as DamageWhileBlind,
-                            COALESCE(AVG(dm.Distance), 0) as AvgDamageDistance,
-                            
-                            -- WEAPON ANALYTICS (WeaponFires table)
-                            COUNT(wf.Id) as ShotsFired,
-                            COUNT(CASE WHEN wf.ThroughSmoke = 1 THEN 1 END) as ShotsThroughSmoke,
-                            COUNT(CASE WHEN wf.IsBlind = 1 THEN 1 END) as ShotsWhileBlind,
-                            COUNT(CASE WHEN wf.IsScoped = 1 THEN 1 END) as ScopedShots,
-                            COALESCE(AVG(wf.Accuracy), 0) as AvgShotAccuracy,
-                            COALESCE(AVG(wf.RecoilIndex), 0) as AvgRecoilControl,
-                            
-                            -- UTILITY ANALYTICS (Grenades, FlashEvents)
-                            COUNT(g.Id) as GrenadesThrown,
-                            COUNT(CASE WHEN g.GrenadeType = 'hegrenade' THEN 1 END) as HEGrenadesThrown,
-                            COUNT(CASE WHEN g.GrenadeType = 'flashbang' THEN 1 END) as FlashbangsThrown,
-                            COUNT(CASE WHEN g.GrenadeType = 'smokegrenade' THEN 1 END) as SmokesThrown,
-                            COUNT(CASE WHEN g.GrenadeType = 'molotov' OR g.GrenadeType = 'incgrenade' THEN 1 END) as MolotovsThrown,
-                            COALESCE(SUM(g.TotalDamage), 0) as GrenadeDamageDealt,
-                            COALESCE(SUM(g.EnemiesAffected), 0) as EnemiesFlashedByGrenades,
-                            COALESCE(SUM(g.TeammatesAffected), 0) as TeammatesFlashedByGrenades,
-                            COUNT(CASE WHEN g.IsLineup = 1 THEN 1 END) as LineupGrenades,
-                            COUNT(CASE WHEN g.IsJumpThrow = 1 THEN 1 END) as JumpThrowGrenades,
-                            
-                            -- FLASH ANALYTICS (FlashEvents table)
-                            COUNT(fe.Id) as TimesFlashed,
-                            COALESCE(AVG(fe.FlashDuration), 0) as AvgFlashDuration,
-                            COUNT(fegiven.Id) as EnemiesFlashed,
-                            COALESCE(SUM(fegiven.FlashDuration), 0) as TotalFlashTimeGiven,
-                            COUNT(CASE WHEN fe.IsTeamFlash = 1 THEN 1 END) as TeamFlashesReceived,
-                            COUNT(CASE WHEN fegiven.IsTeamFlash = 1 THEN 1 END) as TeamFlashesGiven,
-                            
-                            -- BOMB ANALYTICS (Bombs table)
-                            COUNT(CASE WHEN b.EventType = 'plant' THEN 1 END) as BombPlants,
-                            COUNT(CASE WHEN b.EventType = 'defuse' THEN 1 END) as BombDefuses,
-                            COUNT(CASE WHEN b.EventType = 'plant_start' THEN 1 END) as BombPlantAttempts,
-                            COUNT(CASE WHEN b.EventType = 'defuse_start' THEN 1 END) as BombDefuseAttempts,
-                            COUNT(CASE WHEN b.IsClutch = 1 THEN 1 END) as ClutchBombActions,
-                            COUNT(CASE WHEN b.HasKit = 1 THEN 1 END) as DefuseKitUsages,
-                            COUNT(CASE WHEN b.UnderFire = 1 THEN 1 END) as BombActionsUnderFire,
-                            
-                            -- ECONOMY ANALYTICS (EconomyEvents table)
-                            COUNT(CASE WHEN ee.EventType = 'pickup' AND ee.ItemName IN ('ak47', 'm4a1_silencer', 'm4a4', 'awp') THEN 1 END) as RiflePurchases,
-                            COUNT(CASE WHEN ee.EventType = 'pickup' AND ee.ItemName IN ('vesthelm', 'vest') THEN 1 END) as ArmorPurchases,
-                            COUNT(CASE WHEN ee.EventType = 'pickup' AND ee.ItemName = 'defusekit' THEN 1 END) as KitPurchases,
-                            COALESCE(AVG(CAST(ee.MoneyBefore AS FLOAT)), 0) as AvgStartMoney,
-                            COALESCE(AVG(CAST(ee.MoneyAfter AS FLOAT)), 0) as AvgEndMoney,
-                            
-                            -- PERFORMANCE ANALYTICS (PlayerRoundStats table)
+                            -- CORE COMBAT ANALYTICS
+                            COALESCE(SUM(prs.Kills), 0) as TotalKills,
+                            COALESCE(SUM(prs.Deaths), 0) as TotalDeaths,
+                            COALESCE(SUM(prs.Assists), 0) as TotalAssists,
+                            COALESCE(SUM(prs.Damage), 0) as TotalDamageDealt,
                             COALESCE(AVG(prs.Rating), 0) as AvgRating,
-                            COALESCE(AVG(CAST(prs.Damage AS FLOAT)), 0) as AvgDamagePerRound,
+                            
+                            -- SURVIVAL & PERFORMANCE
                             COUNT(CASE WHEN prs.IsAlive = 1 THEN 1 END) as RoundsSurvived,
                             COUNT(CASE WHEN prs.KAST = 1 THEN 1 END) as KASTRounds,
                             COUNT(CASE WHEN prs.MVP = 1 THEN 1 END) as MVPRounds,
                             COUNT(CASE WHEN prs.IsClutch = 1 THEN 1 END) as ClutchRounds,
                             
-                            -- CALCULATED ADVANCED METRICS
-                            CASE 
-                                WHEN COUNT(kv.Id) > 0 THEN CAST(COUNT(k.Id) AS FLOAT) / COUNT(kv.Id)
-                                ELSE CAST(COUNT(k.Id) AS FLOAT)
-                            END as KDRatio,
-                            CASE 
-                                WHEN COUNT(wf.Id) > 0 THEN CAST(COUNT(k.Id) AS FLOAT) / COUNT(wf.Id) * 100
-                                ELSE 0
-                            END as KillsPerShotPercentage,
-                            CASE 
-                                WHEN COUNT(dm.Id) > 0 THEN CAST(COUNT(k.Id) AS FLOAT) / COUNT(dm.Id) * 100
-                                ELSE 0
-                            END as DamageToKillRatio,
-                            CASE 
-                                WHEN COUNT(g.Id) > 0 THEN CAST(COALESCE(SUM(g.EnemiesAffected), 0) AS FLOAT) / COUNT(g.Id)
-                                ELSE 0
-                            END as UtilityEfficiency,
-                            CASE 
-                                WHEN COUNT(DISTINCT r.Id) > 0 THEN CAST(COUNT(CASE WHEN prs.IsAlive = 1 THEN 1 END) AS FLOAT) / COUNT(DISTINCT r.Id) * 100
-                                ELSE 0
-                            END as SurvivalRate
+                            -- ADVANCED KILLS DATA
+                            COUNT(k.Id) as KillEvents,
+                            COUNT(CASE WHEN k.IsHeadshot = 1 THEN 1 END) as Headshots,
+                            COUNT(CASE WHEN k.IsWallbang = 1 THEN 1 END) as WallbangKills,
+                            COUNT(CASE WHEN k.ThroughSmoke = 1 THEN 1 END) as SmokeKills,
+                            COALESCE(AVG(CAST(k.Distance AS FLOAT)), 0) as AvgKillDistance,
+                            
+                            -- WEAPON PERFORMANCE
+                            COUNT(wf.Id) as ShotsFired,
+                            COALESCE(AVG(wf.Accuracy), 0) as AvgShotAccuracy,
+                            
+                            -- UTILITY USAGE
+                            COUNT(g.Id) as GrenadesThrown,
+                            COALESCE(SUM(g.TotalDamage), 0) as GrenadeDamageDealt,
+                            COUNT(fe.Id) as TimesFlashed,
+                            COALESCE(AVG(fe.FlashDuration), 0) as AvgFlashDuration
                             
                         FROM Players p
                         INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
                         LEFT JOIN Rounds r ON r.DemoFileId = d.Id
                         LEFT JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId AND r.Id = prs.RoundId
-                        
-                        -- Combat data
                         LEFT JOIN Kills k ON p.Id = k.KillerId
-                        LEFT JOIN Kills kv ON p.Id = kv.VictimId  
-                        LEFT JOIN Kills ka ON p.Id = ka.AssisterId
-                        
-                        -- Damage data
-                        LEFT JOIN Damages dm ON p.Id = dm.AttackerId
-                        LEFT JOIN Damages dmv ON p.Id = dmv.VictimId
-                        
-                        -- Weapon data
                         LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
-                        
-                        -- Utility data
                         LEFT JOIN Grenades g ON p.Id = g.PlayerId
-                        LEFT JOIN FlashEvents fe ON p.Id = fe.FlashedPlayerId
-                        LEFT JOIN FlashEvents fegiven ON p.Id = fegiven.FlasherPlayerId
-                        
-                        -- Bomb data
-                        LEFT JOIN Bombs b ON p.Id = b.PlayerId
-                        
-                        -- Economy data
-                        LEFT JOIN EconomyEvents ee ON p.Id = ee.PlayerId
                         
                         WHERE (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
@@ -3216,92 +3878,53 @@ namespace CS2DemoParserWeb.Controllers
                         MapName,
                         TotalRounds,
                         
-                        -- Combat Performance
+                        -- Core Combat Performance
                         TotalKills,
                         TotalDeaths,
                         TotalAssists,
-                        KDRatio,
-                        AvgKillDistance,
-                        
-                        -- Accuracy & Precision
-                        Headshots,
-                        CASE WHEN TotalKills > 0 THEN CAST(Headshots AS FLOAT) / TotalKills * 100 ELSE 0 END as HeadshotPercentage,
-                        ShotsFired,
-                        KillsPerShotPercentage as ShotAccuracy,
-                        AvgShotAccuracy,
-                        AvgRecoilControl,
+                        TotalDamageDealt,
+                        CASE 
+                            WHEN TotalDeaths > 0 THEN CAST(TotalKills AS FLOAT) / TotalDeaths
+                            ELSE CAST(TotalKills AS FLOAT)
+                        END as KDRatio,
                         
                         -- Advanced Combat
+                        KillEvents,
+                        Headshots,
+                        CASE WHEN TotalKills > 0 THEN CAST(Headshots AS FLOAT) / TotalKills * 100 ELSE 0 END as HeadshotPercentage,
                         WallbangKills,
                         SmokeKills,
-                        BlindKills,
-                        NoScopeKills,
-                        CollateralKills,
+                        AvgKillDistance,
                         
-                        -- Damage Analytics
-                        TotalDamageDealt,
-                        TotalDamageReceived,
-                        AvgDamagePerHit,
-                        AvgDamagePerRound,
-                        DamageToKillRatio,
-                        DamageThroughSmoke,
-                        WallbangDamage,
-                        DamageWhileBlind,
+                        -- Weapon Performance  
+                        ShotsFired,
+                        CASE WHEN ShotsFired > 0 THEN CAST(TotalKills AS FLOAT) / ShotsFired * 100 ELSE 0 END as KillsPerShotPercentage,
+                        AvgShotAccuracy,
                         
-                        -- Utility Mastery
+                        -- Utility Usage
                         GrenadesThrown,
-                        HEGrenadesThrown,
-                        FlashbangsThrown,
-                        SmokesThrown,
-                        MolotovsThrown,
                         GrenadeDamageDealt,
-                        EnemiesFlashedByGrenades,
-                        TeammatesFlashedByGrenades,
-                        UtilityEfficiency,
-                        LineupGrenades,
-                        JumpThrowGrenades,
+                        CASE WHEN GrenadesThrown > 0 THEN CAST(GrenadeDamageDealt AS FLOAT) / GrenadesThrown ELSE 0 END as UtilityEfficiency,
                         
-                        -- Flash Intelligence
+                        -- Flash Performance
                         TimesFlashed,
                         AvgFlashDuration,
-                        EnemiesFlashed,
-                        TotalFlashTimeGiven,
-                        TeamFlashesReceived,
-                        TeamFlashesGiven,
-                        CASE WHEN TimesFlashed > 0 THEN CAST(EnemiesFlashed AS FLOAT) / TimesFlashed ELSE 0 END as FlashTradeRatio,
                         
-                        -- Objective Play
-                        BombPlants,
-                        BombDefuses,
-                        BombPlantAttempts,
-                        BombDefuseAttempts,
-                        ClutchBombActions,
-                        DefuseKitUsages,
-                        BombActionsUnderFire,
-                        
-                        -- Economic Intelligence
-                        RiflePurchases,
-                        ArmorPurchases,
-                        KitPurchases,
-                        AvgStartMoney,
-                        AvgEndMoney,
-                        
-                        -- Clutch & Performance
+                        -- Survival & Performance
                         RoundsSurvived,
-                        SurvivalRate,
+                        CASE WHEN TotalRounds > 0 THEN CAST(RoundsSurvived AS FLOAT) / TotalRounds * 100 ELSE 0 END as SurvivalRate,
                         KASTRounds,
                         CASE WHEN TotalRounds > 0 THEN CAST(KASTRounds AS FLOAT) / TotalRounds * 100 ELSE 0 END as KASTPercentage,
                         MVPRounds,
                         ClutchRounds,
                         AvgRating,
                         
-                        -- Comprehensive Performance Score (0-100)
-                        CASE WHEN TotalRounds >= 5 THEN
-                            (AvgRating * 20 + 
-                             LEAST(KDRatio * 15, 30) + 
-                             LEAST(SurvivalRate * 0.2, 20) + 
-                             LEAST(UtilityEfficiency * 10, 15) + 
-                             LEAST(CASE WHEN TotalKills > 0 THEN CAST(Headshots AS FLOAT) / TotalKills * 100 ELSE 0 END * 0.15, 15))
+                        -- Overall Performance Score
+                        CASE WHEN TotalRounds >= 3 THEN
+                            (AvgRating * 25 + 
+                             LEAST(CASE WHEN TotalDeaths > 0 THEN CAST(TotalKills AS FLOAT) / TotalDeaths ELSE CAST(TotalKills AS FLOAT) END * 10, 25) + 
+                             LEAST(CASE WHEN TotalRounds > 0 THEN CAST(RoundsSurvived AS FLOAT) / TotalRounds * 100 ELSE 0 END * 0.25, 25) + 
+                             LEAST(CASE WHEN TotalKills > 0 THEN CAST(Headshots AS FLOAT) / TotalKills * 100 ELSE 0 END * 0.25, 25))
                         ELSE 0 END as OverallPerformanceScore
                         
                     FROM PlayerMasterStats
