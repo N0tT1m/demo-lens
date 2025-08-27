@@ -2986,102 +2986,100 @@ namespace CS2DemoParserWeb.Controllers
                             
                             -- NUMERICAL DISADVANTAGE CONTEXT
                             CASE 
-                                WHEN prs.IsAlive = 1 AND Team = 'CT' AND r.CTLivePlayers = 1 AND r.TLivePlayers >= 2 THEN '1vX_CT'
-                                WHEN prs.IsAlive = 1 AND Team = 'T' AND r.TLivePlayers = 1 AND r.CTLivePlayers >= 2 THEN '1vX_T'
-                                WHEN prs.IsAlive = 1 AND Team = 'CT' AND r.CTLivePlayers = 2 AND r.TLivePlayers >= 3 THEN '2vX_CT'
-                                WHEN prs.IsAlive = 1 AND Team = 'T' AND r.TLivePlayers = 2 AND r.CTLivePlayers >= 3 THEN '2vX_T'
+                                WHEN prs.IsAlive = 1 AND p.Team = 'CT' AND r.CTLivePlayers = 1 AND r.TLivePlayers >= 2 THEN '1vX_CT'
+                                WHEN prs.IsAlive = 1 AND p.Team = 'T' AND r.TLivePlayers = 1 AND r.CTLivePlayers >= 2 THEN '1vX_T'
+                                WHEN prs.IsAlive = 1 AND p.Team = 'CT' AND r.CTLivePlayers = 2 AND r.TLivePlayers >= 3 THEN '2vX_CT'
+                                WHEN prs.IsAlive = 1 AND p.Team = 'T' AND r.TLivePlayers = 2 AND r.CTLivePlayers >= 3 THEN '2vX_T'
                                 ELSE 'Neutral'
                             END as NumericalSituation,
                             
-                            -- PRESSURE LEVEL CALCULATION
+                            -- SIMPLIFIED PRESSURE LEVEL CALCULATION
                             CASE 
-                                WHEN b.UnderFire = 1 AND b.DefuseProgress > 0 THEN 10  -- Defusing under fire
-                                WHEN prs.IsAlive = 1 AND r.CTLivePlayers = 1 AND r.TLivePlayers >= 3 THEN 9  -- 1v3+
-                                WHEN prs.IsAlive = 1 AND r.TLivePlayers = 1 AND r.CTLivePlayers >= 3 THEN 9  -- 1v3+
-                                WHEN b.UnderFire = 1 AND b.PlantProgress > 0 THEN 8  -- Planting under fire
-                                WHEN prs.IsAlive = 1 AND r.CTLivePlayers = 1 AND r.TLivePlayers = 2 THEN 7  -- 1v2
-                                WHEN prs.IsAlive = 1 AND r.TLivePlayers = 1 AND r.CTLivePlayers = 2 THEN 7  -- 1v2
-                                WHEN r.BombPlanted = 1 AND r.Duration - 35 < 10 THEN 6  -- Low time defuse
-                                ELSE 3  -- Standard pressure
+                                WHEN prs.IsAlive = 1 AND prs.Deaths > 0 AND prs.Kills >= 2 THEN 9  -- High performance under pressure
+                                WHEN prs.IsAlive = 1 AND prs.Deaths > 0 AND prs.Kills >= 1 THEN 7  -- Good performance under pressure
+                                WHEN prs.Deaths > 0 AND prs.Kills = 0 THEN 3  -- Failed under pressure
+                                WHEN prs.IsAlive = 1 AND prs.Deaths = 0 THEN 5  -- Safe round
+                                ELSE 4  -- Standard pressure
                             END as PressureLevel,
                             
-                            -- PERFORMANCE UNDER PRESSURE
+                            -- PERFORMANCE METRICS
                             prs.Kills,
                             prs.Deaths,
+                            prs.Assists,
                             prs.Damage,
-                            prs.Rating,
                             prs.IsAlive,
-                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
-                            
-                            -- OBJECTIVE PRESSURE
-                            b.DefuseProgress,
-                            b.PlantProgress,
-                            b.TimeRemaining,
-                            b.HasKit,
-                            b.IsClutch,
-                            b.ClutchSize
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
                             
                         FROM Players p
-                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
-                        LEFT JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId AND prs.RoundId = r.Id
-                        LEFT JOIN Bombs b ON p.Id = b.PlayerId AND b.RoundId = r.Id
-                        
-                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                            AND (@Team IS NULL OR p.Team = @Team)
+                        INNER JOIN PlayerRoundStats prs ON p.PlayerId = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.RoundId
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.DemoFileId
+                        WHERE 1=1";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
                     )
                     SELECT 
                         PlayerName,
                         Team,
                         MapName,
+                        NumericalSituation,
                         
                         -- PRESSURE SITUATION ANALYSIS
-                        NumericalSituation,
-                        AVG(PressureLevel) as AvgPressureLevel,
-                        COUNT(CASE WHEN PressureLevel >= 8 THEN 1 END) as HighPressureSituations,
+                        COUNT(*) as TotalSituations,
+                        ROUND(AVG(PressureLevel), 2) as AvgPressureLevel,
+                        COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END) as HighPressureSituations,
                         COUNT(CASE WHEN PressureLevel <= 4 THEN 1 END) as LowPressureSituations,
                         
                         -- PERFORMANCE UNDER PRESSURE
-                        AVG(CASE WHEN PressureLevel >= 7 THEN CAST(Kills AS FLOAT) END) as AvgKillsHighPressure,
-                        AVG(CASE WHEN PressureLevel <= 4 THEN CAST(Kills AS FLOAT) END) as AvgKillsLowPressure,
-                        AVG(CASE WHEN PressureLevel >= 7 THEN CAST(Rating AS FLOAT) END) as HighPressureRating,
-                        AVG(CASE WHEN PressureLevel <= 4 THEN CAST(Rating AS FLOAT) END) as LowPressureRating,
+                        SUM(Kills) as TotalKills,
+                        SUM(Deaths) as TotalDeaths,
+                        SUM(Assists) as TotalAssists,
+                        SUM(Damage) as TotalDamage,
+                        SUM(RoundWon) as RoundsWon,
                         
-                        -- CLUTCH PERFORMANCE SCALING
+                        -- COMBAT RATIOS
+                        ROUND(CASE WHEN SUM(Deaths) > 0 THEN SUM(Kills) * 1.0 / SUM(Deaths) ELSE SUM(Kills) END, 2) as KDRatio,
+                        ROUND(SUM(Damage) * 1.0 / COUNT(*), 2) as AvgDamagePerRound,
+                        ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) as WinRate,
+                        
+                        -- CLUTCH PERFORMANCE
                         COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END) as ClutchAttempts,
                         SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) as ClutchWins,
-                        CAST(SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
-                            NULLIF(COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END), 0) * 100 as ClutchSuccessRate,
+                        ROUND(CASE WHEN COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END) > 0 
+                              THEN (SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) * 100.0 / 
+                                   COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END))
+                              ELSE 0 END, 2) as ClutchSuccessRate,
                         
-                        -- HIGH-STAKES OBJECTIVE PERFORMANCE
-                        COUNT(CASE WHEN DefuseProgress > 0 THEN 1 END) as DefuseAttempts,
-                        COUNT(CASE WHEN PlantProgress > 0 THEN 1 END) as PlantAttempts,
-                        COUNT(CASE WHEN DefuseProgress >= 0.8 THEN 1 END) as NearCompleteDefuses,
-                        COUNT(CASE WHEN PlantProgress >= 0.8 THEN 1 END) as NearCompletePlants,
+                        -- SURVIVAL UNDER PRESSURE
+                        SUM(CASE WHEN IsAlive = 1 THEN 1 ELSE 0 END) as SurvivedRounds,
+                        ROUND((SUM(CASE WHEN IsAlive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as SurvivalRate,
                         
-                        -- MENTAL RESILIENCE INDICATORS
-                        SUM(CASE WHEN PressureLevel >= 7 AND IsAlive = 1 THEN 1 ELSE 0 END) as SurvivedHighPressure,
-                        COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END) as TotalHighPressure,
-                        CAST(SUM(CASE WHEN PressureLevel >= 7 AND IsAlive = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
-                            NULLIF(COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END), 0) * 100 as HighPressureSurvivalRate,
-                        
-                        -- COMEBACK POTENTIAL
-                        COUNT(CASE WHEN PressureLevel >= 8 AND RoundWon = 1 THEN 1 END) as ExtremePressureWins,
-                        
-                        -- OVERALL PRESSURE PERFORMANCE SCORE
-                        (COALESCE(CAST(SUM(CASE WHEN NumericalSituation LIKE '1vX_%' AND RoundWon = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
-                            NULLIF(COUNT(CASE WHEN NumericalSituation LIKE '1vX_%' THEN 1 END), 0) * 40, 0)) +
-                        (COALESCE(AVG(CASE WHEN PressureLevel >= 7 THEN CAST(Rating AS FLOAT) END) * 30, 0)) +
-                        (COUNT(CASE WHEN PressureLevel >= 8 AND RoundWon = 1 THEN 1 END) * 10) +
-                        (COALESCE(CAST(SUM(CASE WHEN PressureLevel >= 7 AND IsAlive = 1 THEN 1 ELSE 0 END) AS FLOAT) / 
-                            NULLIF(COUNT(CASE WHEN PressureLevel >= 7 THEN 1 END), 0) * 20, 0)) as PressureResilienceScore
+                        -- PRESSURE PERFORMANCE SCORE (0-100)
+                        CASE 
+                            WHEN ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) >= 70 AND 
+                                 ROUND(CASE WHEN SUM(Deaths) > 0 THEN SUM(Kills) * 1.0 / SUM(Deaths) ELSE SUM(Kills) END, 2) >= 1.5 THEN 95
+                            WHEN ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) >= 60 AND 
+                                 ROUND(CASE WHEN SUM(Deaths) > 0 THEN SUM(Kills) * 1.0 / SUM(Deaths) ELSE SUM(Kills) END, 2) >= 1.2 THEN 80
+                            WHEN ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) >= 50 THEN 65
+                            WHEN ROUND(CASE WHEN SUM(Deaths) > 0 THEN SUM(Kills) * 1.0 / SUM(Deaths) ELSE SUM(Kills) END, 2) >= 1.0 THEN 50
+                            ELSE 30
+                        END as PressurePerformanceScore
                         
                     FROM PressureData
+                    WHERE NumericalSituation != 'Neutral'
                     GROUP BY PlayerName, Team, MapName, NumericalSituation
-                    HAVING COUNT(*) >= 5
-                    ORDER BY PressureResilienceScore DESC, ClutchSuccessRate DESC";
+                    HAVING COUNT(*) >= 3
+                    ORDER BY PressurePerformanceScore DESC, WinRate DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
