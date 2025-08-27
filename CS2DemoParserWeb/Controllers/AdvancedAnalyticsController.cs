@@ -2509,91 +2509,76 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH PositionData AS (
+                    WITH PositionalData AS (
                         SELECT 
                             p.PlayerName,
                             p.Team,
                             d.MapName,
                             r.RoundNumber,
                             
-                            -- SITE CONTROL ANALYSIS
+                            -- SIMPLIFIED POSITIONING - Use round half for positioning
                             CASE 
-                                WHEN b.Site = 'A' THEN 'A_Site'
-                                WHEN b.Site = 'B' THEN 'B_Site' 
-                                ELSE 'Mid_Map'
-                            END as LocationZone,
+                                WHEN r.RoundNumber <= 15 THEN 'First_Half'
+                                ELSE 'Second_Half'
+                            END as PositionContext,
                             
-                            -- BOMB POSITIONING
-                            CASE WHEN b.EventType = 'plant' THEN 1 ELSE 0 END as BombPlants,
-                            CASE WHEN b.EventType = 'defuse' THEN 1 ELSE 0 END as BombDefuses,
-                            b.PositionX as BombPositionX,
-                            b.PositionY as BombPositionY,
-                            
-                            -- KILL POSITIONING
-                            k.KillerPositionX,
-                            k.KillerPositionY,
-                            k.VictimPositionX, 
-                            k.VictimPositionY,
-                            k.Distance as KillDistance,
-                            
-                            -- WEAPON FIRE POSITIONING
-                            wf.PositionX as ShootPositionX,
-                            wf.PositionY as ShootPositionY,
-                            wf.ViewAngleX,
-                            wf.ViewAngleY,
-                            
-                            -- ROUND CONTEXT
+                            -- ROUND OUTCOME
                             CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
-                            r.CTLivePlayers,
-                            r.TLivePlayers
+                            
+                            -- PLAYER PERFORMANCE
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Assists,
+                            prs.Damage,
+                            prs.IsAlive
                             
                         FROM Players p
-                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        INNER JOIN Rounds r ON r.DemoFileId = d.Id
-                        LEFT JOIN Bombs b ON p.Id = b.PlayerId AND b.RoundId = r.Id
-                        LEFT JOIN Kills k ON p.Id = k.KillerId AND k.RoundId = r.Id
-                        LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId AND wf.RoundId = r.Id
-                        
-                        WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                            AND (@MapName IS NULL OR d.MapName = @MapName)
-                            AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                            AND (@Team IS NULL OR p.Team = @Team)
+                        INNER JOIN PlayerRoundStats prs ON p.PlayerId = prs.PlayerId
+                        INNER JOIN Rounds r ON prs.RoundId = r.RoundId
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.DemoFileId
+                        WHERE 1=1";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
                     )
                     SELECT 
                         PlayerName,
                         Team,
                         MapName,
-                        LocationZone,
+                        PositionContext,
                         
-                        -- SITE CONTROL METRICS
-                        COUNT(*) as PositionalActions,
-                        SUM(BombPlants) as PlantActions,
-                        SUM(BombDefuses) as DefuseActions,
-                        SUM(RoundWon) as RoundsWonAtLocation,
-                        CAST(SUM(RoundWon) AS FLOAT) / COUNT(*) * 100 as LocationWinPercentage,
+                        -- PERFORMANCE METRICS
+                        COUNT(*) as RoundsPlayed,
+                        SUM(RoundWon) as RoundsWon,
+                        ROUND((SUM(RoundWon) * 100.0 / COUNT(*)), 2) as WinPercentage,
                         
-                        -- POSITIONING EFFECTIVENESS
-                        COUNT(CASE WHEN KillDistance IS NOT NULL THEN 1 END) as KillsFromPosition,
-                        AVG(KillDistance) as AvgKillDistanceFromPosition,
+                        -- COMBAT EFFECTIVENESS
+                        SUM(Kills) as TotalKills,
+                        SUM(Deaths) as TotalDeaths,
+                        SUM(Assists) as TotalAssists,
+                        SUM(Damage) as TotalDamage,
                         
-                        -- CROSSFIRE & ANGLES
-                        COUNT(DISTINCT ViewAngleX) as AngleVariety,
-                        AVG(ABS(ViewAngleX)) as AvgViewAngleX,
-                        AVG(ABS(ViewAngleY)) as AvgViewAngleY,
+                        -- RATIOS
+                        ROUND(CASE WHEN SUM(Deaths) > 0 THEN SUM(Kills) * 1.0 / SUM(Deaths) ELSE SUM(Kills) END, 2) as KDRatio,
+                        ROUND(SUM(Damage) * 1.0 / COUNT(*), 2) as AvgDamagePerRound,
                         
-                        -- POSITION CLUSTERS (simplified coordinate grouping)
-                        ROUND(AVG(COALESCE(BombPositionX, ShootPositionX, KillerPositionX)), 0) as AvgPositionX,
-                        ROUND(AVG(COALESCE(BombPositionY, ShootPositionY, KillerPositionY)), 0) as AvgPositionY,
+                        -- SURVIVAL METRICS
+                        SUM(CASE WHEN IsAlive = 1 THEN 1 ELSE 0 END) as RoundsSurvived,
+                        ROUND((SUM(CASE WHEN IsAlive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as SurvivalRate
                         
-                        -- RETAKE SUCCESS
-                        COUNT(CASE WHEN CTLivePlayers < TLivePlayers AND RoundWon = 1 AND Team = 'CT' THEN 1 END) as SuccessfulRetakes,
-                        COUNT(CASE WHEN TLivePlayers < CTLivePlayers AND RoundWon = 1 AND Team = 'T' THEN 1 END) as SuccessfulPostPlants
-                        
-                    FROM PositionData
-                    WHERE LocationZone IS NOT NULL
-                    GROUP BY PlayerName, Team, MapName, LocationZone
+                    FROM PositionalData
+                    GROUP BY PlayerName, Team, MapName, PositionContext
                     HAVING COUNT(*) >= 3
-                    ORDER BY LocationWinPercentage DESC, KillsFromPosition DESC";
+                    ORDER BY WinPercentage DESC, KDRatio DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
@@ -2607,8 +2592,8 @@ namespace CS2DemoParserWeb.Controllers
 
                 return Ok(new
                 {
-                    Title = "Positioning & Movement Analysis",
-                    Description = "Site control, crossfire positioning, retake positioning, and movement pattern analysis",
+                    Title = "Positioning Analysis",
+                    Description = "Performance analysis by game position (first half vs second half) showing combat effectiveness and survival rates",
                     Data = data,
                     TotalRecords = data.Count
                 });
