@@ -2758,13 +2758,13 @@ namespace CS2DemoParserWeb.Controllers
                             
                             -- COMBAT CONDITIONS BASED ON AVAILABLE DATA
                             CASE 
-                                WHEN k.ThroughSmoke = 1 AND k.IsWallbang = 1 THEN 'Smoke_And_Wallbang'
-                                WHEN k.ThroughSmoke = 1 AND k.Distance > 800 THEN 'Smoke_And_LongRange'
-                                WHEN k.IsWallbang = 1 AND k.Distance > 600 THEN 'Wallbang_And_LongRange'
-                                WHEN k.ThroughSmoke = 1 THEN 'Through_Smoke'
-                                WHEN k.IsWallbang = 1 THEN 'Wallbang'
-                                WHEN k.Distance > 1000 THEN 'Long_Range'
+                                WHEN k.IsHeadshot = 1 AND k.Distance > 800 THEN 'Precision_LongRange'
+                                WHEN k.Distance > 1200 THEN 'Long_Range'
+                                WHEN k.Distance > 800 THEN 'Medium_Range'
                                 WHEN k.IsHeadshot = 1 THEN 'Precision'
+                                WHEN k.Distance < 300 THEN 'Close_Range'
+                                WHEN k.Weapon LIKE '%awp%' THEN 'Sniper_Combat'
+                                WHEN k.Weapon LIKE '%ak47%' OR k.Weapon LIKE '%m4a%' THEN 'Rifle_Combat'
                                 ELSE 'Standard'
                             END as CombatCondition,
                             
@@ -2772,8 +2772,6 @@ namespace CS2DemoParserWeb.Controllers
                             CASE WHEN k.Id IS NOT NULL THEN 1 ELSE 0 END as KillSuccess,
                             k.Distance as KillDistance,
                             k.IsHeadshot,
-                            k.IsWallbang as WallbangKill,
-                            k.ThroughSmoke,
                             k.Weapon,
                             
                             -- ROUND CONTEXT
@@ -2817,10 +2815,10 @@ namespace CS2DemoParserWeb.Controllers
                         SUM(IsHeadshot) as HeadshotKillsInCondition,
                         ROUND(SUM(IsHeadshot) * 100.0 / NULLIF(SUM(KillSuccess), 0), 2) as HeadshotRateInCondition,
                         
-                        -- WALLBANG & SMOKE EXPERTISE  
-                        SUM(WallbangKill) as WallbangKills,
-                        SUM(ThroughSmoke) as ThroughSmokeKills,
-                        ROUND(SUM(WallbangKill) * 100.0 / NULLIF(COUNT(*), 0), 2) as WallbangRate,
+                        -- DISTANCE EXPERTISE  
+                        COUNT(CASE WHEN KillDistance > 1000 THEN 1 END) as LongRangeKills,
+                        COUNT(CASE WHEN KillDistance < 300 THEN 1 END) as CloseRangeKills,
+                        ROUND(COUNT(CASE WHEN KillDistance > 1000 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 2) as LongRangeKillRate,
                         
                         -- ROUND IMPACT IN CONDITIONS
                         SUM(RoundWon) as RoundsWonInCondition,
@@ -2829,10 +2827,12 @@ namespace CS2DemoParserWeb.Controllers
                         
                         -- CIRCUMSTANTIAL MASTERY SCORE
                         CASE 
-                            WHEN CombatCondition LIKE '%_And_%' THEN 
+                            WHEN CombatCondition = 'Precision_LongRange' THEN 
                                 ROUND((CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 2.0, 2)
-                            WHEN CombatCondition != 'Standard' THEN 
+                            WHEN CombatCondition LIKE '%Precision%' OR CombatCondition = 'Long_Range' THEN 
                                 ROUND((CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 1.5, 2)
+                            WHEN CombatCondition != 'Standard' THEN 
+                                ROUND((CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100) * 1.3, 2)
                             ELSE ROUND(CAST(SUM(KillSuccess) AS FLOAT) / COUNT(*) * 100, 2)
                         END as CircumstantialMasteryScore
                         
