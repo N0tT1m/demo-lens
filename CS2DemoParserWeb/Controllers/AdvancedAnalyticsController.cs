@@ -28,6 +28,46 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
+                    -- DIAGNOSTIC QUERY - Check what data exists
+                    SELECT TOP 20
+                        'DemoFiles' as TableName,
+                        d.Id as DemoId,
+                        d.FileName,
+                        d.MapName,
+                        d.ParsedAt,
+                        COUNT(DISTINCT r.Id) as RoundCount,
+                        COUNT(DISTINCT k.Id) as KillCount,
+                        MAX(p.PlayerName) as SamplePlayer
+                    FROM DemoFiles d
+                    LEFT JOIN Rounds r ON r.DemoFileId = d.Id
+                    LEFT JOIN Kills k ON k.RoundId = r.Id
+                    LEFT JOIN Players p ON k.KillerId = p.Id
+                    WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                        AND (@MapName IS NULL OR d.MapName = @MapName)
+                    GROUP BY d.Id, d.FileName, d.MapName, d.ParsedAt
+                    
+                    UNION ALL
+                    
+                    SELECT TOP 10
+                        'Basic Stats' as TableName,
+                        d.Id as DemoId,
+                        d.FileName,
+                        d.MapName,
+                        d.ParsedAt,
+                        COUNT(DISTINCT prs.Id) as PlayerRoundStatCount,
+                        COUNT(DISTINCT k.Id) as KillCount,
+                        'N/A' as SamplePlayer
+                    FROM DemoFiles d
+                    LEFT JOIN Rounds r ON r.DemoFileId = d.Id
+                    LEFT JOIN PlayerRoundStats prs ON prs.RoundId = r.Id
+                    LEFT JOIN Kills k ON k.RoundId = r.Id
+                    WHERE (@DemoId IS NULL OR d.Id = @DemoId)
+                        AND (@MapName IS NULL OR d.MapName = @MapName)
+                    GROUP BY d.Id, d.FileName, d.MapName, d.ParsedAt
+                    
+                    ORDER BY ParsedAt DESC"; 
+                
+                /*
                     WITH RoundPlayerCounts AS (
                         SELECT 
                             r.Id as RoundId,
@@ -101,6 +141,7 @@ namespace CS2DemoParserWeb.Controllers
                         AND (@Team IS NULL OR ClutchTeam = @Team)
                     GROUP BY ClutchPlayer, ClutchTeam, MapName, ClutchType
                     ORDER BY ClutchSuccessRate DESC, ClutchAttempts DESC";
+                */
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
