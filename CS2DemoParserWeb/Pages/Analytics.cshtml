@@ -33,6 +33,11 @@
                         <option value="de_inferno">de_inferno</option>
                         <option value="de_ancient">de_ancient</option>
                         <option value="de_vertigo">de_vertigo</option>
+                        <option value="de_nuke">de_nuke</option>
+                        <option value="de_overpass">de_overpass</option>
+                        <option value="de_train">de_train</option>
+                        <option value="de_cache">de_cache</option>
+                        <option value="de_anubis">de_anubis</option>
                     </select>
                 </div>
                 
@@ -449,6 +454,16 @@ function getFilters() {
     };
 }
 
+function buildQueryString(filters) {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+        if (filters[key] !== null && filters[key] !== '' && filters[key] !== undefined) {
+            params.append(key, filters[key]);
+        }
+    });
+    return params.toString();
+}
+
 function showLoading() {
     const containers = ['clutchResults', 'tradeResults', 'firstKillResults', 'economyResults', 'positionResults', 'comprehensiveClutchResults', 'weaponsResults', 'grenadesResults', 'momentumResults', 'coordinationResults', 'consistencyResults', 'damageResults'];
     containers.forEach(containerId => {
@@ -464,7 +479,7 @@ function showLoading() {
 }
 
 async function loadClutchAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/comprehensive-clutch-analysis?${params}`);
     
     if (response.ok) {
@@ -476,7 +491,7 @@ async function loadClutchAnalysis(filters) {
 }
 
 async function loadTradeAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/trade-kill-optimization?${params}`);
     
     if (response.ok) {
@@ -488,7 +503,7 @@ async function loadTradeAnalysis(filters) {
 }
 
 async function loadFirstKillAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/first-blood-impact-analysis?${params}`);
     
     if (response.ok) {
@@ -500,7 +515,7 @@ async function loadFirstKillAnalysis(filters) {
 }
 
 async function loadEconomyAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/economic-efficiency-analysis?${params}`);
     
     if (response.ok) {
@@ -512,7 +527,7 @@ async function loadEconomyAnalysis(filters) {
 }
 
 async function loadPositionAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/positioning-intelligence?${params}`);
     
     if (response.ok) {
@@ -524,7 +539,7 @@ async function loadPositionAnalysis(filters) {
 }
 
 async function loadComprehensiveClutchAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/comprehensive-clutch-analysis?${params}`);
     
     if (response.ok) {
@@ -889,7 +904,7 @@ function displayComprehensiveClutchResults(response) {
 
 // Load additional analytics functions
 async function loadWeaponsAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/weapon-mastery-analytics?${params}`);
     
     if (response.ok) {
@@ -901,7 +916,7 @@ async function loadWeaponsAnalysis(filters) {
 }
 
 async function loadGrenadesAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/grenade-impact-quantification?${params}`);
     
     if (response.ok) {
@@ -913,7 +928,7 @@ async function loadGrenadesAnalysis(filters) {
 }
 
 async function loadMomentumAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/round-momentum-tracking?${params}`);
     
     if (response.ok) {
@@ -925,7 +940,7 @@ async function loadMomentumAnalysis(filters) {
 }
 
 async function loadCoordinationAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/team-coordination-metrics?${params}`);
     
     if (response.ok) {
@@ -937,7 +952,7 @@ async function loadCoordinationAnalysis(filters) {
 }
 
 async function loadConsistencyAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/performance-consistency-profiling?${params}`);
     
     if (response.ok) {
@@ -949,7 +964,7 @@ async function loadConsistencyAnalysis(filters) {
 }
 
 async function loadDamageAnalysis(filters) {
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     const response = await fetch(`/api/advanced-analytics/damage-efficiency-analytics?${params}`);
     
     if (response.ok) {
@@ -1025,7 +1040,7 @@ async function exportAnalysis(analysisType) {
     const endpoint = endpoints[analysisType];
     if (!endpoint) return;
     
-    const params = new URLSearchParams(filters);
+    const params = buildQueryString(filters);
     window.location.href = `/api/advanced-analytics/${endpoint}?${params}`;
 }
 
