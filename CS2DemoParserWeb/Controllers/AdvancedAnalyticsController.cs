@@ -590,9 +590,11 @@ namespace CS2DemoParserWeb.Controllers
                         LEFT JOIN TradeKillAnalysis t2 ON t1.RoundId = t2.RoundId 
                             AND t2.TradeKillTime > t1.TradeKillTime 
                             AND t2.TradeKillTime <= t1.TradeKillTime + 3.0
-                        GROUP BY t1.TradeKillId, t1.InitialKillId, t1.InitialKillTime, t1.InitialKiller, t1.InitialKillerTeam,
-                                 t1.InitialVictim, t1.InitialVictimTeam, t1.TradeKiller, t1.TradeKillerTeam, t1.TradeKillTime,
-                                 t1.TradeTimeSeconds, t1.TradeDistance, t1.TraderMovementDistance, t1.MapName, t1.TradeArea, t1.TradeQuality, t1.RoundId
+                        GROUP BY t1.TradeKillId, t1.InitialKillId, t1.InitialKillTime, t1.InitialWeapon, t1.InitialKillerX, t1.InitialKillerY, 
+                                 t1.InitialVictimX, t1.InitialVictimY, t1.InitialKiller, t1.InitialKillerTeam, t1.InitialVictim, t1.InitialVictimTeam, 
+                                 t1.TradeKiller, t1.TradeKillerTeam, t1.TradeVictim, t1.TradeKillTime, t1.TradeWeapon, t1.TradeKillerX, t1.TradeKillerY,
+                                 t1.TradeTimeSeconds, t1.FileName, t1.MapName, t1.RoundNumber, t1.RoundId, t1.TradeDistance, t1.TraderMovementDistance, 
+                                 t1.TradeArea, t1.TradeQuality
                     ),
                     FailedTradeOpportunities AS (
                         -- Identify situations where trades could have happened but didn't
