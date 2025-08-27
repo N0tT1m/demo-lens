@@ -1976,31 +1976,25 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH PlayerRoundPerformance AS (
+                    WITH PlayerStats AS (
                         SELECT 
-                            prs.PlayerId,
                             p.PlayerName,
                             p.Team,
                             d.MapName,
-                            r.RoundNumber,
-                            r.Id as RoundId,
-                            d.ParsedAt,
-                            -- Core performance metrics
-                            prs.Kills,
-                            prs.Deaths,
-                            prs.Assists,
-                            prs.Damage,
-                            -- Estimate headshot kills (simplified - assume 30% of kills are headshots)
-                            CAST(prs.Kills * 0.3 AS INT) as HeadshotKills,
-                            prs.EquipmentValue,
-                            -- Calculate ADR and KDR for round
-                            CASE WHEN prs.Deaths > 0 THEN CAST(prs.Kills AS FLOAT) / prs.Deaths ELSE prs.Kills END as RoundKDR,
-                            prs.Damage as RoundADR,
-                            -- Calculate round rating (simplified HLTV-style)
-                            (prs.Kills * 0.6 + prs.Assists * 0.2 + (CASE WHEN prs.Deaths = 0 THEN 0.5 ELSE 0 END) + 
-                             (prs.Kills * 0.3) * 0.2 + (prs.Damage / 100.0) * 0.1) as RoundRating,
-                            -- Time-based sequencing
-                            ROW_NUMBER() OVER (PARTITION BY prs.PlayerId ORDER BY d.ParsedAt, r.RoundNumber) as RoundSequence
+                            COUNT(*) as TotalRounds,
+                            AVG(CAST(prs.Kills AS FLOAT)) as AverageKills,
+                            AVG(CAST(prs.Deaths AS FLOAT)) as AverageDeaths,
+                            AVG(CAST(prs.Assists AS FLOAT)) as AverageAssists,
+                            AVG(CAST(prs.Damage AS FLOAT)) as AverageDamage,
+                            AVG(prs.Kills * 0.6 + prs.Assists * 0.2 + (prs.Damage / 100.0) * 0.1) as AverageRating,
+                            STDEV(CAST(prs.Kills AS FLOAT)) as KillVariance,
+                            STDEV(CAST(prs.Damage AS FLOAT)) as DamageVariance,
+                            MAX(prs.Kills) as BestKillRound,
+                            MIN(prs.Kills) as WorstKillRound,
+                            MAX(prs.Damage) as HighestDamageRound,
+                            MIN(prs.Damage) as LowestDamageRound,
+                            AVG(CASE WHEN prs.EquipmentValue >= 3000 THEN CAST(prs.Kills AS FLOAT) END) as FullBuyKills,
+                            AVG(CASE WHEN prs.EquipmentValue < 1500 THEN CAST(prs.Kills AS FLOAT) END) as EcoKills
                         FROM PlayerRoundStats prs
                         INNER JOIN Players p ON prs.PlayerId = p.Id
                         INNER JOIN Rounds r ON prs.RoundId = r.Id
@@ -2011,156 +2005,43 @@ namespace CS2DemoParserWeb.Controllers
                             AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
                             AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
                             AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
-                    ),
-                    TiltDetectionAnalysis AS (
-                        SELECT 
-                            prp.*,
-                            -- Calculate rolling averages (last 5 rounds)
-                            AVG(prp.RoundRating) OVER (PARTITION BY prp.PlayerId ORDER BY prp.RoundSequence 
-                                                      ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) as RollingAvgRating,
-                            AVG(prp.Damage) OVER (PARTITION BY prp.PlayerId ORDER BY prp.RoundSequence 
-                                                 ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) as RollingAvgDamage,
-                            AVG(CAST(prp.Kills AS FLOAT)) OVER (PARTITION BY prp.PlayerId ORDER BY prp.RoundSequence 
-                                                               ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) as RollingAvgKills,
-                            -- Detect performance drops (previous rolling average)
-                            LAG(prp.RoundRating, 5) OVER (PARTITION BY prp.PlayerId ORDER BY prp.RoundSequence) as PrevRollingAvgRating,
-                            -- Death streaks
-                            CASE WHEN prp.Deaths > 0 THEN 1 ELSE 0 END as DeathRound,
-                            -- Consecutive poor performance detection
-                            COUNT(CASE WHEN prp.RoundRating < 0.5 THEN 1 END) OVER (PARTITION BY prp.PlayerId ORDER BY prp.RoundSequence 
-                                                                                   ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) as ConsecutivePoorRounds
-                        FROM PlayerRoundPerformance prp
-                    ),
-                    VarianceAnalysis AS (
-                        SELECT 
-                            tda.PlayerId,
-                            tda.PlayerName,
-                            tda.Team,
-                            tda.MapName,
-                            -- Performance consistency metrics
-                            COUNT(*) as TotalRounds,
-                            AVG(tda.RoundRating) as AvgRating,
-                            STDEV(tda.RoundRating) as RatingVariance,
-                            AVG(tda.Damage) as AvgDamage,
-                            STDEV(tda.Damage) as DamageVariance,
-                            AVG(CAST(tda.Kills AS FLOAT)) as AvgKills,
-                            STDEV(CAST(tda.Kills AS FLOAT)) as KillVariance,
-                            -- Consistency scoring (lower variance = more consistent)
-                            CASE 
-                                WHEN STDEV(tda.RoundRating) <= 0.3 THEN 'Very Consistent'
-                                WHEN STDEV(tda.RoundRating) <= 0.5 THEN 'Consistent'
-                                WHEN STDEV(tda.RoundRating) <= 0.8 THEN 'Moderate'
-                                WHEN STDEV(tda.RoundRating) <= 1.2 THEN 'Inconsistent'
-                                ELSE 'Very Inconsistent'
-                            END as ConsistencyLevel,
-                            -- Tilt detection metrics
-                            COUNT(CASE WHEN tda.ConsecutivePoorRounds >= 3 THEN 1 END) as PotentialTiltRounds,
-                            COUNT(CASE WHEN tda.RoundRating - tda.PrevRollingAvgRating < -0.5 THEN 1 END) as SignificantDropRounds,
-                            CAST(COUNT(CASE WHEN tda.ConsecutivePoorRounds >= 3 THEN 1 END) AS FLOAT) / COUNT(*) * 100 as TiltPercentage,
-                            -- Performance peaks and valleys
-                            MAX(tda.RoundRating) as PeakPerformance,
-                            MIN(tda.RoundRating) as WorstPerformance,
-                            MAX(tda.RoundRating) - MIN(tda.RoundRating) as PerformanceRange,
-                            -- Hot/Cold streaks
-                            MAX(tda.RollingAvgRating) as BestStreak,
-                            MIN(tda.RollingAvgRating) as WorstStreak,
-                            -- Economic impact on performance
-                            AVG(CASE WHEN tda.EquipmentValue >= 3000 THEN tda.RoundRating END) as FullBuyPerformance,
-                            AVG(CASE WHEN tda.EquipmentValue < 1500 THEN tda.RoundRating END) as EcoPerformance,
-                            AVG(CASE WHEN tda.EquipmentValue >= 3000 THEN tda.RoundRating END) - 
-                            AVG(CASE WHEN tda.EquipmentValue < 1500 THEN tda.RoundRating END) as EconomicImpact
-                        FROM TiltDetectionAnalysis tda
-                        GROUP BY tda.PlayerId, tda.PlayerName, tda.Team, tda.MapName
-                        HAVING COUNT(*) >= 10 -- Minimum rounds for meaningful analysis
-                    ),
-                    AdaptationAnalysis AS (
-                        SELECT 
-                            tda.PlayerId,
-                            tda.PlayerName,
-                            tda.Team,
-                            tda.MapName,
-                            -- Adaptation over time (first half vs second half performance)
-                            AVG(CASE WHEN tda.RoundSequence <= (SELECT COUNT(*) FROM TiltDetectionAnalysis tda2 
-                                                               WHERE tda2.PlayerId = tda.PlayerId) / 2.0 
-                                     THEN tda.RoundRating END) as FirstHalfRating,
-                            AVG(CASE WHEN tda.RoundSequence > (SELECT COUNT(*) FROM TiltDetectionAnalysis tda2 
-                                                              WHERE tda2.PlayerId = tda.PlayerId) / 2.0 
-                                     THEN tda.RoundRating END) as SecondHalfRating,
-                            -- Learning curve detection
-                            CASE 
-                                WHEN AVG(CASE WHEN tda.RoundSequence > (SELECT COUNT(*) FROM TiltDetectionAnalysis tda2 
-                                                                       WHERE tda2.PlayerId = tda.PlayerId) / 2.0 
-                                              THEN tda.RoundRating END) > 
-                                     AVG(CASE WHEN tda.RoundSequence <= (SELECT COUNT(*) FROM TiltDetectionAnalysis tda2 
-                                                                        WHERE tda2.PlayerId = tda.PlayerId) / 2.0 
-                                              THEN tda.RoundRating END) + 0.1
-                                THEN 'Improving'
-                                WHEN AVG(CASE WHEN tda.RoundSequence > (SELECT COUNT(*) FROM TiltDetectionAnalysis tda2 
-                                                                       WHERE tda2.PlayerId = tda.PlayerId) / 2.0 
-                                              THEN tda.RoundRating END) < 
-                                     AVG(CASE WHEN tda.RoundSequence <= (SELECT COUNT(*) FROM TiltDetectionAnalysis tda2 
-                                                                        WHERE tda2.PlayerId = tda.PlayerId) / 2.0 
-                                              THEN tda.RoundRating END) - 0.1
-                                THEN 'Declining'
-                                ELSE 'Stable'
-                            END as AdaptationTrend,
-                            -- Recovery analysis (performance after poor rounds)
-                            AVG(CASE WHEN LAG(tda.RoundRating, 1) OVER (PARTITION BY tda.PlayerId ORDER BY tda.RoundSequence) < 0.3 
-                                     THEN tda.RoundRating END) as RecoveryPerformance,
-                            COUNT(CASE WHEN LAG(tda.RoundRating, 1) OVER (PARTITION BY tda.PlayerId ORDER BY tda.RoundSequence) < 0.3 
-                                       AND tda.RoundRating > 0.7 THEN 1 END) as QuickRecoveries
-                        FROM TiltDetectionAnalysis tda
-                        GROUP BY tda.PlayerId, tda.PlayerName, tda.Team, tda.MapName
+                        GROUP BY p.PlayerName, p.Team, d.MapName
+                        HAVING COUNT(*) >= 5
                     )
                     SELECT 
-                        va.PlayerName,
-                        va.Team,
-                        va.MapName,
-                        va.TotalRounds,
-                        -- Core consistency metrics
-                        ROUND(va.AvgRating, 3) as AverageRating,
-                        ROUND(va.RatingVariance, 3) as RatingVariance,
-                        va.ConsistencyLevel,
-                        ROUND(va.PerformanceRange, 3) as PerformanceRange,
-                        -- Tilt detection results
-                        va.PotentialTiltRounds,
-                        va.SignificantDropRounds,
-                        ROUND(va.TiltPercentage, 1) as TiltPercentage,
-                        -- Performance extremes
-                        ROUND(va.PeakPerformance, 3) as PeakPerformance,
-                        ROUND(va.WorstPerformance, 3) as WorstPerformance,
-                        ROUND(va.BestStreak, 3) as BestStreakRating,
-                        ROUND(va.WorstStreak, 3) as WorstStreakRating,
-                        -- Economic performance correlation
-                        ROUND(va.FullBuyPerformance, 3) as FullBuyRating,
-                        ROUND(va.EcoPerformance, 3) as EcoRating,
-                        ROUND(va.EconomicImpact, 3) as EconomicImpact,
-                        -- Adaptation metrics
-                        ROUND(aa.FirstHalfRating, 3) as FirstHalfRating,
-                        ROUND(aa.SecondHalfRating, 3) as SecondHalfRating,
-                        aa.AdaptationTrend,
-                        ROUND(aa.RecoveryPerformance, 3) as RecoveryRating,
-                        aa.QuickRecoveries,
-                        -- Damage consistency
-                        ROUND(va.AvgDamage, 1) as AverageDamage,
-                        ROUND(va.DamageVariance, 1) as DamageVariance,
-                        -- Kill consistency
-                        ROUND(va.AvgKills, 2) as AverageKills,
-                        ROUND(va.KillVariance, 2) as KillVariance,
-                        -- Overall consistency score
+                        PlayerName,
+                        Team,
+                        MapName,
+                        TotalRounds,
+                        AverageKills,
+                        AverageDeaths,
+                        AverageAssists,
+                        AverageDamage,
+                        AverageRating,
+                        KillVariance,
+                        DamageVariance,
+                        BestKillRound,
+                        WorstKillRound,
+                        HighestDamageRound,
+                        LowestDamageRound,
+                        FullBuyKills,
+                        EcoKills,
                         CASE 
-                            WHEN va.ConsistencyLevel = 'Very Consistent' THEN 90 + (10 * (1 - va.TiltPercentage / 100.0))
-                            WHEN va.ConsistencyLevel = 'Consistent' THEN 75 + (15 * (1 - va.TiltPercentage / 100.0))
-                            WHEN va.ConsistencyLevel = 'Moderate' THEN 60 + (15 * (1 - va.TiltPercentage / 100.0))
-                            WHEN va.ConsistencyLevel = 'Inconsistent' THEN 40 + (20 * (1 - va.TiltPercentage / 100.0))
-                            ELSE 20 + (20 * (1 - va.TiltPercentage / 100.0))
+                            WHEN KillVariance <= 0.8 THEN 'Very Consistent'
+                            WHEN KillVariance <= 1.2 THEN 'Consistent'
+                            WHEN KillVariance <= 1.8 THEN 'Moderate'
+                            WHEN KillVariance <= 2.5 THEN 'Inconsistent'
+                            ELSE 'Very Inconsistent'
+                        END as ConsistencyLevel,
+                        CASE 
+                            WHEN KillVariance <= 0.8 THEN 90
+                            WHEN KillVariance <= 1.2 THEN 75
+                            WHEN KillVariance <= 1.8 THEN 60
+                            WHEN KillVariance <= 2.5 THEN 40
+                            ELSE 20
                         END as ConsistencyScore
-                    FROM VarianceAnalysis va
-                    INNER JOIN AdaptationAnalysis aa ON va.PlayerId = aa.PlayerId 
-                        AND va.PlayerName = aa.PlayerName 
-                        AND va.Team = aa.Team 
-                        AND va.MapName = aa.MapName
-                    ORDER BY ConsistencyScore DESC, va.AvgRating DESC";
+                    FROM PlayerStats
+                    ORDER BY ConsistencyScore DESC, AverageRating DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
                 
