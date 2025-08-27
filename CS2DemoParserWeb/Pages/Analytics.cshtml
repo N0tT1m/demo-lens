@@ -10,24 +10,20 @@
         <p class="lead">Deep insights into gameplay patterns, clutch performance, and tactical intelligence</p>
     </div>
 
-    <div class="row">
-    <!-- Analytics Controls -->
-    <div class="col-lg-3">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title">📊 Analysis Filters</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="demoSelect" class="form-label">Demo File</label>
-                    <select class="form-select" id="demoSelect">
+    <!-- Top Filters Bar -->
+    <div class="card mb-4 filters-card">
+        <div class="card-body py-3">
+            <div class="row align-items-end">
+                <div class="col-md-2">
+                    <label for="demoSelect" class="form-label fw-semibold">📁 Demo File</label>
+                    <select class="form-select form-select-sm" id="demoSelect">
                         <option value="">All Demos</option>
                     </select>
                 </div>
                 
-                <div class="mb-3">
-                    <label for="mapSelect" class="form-label">Map</label>
-                    <select class="form-select" id="mapSelect">
+                <div class="col-md-2">
+                    <label for="mapSelect" class="form-label fw-semibold">🗺️ Map</label>
+                    <select class="form-select form-select-sm" id="mapSelect">
                         <option value="">All Maps</option>
                         <option value="de_dust2">de_dust2</option>
                         <option value="de_mirage">de_mirage</option>
@@ -42,29 +38,37 @@
                     </select>
                 </div>
                 
-                <div class="mb-3">
-                    <label for="playerSelect" class="form-label">Player</label>
-                    <select class="form-select" id="playerSelect">
+                <div class="col-md-2">
+                    <label for="playerSelect" class="form-label fw-semibold">👤 Player</label>
+                    <select class="form-select form-select-sm" id="playerSelect">
                         <option value="">All Players</option>
                     </select>
                 </div>
                 
-                <div class="mb-3">
-                    <label for="teamSelect" class="form-label">Team</label>
-                    <select class="form-select" id="teamSelect">
+                <div class="col-md-2">
+                    <label for="teamSelect" class="form-label fw-semibold">⚔️ Team</label>
+                    <select class="form-select form-select-sm" id="teamSelect">
                         <option value="">All Teams</option>
                         <option value="TERRORIST">Terrorist</option>
                         <option value="CT">Counter-Terrorist</option>
                     </select>
                 </div>
                 
-                <button type="button" class="btn btn-primary w-100" onclick="refreshAnalytics()">🔄 Update Analytics</button>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-primary btn-sm px-4" onclick="refreshAnalytics()">
+                        <i class="fas fa-sync-alt me-2"></i>Update Analytics
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="clearFilters()">
+                        <i class="fas fa-times me-1"></i>Clear
+                    </button>
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- Analytics Results -->
-    <div class="col-lg-9">
+    <!-- Analytics Results - Full Width -->
+    <div class="row">
+        <div class="col-12">
         <!-- Analysis Type Tabs -->
         <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
             <li class="nav-item" role="presentation">
@@ -476,8 +480,8 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
-</div>
 </div>
 
 <!-- Enhanced CSS for professional analytics interface -->
@@ -511,11 +515,11 @@ body {
     font-weight: 400;
 }
 
-/* Enhanced table styling */
+/* Enhanced table styling - Full width optimization */
 .analytics-table {
     width: 100%;
-    min-width: 1400px;
-    font-size: 0.85rem;
+    min-width: 1600px;
+    font-size: 0.87rem;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
@@ -658,15 +662,27 @@ body {
     transform: translateY(-1px);
 }
 
-/* Layout improvements */
-.col-lg-9 {
-    flex: 0 0 auto;
-    width: 87%;
+/* Layout improvements - Full width for analytics */
+.filters-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(102, 126, 234, 0.2);
 }
 
-.col-lg-3 {
-    flex: 0 0 auto;
-    width: 13%;
+.filters-card .card-body {
+    padding: 1rem 1.5rem;
+}
+
+.filters-card .form-label {
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.form-select-sm {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
 }
 
 .tab-content .card {
@@ -761,7 +777,14 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Responsive enhancements */
+/* Responsive enhancements for full-width layout */
+@media (max-width: 1600px) {
+    .analytics-table {
+        min-width: 1400px;
+        font-size: 0.83rem;
+    }
+}
+
 @media (max-width: 1400px) {
     .analytics-table {
         min-width: 1200px;
@@ -770,10 +793,6 @@ body {
 }
 
 @media (max-width: 1200px) {
-    .col-lg-9, .col-lg-3 {
-        width: 100%;
-    }
-    
     .container-fluid {
         margin: 10px;
         padding: 20px;
@@ -783,16 +802,42 @@ body {
         padding: 8px 12px;
         font-size: 0.85rem;
     }
+    
+    .filters-card .row {
+        row-gap: 0.5rem;
+    }
+    
+    .filters-card [class*="col-md-"] {
+        flex: 0 0 auto;
+        width: 50%;
+    }
+    
+    .filters-card .col-md-3 {
+        width: 100%;
+        text-align: center;
+        margin-top: 1rem;
+    }
 }
 
 @media (max-width: 768px) {
     .analytics-table {
-        min-width: 800px;
+        min-width: 900px;
         font-size: 0.75rem;
     }
     
     .display-5 {
         font-size: 1.8rem;
+    }
+    
+    .filters-card [class*="col-md-"] {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .nav-tabs .nav-link {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        margin-right: 1px;
     }
 }
 
@@ -1739,6 +1784,16 @@ function displayGenericResults(response, containerId) {
         </div>`;
     
     container.innerHTML = html;
+}
+
+function clearFilters() {
+    document.getElementById('demoSelect').value = '';
+    document.getElementById('mapSelect').value = '';
+    document.getElementById('playerSelect').value = '';
+    document.getElementById('teamSelect').value = '';
+    
+    // Optionally refresh analytics with cleared filters
+    // refreshAnalytics();
 }
 
 function showError(message) {
