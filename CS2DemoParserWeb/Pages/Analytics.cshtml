@@ -6,7 +6,7 @@
 
 <div class="text-center mb-4">
     <h1 class="display-5">🎯 Advanced CS2 Analytics</h1>
-    <p class="lead">Deep insights into gameplay patterns, clutch performance, and tactical intelligence - Updated Version</p>
+    <p class="lead">Deep insights into gameplay patterns, clutch performance, and tactical intelligence</p>
 </div>
 
 <div class="row">
@@ -67,283 +67,111 @@
         <!-- Analysis Type Tabs -->
         <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="clutch-tab" data-bs-toggle="tab" data-bs-target="#clutch" type="button" role="tab">
-                    🎯 Clutch Analysis
+                <button class="nav-link active" id="detailed-clutch-tab" data-bs-toggle="tab" data-bs-target="#detailed-clutch" type="button" role="tab">
+                    🎯 Detailed Clutch Intelligence
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="trade-tab" data-bs-toggle="tab" data-bs-target="#trade" type="button" role="tab">
-                    ⚡ Trade Kills
+                <button class="nav-link" id="flash-analytics-tab" data-bs-toggle="tab" data-bs-target="#flash-analytics" type="button" role="tab">
+                    ⚡ Flash Usage Analytics
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="first-kill-tab" data-bs-toggle="tab" data-bs-target="#first-kill" type="button" role="tab">
-                    🥇 First Kill Impact
+                <button class="nav-link" id="enhanced-weapons-tab" data-bs-toggle="tab" data-bs-target="#enhanced-weapons" type="button" role="tab">
+                    🔫 Enhanced Weapon Performance
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="economy-tab" data-bs-toggle="tab" data-bs-target="#economy" type="button" role="tab">
-                    💰 Economic Intelligence
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="position-tab" data-bs-toggle="tab" data-bs-target="#position" type="button" role="tab">
-                    📍 Position Analysis
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="comprehensive-clutch-tab" data-bs-toggle="tab" data-bs-target="#comprehensive-clutch" type="button" role="tab">
-                    🔥 Comprehensive Clutch
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="weapons-tab" data-bs-toggle="tab" data-bs-target="#weapons" type="button" role="tab">
-                    🔫 Weapon Mastery
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="grenades-tab" data-bs-toggle="tab" data-bs-target="#grenades" type="button" role="tab">
-                    💣 Grenade Impact
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="momentum-tab" data-bs-toggle="tab" data-bs-target="#momentum" type="button" role="tab">
-                    📈 Round Momentum
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="coordination-tab" data-bs-toggle="tab" data-bs-target="#coordination" type="button" role="tab">
-                    🤝 Team Coordination
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="consistency-tab" data-bs-toggle="tab" data-bs-target="#consistency" type="button" role="tab">
-                    📊 Performance Consistency
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="damage-tab" data-bs-toggle="tab" data-bs-target="#damage" type="button" role="tab">
-                    ⚔️ Damage Efficiency
+                <button class="nav-link" id="positioning-intelligence-tab" data-bs-toggle="tab" data-bs-target="#positioning-intelligence" type="button" role="tab">
+                    📍 Advanced Positioning Intelligence
                 </button>
             </li>
         </ul>
         
         <!-- Tab Content -->
         <div class="tab-content" id="analyticsTabContent">
-            <!-- Clutch Analysis -->
-            <div class="tab-pane fade show active" id="clutch" role="tabpanel">
+            <!-- Detailed Clutch Intelligence -->
+            <div class="tab-pane fade show active" id="detailed-clutch" role="tabpanel">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">🎯 Clutch Situation Analysis</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('clutch')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="clutchResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-chart-bar fa-3x mb-3"></i>
-                                <p>Click "Update Analytics" to load clutch performance data</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Trade Kill Analysis -->
-            <div class="tab-pane fade" id="trade" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">⚡ Trade Kill Analysis</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('trade')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="tradeResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-exchange-alt fa-3x mb-3"></i>
-                                <p>Analysis of how quickly teammates trade frags</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- First Kill Impact -->
-            <div class="tab-pane fade" id="first-kill" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">🥇 First Kill Impact</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('first-kill')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="firstKillResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-crosshairs fa-3x mb-3"></i>
-                                <p>Impact of opening frags on round outcomes</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Economic Intelligence -->
-            <div class="tab-pane fade" id="economy" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">💰 Economic Intelligence</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('economy')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="economyResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-coins fa-3x mb-3"></i>
-                                <p>Win rates and efficiency across different economic situations</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Position Analysis -->
-            <div class="tab-pane fade" id="position" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">📍 Position Analysis</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('position')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="positionResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-map fa-3x mb-3"></i>
-                                <p>Death hotspots and dangerous areas by map location</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Comprehensive Clutch Analysis -->
-            <div class="tab-pane fade" id="comprehensive-clutch" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">🔥 Comprehensive Clutch Analysis</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('comprehensive-clutch')">📥 Export CSV</button>
+                        <h5 class="card-title mb-0">🎯 Detailed Clutch Intelligence</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('detailed-clutch')">📥 Export CSV</button>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-info mb-3">
-                            <strong>Comprehensive Clutch Intelligence:</strong> 
-                            Analyzes clutch setups, health/armor states, economic context, positioning, weapon choices, and multi-clutch performance patterns.
+                            <strong>Advanced Clutch Analysis:</strong> 
+                            Analyzes player performance in 1vX situations, success rates, health correlation, and weapon effectiveness.
                         </div>
-                        <div id="comprehensiveClutchResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-fire fa-3x mb-3"></i>
-                                <p>Deep clutch performance analysis including setup positioning, health conditions, and equipment correlation</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Weapon Mastery Analysis -->
-            <div class="tab-pane fade" id="weapons" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">🔫 Weapon Mastery Analytics</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('weapons')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="weaponsResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-crosshairs fa-3x mb-3"></i>
-                                <p>Accuracy analysis, range effectiveness, and weapon-specific performance metrics</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Grenade Impact Analysis -->
-            <div class="tab-pane fade" id="grenades" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">💣 Grenade Impact Quantification</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('grenades')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="grenadesResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-bomb fa-3x mb-3"></i>
-                                <p>Flash effectiveness, smoke timing, HE damage analysis, and utility combinations</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Round Momentum Analysis -->
-            <div class="tab-pane fade" id="momentum" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">📈 Round Momentum Tracking</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('momentum')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="momentumResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-chart-line fa-3x mb-3"></i>
-                                <p>Streak analysis, comeback potential, momentum shifts, and force reset identification</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Team Coordination Analysis -->
-            <div class="tab-pane fade" id="coordination" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">🤝 Team Coordination Metrics</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('coordination')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="coordinationResults">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-users fa-3x mb-3"></i>
-                                <p>Rotation timing, stack effectiveness, spread formation, and synchronized utility usage</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Performance Consistency Analysis -->
-            <div class="tab-pane fade" id="consistency" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">📊 Performance Consistency Profiling</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('consistency')">📥 Export CSV</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="consistencyResults">
+                        <div id="detailedClutchResults">
                             <div class="text-center text-muted">
                                 <i class="fas fa-chart-bar fa-3x mb-3"></i>
-                                <p>Tilt detection, variance tracking, and adaptation analysis for player consistency</p>
+                                <p>Click "Update Analytics" to load detailed clutch intelligence data</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Damage Efficiency Analysis -->
-            <div class="tab-pane fade" id="damage" role="tabpanel">
+            <!-- Flash Usage Analytics -->
+            <div class="tab-pane fade" id="flash-analytics" role="tabpanel">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">⚔️ Damage Efficiency Analytics</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('damage')">📥 Export CSV</button>
+                        <h5 class="card-title mb-0">⚡ Flash Usage Analytics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('flash-analytics')">📥 Export CSV</button>
                     </div>
                     <div class="card-body">
-                        <div id="damageResults">
+                        <div class="alert alert-info mb-3">
+                            <strong>Flash Effectiveness Analysis:</strong> 
+                            Measures flash duration, team flash rates, positioning correlation, and tactical impact on round outcomes.
+                        </div>
+                        <div id="flashAnalyticsResults">
                             <div class="text-center text-muted">
-                                <i class="fas fa-sword fa-3x mb-3"></i>
-                                <p>Damage waste identification, armor penetration, finishing ability, and multi-target tracking</p>
+                                <i class="fas fa-flash fa-3x mb-3"></i>
+                                <p>Analysis of flashbang effectiveness, team flash rates, and positioning correlation</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Enhanced Weapon Performance -->
+            <div class="tab-pane fade" id="enhanced-weapons" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">🔫 Enhanced Weapon Performance</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('enhanced-weapons')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Advanced Weapon Analytics:</strong> 
+                            Analyzes weapon usage patterns, accuracy, recoil control, range effectiveness, and situational performance.
+                        </div>
+                        <div id="enhancedWeaponsResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-crosshairs fa-3x mb-3"></i>
+                                <p>Weapon accuracy, usage patterns, recoil control, and range effectiveness analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Advanced Positioning Intelligence -->
+            <div class="tab-pane fade" id="positioning-intelligence" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">📍 Advanced Positioning Intelligence</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('positioning-intelligence')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Positioning Analysis:</strong> 
+                            Maps death hotspots, analyzes position effectiveness, rotation timing, and tactical positioning patterns.
+                        </div>
+                        <div id="positioningIntelligenceResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-map fa-3x mb-3"></i>
+                                <p>Death hotspots, position effectiveness, rotation timing, and tactical positioning analysis</p>
                             </div>
                         </div>
                     </div>
@@ -424,20 +252,12 @@ async function refreshAnalytics() {
     showLoading();
     
     try {
-        // Load all analytics in parallel for better performance
+        // Load the 4 Tier 1 analytics in parallel
         await Promise.all([
-            loadClutchAnalysis(filters),
-            loadTradeAnalysis(filters),
-            loadFirstKillAnalysis(filters),
-            loadEconomyAnalysis(filters),
-            loadPositionAnalysis(filters),
-            loadComprehensiveClutchAnalysis(filters),
-            loadWeaponsAnalysis(filters),
-            loadGrenadesAnalysis(filters),
-            loadMomentumAnalysis(filters),
-            loadCoordinationAnalysis(filters),
-            loadConsistencyAnalysis(filters),
-            loadDamageAnalysis(filters)
+            loadDetailedClutchAnalysis(filters),
+            loadFlashAnalytics(filters),
+            loadEnhancedWeaponsAnalysis(filters),
+            loadPositioningIntelligenceAnalysis(filters)
         ]);
     } catch (error) {
         console.error('Error refreshing analytics:', error);
@@ -465,7 +285,7 @@ function buildQueryString(filters) {
 }
 
 function showLoading() {
-    const containers = ['clutchResults', 'tradeResults', 'firstKillResults', 'economyResults', 'positionResults', 'comprehensiveClutchResults', 'weaponsResults', 'grenadesResults', 'momentumResults', 'coordinationResults', 'consistencyResults', 'damageResults'];
+    const containers = ['detailedClutchResults', 'flashAnalyticsResults', 'enhancedWeaponsResults', 'positioningIntelligenceResults'];
     containers.forEach(containerId => {
         document.getElementById(containerId).innerHTML = `
             <div class="text-center">
@@ -478,83 +298,59 @@ function showLoading() {
     });
 }
 
-async function loadClutchAnalysis(filters) {
+async function loadDetailedClutchAnalysis(filters) {
     const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/comprehensive-clutch-analysis?${params}`);
+    const response = await fetch(`/api/advanced-analytics/detailed-clutch-intelligence?${params}`);
     
     if (response.ok) {
         const data = await response.json();
-        displayClutchResults(data);
+        displayDetailedClutchResults(data);
     } else {
-        document.getElementById('clutchResults').innerHTML = '<div class="alert alert-danger">Failed to load clutch analysis</div>';
+        document.getElementById('detailedClutchResults').innerHTML = '<div class="alert alert-danger">Failed to load detailed clutch analysis</div>';
     }
 }
 
-async function loadTradeAnalysis(filters) {
+async function loadFlashAnalytics(filters) {
     const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/enhanced-trade-kill-optimization?${params}`);
+    const response = await fetch(`/api/advanced-analytics/flash-usage-analytics?${params}`);
     
     if (response.ok) {
         const data = await response.json();
-        displayTradeResults(data);
+        displayFlashAnalyticsResults(data);
     } else {
-        document.getElementById('tradeResults').innerHTML = '<div class="alert alert-danger">Failed to load trade analysis</div>';
+        document.getElementById('flashAnalyticsResults').innerHTML = '<div class="alert alert-danger">Failed to load flash analytics</div>';
     }
 }
 
-async function loadFirstKillAnalysis(filters) {
+async function loadEnhancedWeaponsAnalysis(filters) {
     const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/first-blood-impact-analysis?${params}`);
+    const response = await fetch(`/api/advanced-analytics/enhanced-weapon-performance?${params}`);
     
     if (response.ok) {
         const data = await response.json();
-        displayFirstKillResults(data);
+        displayEnhancedWeaponsResults(data);
     } else {
-        document.getElementById('firstKillResults').innerHTML = '<div class="alert alert-danger">Failed to load first kill analysis</div>';
+        document.getElementById('enhancedWeaponsResults').innerHTML = '<div class="alert alert-danger">Failed to load enhanced weapons analysis</div>';
     }
 }
 
-async function loadEconomyAnalysis(filters) {
+async function loadPositioningIntelligenceAnalysis(filters) {
     const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/economic-efficiency-analysis?${params}`);
+    const response = await fetch(`/api/advanced-analytics/advanced-positioning-intelligence?${params}`);
     
     if (response.ok) {
         const data = await response.json();
-        displayEconomyResults(data);
+        displayPositioningIntelligenceResults(data);
     } else {
-        document.getElementById('economyResults').innerHTML = '<div class="alert alert-danger">Failed to load economy analysis</div>';
+        document.getElementById('positioningIntelligenceResults').innerHTML = '<div class="alert alert-danger">Failed to load positioning intelligence analysis</div>';
     }
 }
 
-async function loadPositionAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/positioning-intelligence?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayPositionResults(data);
-    } else {
-        document.getElementById('positionResults').innerHTML = '<div class="alert alert-danger">Failed to load position analysis</div>';
-    }
-}
-
-async function loadComprehensiveClutchAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/comprehensive-clutch-analysis?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayComprehensiveClutchResults(data);
-    } else {
-        document.getElementById('comprehensiveClutchResults').innerHTML = '<div class="alert alert-danger">Failed to load comprehensive clutch analysis</div>';
-    }
-}
-
-function displayClutchResults(response) {
-    const container = document.getElementById('clutchResults');
+function displayDetailedClutchResults(response) {
+    const container = document.getElementById('detailedClutchResults');
     
     if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No clutch situations found for the selected filters.</div>';
+        container.innerHTML = '<div class="alert alert-info">No detailed clutch data found for the selected filters.</div>';
         return;
     }
     
@@ -564,13 +360,13 @@ function displayClutchResults(response) {
                 <thead class="table-dark">
                     <tr>
                         <th>Player</th>
-                        <th>Team</th>
-                        <th>Map</th>
-                        <th>Clutch Type</th>
-                        <th>Attempts</th>
-                        <th>Wins</th>
+                        <th>Total Attempts</th>
+                        <th>Clutch Wins</th>
                         <th>Success Rate</th>
-                        <th>Demos</th>
+                        <th>Avg Health</th>
+                        <th>Preferred Weapon</th>
+                        <th>Avg Distance</th>
+                        <th>Multi-Kill Rate</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -578,440 +374,189 @@ function displayClutchResults(response) {
     
     response.Data.forEach(row => {
         const successRate = parseFloat(row.ClutchSuccessRate || 0).toFixed(1);
-        const rateClass = successRate > 50 ? 'text-success' : successRate > 25 ? 'text-warning' : 'text-danger';
+        const avgHealth = parseFloat(row.AverageClutchHealth || 0).toFixed(0);
+        const avgDistance = parseFloat(row.AverageClutchDistance || 0).toFixed(0);
+        const multiKillRate = parseFloat(row.MultiKillRate || 0).toFixed(1);
+        
+        const successClass = successRate > 40 ? 'bg-success' : successRate > 20 ? 'bg-warning' : 'bg-danger';
         
         html += `
             <tr>
                 <td><strong>${row.ClutchPlayer}</strong></td>
-                <td><span class="badge ${row.ClutchTeam === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.ClutchTeam}</span></td>
-                <td>${row.MapName}</td>
-                <td><span class="badge bg-info">${row.ClutchType}</span></td>
-                <td>${row.ClutchAttempts}</td>
-                <td>${row.ClutchWins}</td>
-                <td><span class="badge ${rateClass === 'text-success' ? 'bg-success' : rateClass === 'text-warning' ? 'bg-warning' : 'bg-danger'}">${successRate}%</span></td>
-                <td>${row.DemosPlayed}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-function displayTradeResults(response) {
-    const container = document.getElementById('tradeResults');
-    
-    if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No trade kill data found for the selected filters.</div>';
-        return;
-    }
-    
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Player</th>
-                        <th>Team</th>
-                        <th>Map</th>
-                        <th>Total Trades</th>
-                        <th>Avg Time (s)</th>
-                        <th>Fastest (s)</th>
-                        <th>Fast Trades (%)</th>
-                        <th>Avg Distance</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    response.Data.forEach(row => {
-        const avgTime = parseFloat(row.AvgTradeTimeSeconds || 0).toFixed(2);
-        const fastestTime = parseFloat(row.FastestTradeSeconds || 0).toFixed(2);
-        const fastTradePercentage = parseFloat(row.FastTradePercentage || 0).toFixed(1);
-        const avgDistance = parseFloat(row.AvgTradeDistance || 0).toFixed(0);
-        
-        html += `
-            <tr>
-                <td><strong>${row.Player}</strong></td>
-                <td><span class="badge ${row.Team === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.Team}</span></td>
-                <td>${row.MapName}</td>
-                <td>${row.TotalTrades}</td>
-                <td>${avgTime}</td>
-                <td><span class="badge bg-success">${fastestTime}</span></td>
-                <td>${fastTradePercentage}%</td>
-                <td>${avgDistance} units</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-function displayFirstKillResults(response) {
-    const container = document.getElementById('firstKillResults');
-    
-    if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No first kill data found for the selected filters.</div>';
-        return;
-    }
-    
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Player</th>
-                        <th>Team</th>
-                        <th>Map</th>
-                        <th>Type</th>
-                        <th>First Kills</th>
-                        <th>Rounds Won</th>
-                        <th>Win Rate (%)</th>
-                        <th>Headshot %</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    response.Data.forEach(row => {
-        const winRate = parseFloat(row.FirstKillWinPercentage || 0).toFixed(1);
-        const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
-        const winRateClass = winRate > 60 ? 'bg-success' : winRate > 45 ? 'bg-warning' : 'bg-danger';
-        
-        html += `
-            <tr>
-                <td><strong>${row.Player}</strong></td>
-                <td><span class="badge ${row.Team === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.Team}</span></td>
-                <td>${row.MapName}</td>
-                <td><span class="badge bg-secondary">${row.FirstKillType}</span></td>
-                <td>${row.TotalFirstKills}</td>
-                <td>${row.RoundsWonAfterFirstKill}</td>
-                <td><span class="badge ${winRateClass}">${winRate}%</span></td>
-                <td>${headshotRate}%</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-function displayEconomyResults(response) {
-    const container = document.getElementById('economyResults');
-    
-    if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No economic data found for the selected filters.</div>';
-        return;
-    }
-    
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Map</th>
-                        <th>Economy Type</th>
-                        <th>Total Rounds</th>
-                        <th>T Win %</th>
-                        <th>CT Win %</th>
-                        <th>Avg CT Equipment</th>
-                        <th>Avg T Equipment</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    response.Data.forEach(row => {
-        const tWinRate = parseFloat(row.TWinPercentage || 0).toFixed(1);
-        const ctWinRate = parseFloat(row.CTWinPercentage || 0).toFixed(1);
-        const ctEquipment = parseFloat(row.AvgCTEquipmentValue || 0).toFixed(0);
-        const tEquipment = parseFloat(row.AvgTEquipmentValue || 0).toFixed(0);
-        
-        html += `
-            <tr>
-                <td>${row.MapName}</td>
-                <td><span class="badge bg-info">${row.EconomyType}</span></td>
-                <td>${row.TotalRounds}</td>
-                <td><span class="badge bg-danger">${tWinRate}%</span></td>
-                <td><span class="badge bg-primary">${ctWinRate}%</span></td>
-                <td>$${ctEquipment}</td>
-                <td>$${tEquipment}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-function displayPositionResults(response) {
-    const container = document.getElementById('positionResults');
-    
-    if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No position data found for the selected filters.</div>';
-        return;
-    }
-    
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Map</th>
-                        <th>Area</th>
-                        <th>Team</th>
-                        <th>Deaths</th>
-                        <th>Avg Kill Distance</th>
-                        <th>Headshot %</th>
-                        <th>Position (X,Y)</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    response.Data.forEach(row => {
-        const avgDistance = parseFloat(row.AvgKillDistance || 0).toFixed(0);
-        const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
-        const avgX = parseFloat(row.AvgDeathX || 0).toFixed(0);
-        const avgY = parseFloat(row.AvgDeathY || 0).toFixed(0);
-        
-        html += `
-            <tr>
-                <td>${row.MapName}</td>
-                <td><span class="badge bg-secondary">${row.MapArea}</span></td>
-                <td><span class="badge ${row.Team === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.Team}</span></td>
-                <td><strong>${row.TotalDeaths}</strong></td>
-                <td>${avgDistance} units</td>
-                <td>${headshotRate}%</td>
-                <td>(${avgX}, ${avgY})</td>
-            </tr>
-        `;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-function displayComprehensiveClutchResults(response) {
-    const container = document.getElementById('comprehensiveClutchResults');
-    
-    if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No comprehensive clutch data found for the selected filters.</div>';
-        return;
-    }
-    
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Player</th>
-                        <th>Team</th>
-                        <th>Map</th>
-                        <th>Total Attempts</th>
-                        <th>Overall Success %</th>
-                        <th>1v2 Success %</th>
-                        <th>1v3 Success %</th>
-                        <th>1v4+ Success %</th>
-                        <th>Healthy vs Low HP</th>
-                        <th>Full Buy vs Eco</th>
-                        <th>Weapon Mix</th>
-                        <th>Avg Equipment</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    response.Data.forEach(row => {
-        const overallSuccess = parseFloat(row.OverallClutchSuccessRate || 0).toFixed(1);
-        const success1v2 = parseFloat(row.Clutch1v2SuccessRate || 0).toFixed(1);
-        const success1v3 = parseFloat(row.Clutch1v3SuccessRate || 0).toFixed(1);
-        const success1v4Plus = parseFloat(row.Clutch1v4PlusSuccessRate || 0).toFixed(1);
-        
-        const healthySuccess = parseFloat(row.HealthyClutchSuccessRate || 0).toFixed(1);
-        const lowHealthSuccess = parseFloat(row.LowHealthClutchSuccessRate || 0).toFixed(1);
-        const fullBuySuccess = parseFloat(row.FullBuyClutchSuccessRate || 0).toFixed(1);
-        const ecoSuccess = parseFloat(row.EcoClutchSuccessRate || 0).toFixed(1);
-        
-        const avgEquipment = parseFloat(row.AvgClutchEquipmentValue || 0).toFixed(0);
-        
-        const rifleClutches = row.RifleClutches || 0;
-        const awpClutches = row.AwpClutches || 0;
-        const pistolClutches = row.PistolClutches || 0;
-        
-        const overallClass = overallSuccess > 40 ? 'bg-success' : overallSuccess > 20 ? 'bg-warning' : 'bg-danger';
-        
-        html += `
-            <tr>
-                <td><strong>${row.ClutchPlayer}</strong></td>
-                <td><span class="badge ${row.ClutchTeam === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.ClutchTeam}</span></td>
-                <td>${row.MapName}</td>
                 <td>${row.TotalClutchAttempts}</td>
-                <td><span class="badge ${overallClass}">${overallSuccess}%</span></td>
-                <td>${success1v2}%</td>
-                <td>${success1v3}%</td>
-                <td>${success1v4Plus}%</td>
-                <td>
-                    <small class="text-success">${healthySuccess}%</small> vs 
-                    <small class="text-danger">${lowHealthSuccess}%</small>
-                </td>
-                <td>
-                    <small class="text-success">${fullBuySuccess}%</small> vs 
-                    <small class="text-warning">${ecoSuccess}%</small>
-                </td>
-                <td>
-                    <small>R:${rifleClutches} A:${awpClutches} P:${pistolClutches}</small>
-                </td>
-                <td>$${avgEquipment}</td>
+                <td>${row.ClutchWins}</td>
+                <td><span class="badge ${successClass}">${successRate}%</span></td>
+                <td>${avgHealth} HP</td>
+                <td>${row.PreferredClutchWeapon || 'Mixed'}</td>
+                <td>${avgDistance} units</td>
+                <td>${multiKillRate}%</td>
             </tr>
         `;
     });
     
     html += '</tbody></table></div>';
-    
-    // Add summary statistics
-    html += `
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="card-title mb-0">💡 Key Insights</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <h6>Health Impact</h6>
-                                <p class="text-muted small">Compare "Healthy vs Low HP" columns to see how player condition affects clutch success.</p>
-                            </div>
-                            <div class="col-md-4">
-                                <h6>Economic Correlation</h6>
-                                <p class="text-muted small">"Full Buy vs Eco" shows how equipment investment correlates with clutch wins.</p>
-                            </div>
-                            <div class="col-md-4">
-                                <h6>Weapon Preferences</h6>
-                                <p class="text-muted small">R=Rifles, A=AWP, P=Pistols. Shows weapon distribution in clutch situations.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
     container.innerHTML = html;
 }
 
-// Load additional analytics functions
-async function loadWeaponsAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/weapon-mastery-analytics?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayGenericResults(data, 'weaponsResults', 'Weapon Mastery');
-    } else {
-        document.getElementById('weaponsResults').innerHTML = '<div class="alert alert-danger">Failed to load weapon mastery analytics</div>';
-    }
-}
-
-async function loadGrenadesAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/grenade-impact-quantification?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayGenericResults(data, 'grenadesResults', 'Grenade Impact');
-    } else {
-        document.getElementById('grenadesResults').innerHTML = '<div class="alert alert-danger">Failed to load grenade impact analytics</div>';
-    }
-}
-
-async function loadMomentumAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/round-momentum-tracking?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayGenericResults(data, 'momentumResults', 'Round Momentum');
-    } else {
-        document.getElementById('momentumResults').innerHTML = '<div class="alert alert-danger">Failed to load round momentum analytics</div>';
-    }
-}
-
-async function loadCoordinationAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/team-coordination-metrics?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayGenericResults(data, 'coordinationResults', 'Team Coordination');
-    } else {
-        document.getElementById('coordinationResults').innerHTML = '<div class="alert alert-danger">Failed to load team coordination analytics</div>';
-    }
-}
-
-async function loadConsistencyAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/performance-consistency-profiling?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayGenericResults(data, 'consistencyResults', 'Performance Consistency');
-    } else {
-        document.getElementById('consistencyResults').innerHTML = '<div class="alert alert-danger">Failed to load performance consistency analytics</div>';
-    }
-}
-
-async function loadDamageAnalysis(filters) {
-    const params = buildQueryString(filters);
-    const response = await fetch(`/api/advanced-analytics/damage-efficiency-analytics?${params}`);
-    
-    if (response.ok) {
-        const data = await response.json();
-        displayGenericResults(data, 'damageResults', 'Damage Efficiency');
-    } else {
-        document.getElementById('damageResults').innerHTML = '<div class="alert alert-danger">Failed to load damage efficiency analytics</div>';
-    }
-}
-
-function displayGenericResults(response, containerId, title) {
-    const container = document.getElementById(containerId);
+function displayFlashAnalyticsResults(response) {
+    const container = document.getElementById('flashAnalyticsResults');
     
     if (!response.Data || response.Data.length === 0) {
-        container.innerHTML = `<div class="alert alert-info">No ${title} data found for the selected filters.</div>`;
+        container.innerHTML = '<div class="alert alert-info">No flash analytics data found for the selected filters.</div>';
         return;
     }
     
-    // Generic table display for complex analytics
-    const data = response.Data[0]; // Get first row to determine columns
-    const columns = Object.keys(data);
-    
     let html = `
-        <div class="alert alert-success mb-3">
-            <strong>${response.Title}:</strong> ${response.Description}
-        </div>
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
-                    <tr>`;
-    
-    columns.forEach(col => {
-        html += `<th>${col.replace(/([A-Z])/g, ' $1').trim()}</th>`;
-    });
-    
-    html += `</tr></thead><tbody>`;
+                    <tr>
+                        <th>Player</th>
+                        <th>Team</th>
+                        <th>Total Flashes</th>
+                        <th>Flash Efficiency</th>
+                        <th>Team Flash Rate</th>
+                        <th>Avg Flash Duration</th>
+                        <th>Blind Kills</th>
+                        <th>Flash Assists</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
     
     response.Data.forEach(row => {
-        html += '<tr>';
-        columns.forEach(col => {
-            let value = row[col];
-            if (typeof value === 'number' && !Number.isInteger(value)) {
-                value = value.toFixed(2);
-            }
-            html += `<td>${value || 'N/A'}</td>`;
-        });
-        html += '</tr>';
+        const efficiency = parseFloat(row.FlashEfficiency || 0).toFixed(1);
+        const teamFlashRate = parseFloat(row.TeamFlashRate || 0).toFixed(1);
+        const avgDuration = parseFloat(row.AverageFlashDuration || 0).toFixed(2);
+        
+        const efficiencyClass = efficiency > 70 ? 'text-success' : efficiency > 40 ? 'text-warning' : 'text-danger';
+        const teamFlashClass = teamFlashRate < 15 ? 'text-success' : teamFlashRate < 30 ? 'text-warning' : 'text-danger';
+        
+        html += `
+            <tr>
+                <td><strong>${row.FlasherPlayer}</strong></td>
+                <td><span class="badge ${row.FlasherPlayerTeam === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.FlasherPlayerTeam}</span></td>
+                <td>${row.TotalFlashes}</td>
+                <td><span class="${efficiencyClass}">${efficiency}%</span></td>
+                <td><span class="${teamFlashClass}">${teamFlashRate}%</span></td>
+                <td>${avgDuration}s</td>
+                <td>${row.BlindKills || 0}</td>
+                <td>${row.FlashAssists || 0}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function displayEnhancedWeaponsResults(response) {
+    const container = document.getElementById('enhancedWeaponsResults');
+    
+    if (!response.Data || response.Data.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No enhanced weapons data found for the selected filters.</div>';
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Player</th>
+                        <th>Weapon</th>
+                        <th>Total Fires</th>
+                        <th>Accuracy</th>
+                        <th>Headshot %</th>
+                        <th>Avg Recoil</th>
+                        <th>Range Efficiency</th>
+                        <th>Blind Shots</th>
+                        <th>Through Smoke</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    response.Data.forEach(row => {
+        const accuracy = parseFloat(row.WeaponAccuracy || 0).toFixed(1);
+        const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
+        const avgRecoil = parseFloat(row.AverageRecoilIndex || 0).toFixed(2);
+        const rangeEfficiency = parseFloat(row.RangeEfficiency || 0).toFixed(1);
+        
+        const accuracyClass = accuracy > 25 ? 'text-success' : accuracy > 15 ? 'text-warning' : 'text-danger';
+        
+        html += `
+            <tr>
+                <td><strong>${row.PlayerName}</strong></td>
+                <td><span class="badge bg-secondary">${row.Weapon}</span></td>
+                <td>${row.TotalShots}</td>
+                <td><span class="${accuracyClass}">${accuracy}%</span></td>
+                <td>${headshotRate}%</td>
+                <td>${avgRecoil}</td>
+                <td>${rangeEfficiency}%</td>
+                <td>${row.BlindShots || 0}</td>
+                <td>${row.ThroughSmokeShots || 0}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function displayPositioningIntelligenceResults(response) {
+    const container = document.getElementById('positioningIntelligenceResults');
+    
+    if (!response.Data || response.Data.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No positioning intelligence data found for the selected filters.</div>';
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Map Area</th>
+                        <th>Player</th>
+                        <th>Team</th>
+                        <th>Position Events</th>
+                        <th>Survival Rate</th>
+                        <th>Avg Position Time</th>
+                        <th>Kill/Death Ratio</th>
+                        <th>Engagement Range</th>
+                        <th>Position (X,Y,Z)</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    response.Data.forEach(row => {
+        const survivalRate = parseFloat(row.PositionSurvivalRate || 0).toFixed(1);
+        const avgTime = parseFloat(row.AveragePositionTime || 0).toFixed(1);
+        const kdRatio = parseFloat(row.KillDeathRatio || 0).toFixed(2);
+        const engagementRange = parseFloat(row.AverageEngagementRange || 0).toFixed(0);
+        
+        const survivalClass = survivalRate > 60 ? 'text-success' : survivalRate > 40 ? 'text-warning' : 'text-danger';
+        const kdClass = kdRatio > 1.0 ? 'text-success' : kdRatio > 0.8 ? 'text-warning' : 'text-danger';
+        
+        const avgX = parseFloat(row.AveragePositionX || 0).toFixed(0);
+        const avgY = parseFloat(row.AveragePositionY || 0).toFixed(0);
+        const avgZ = parseFloat(row.AveragePositionZ || 0).toFixed(0);
+        
+        html += `
+            <tr>
+                <td><span class="badge bg-info">${row.MapArea}</span></td>
+                <td><strong>${row.PlayerName}</strong></td>
+                <td><span class="badge ${row.Team === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.Team}</span></td>
+                <td>${row.TotalPositionEvents}</td>
+                <td><span class="${survivalClass}">${survivalRate}%</span></td>
+                <td>${avgTime}s</td>
+                <td><span class="${kdClass}">${kdRatio}</span></td>
+                <td>${engagementRange} units</td>
+                <td><small>(${avgX}, ${avgY}, ${avgZ})</small></td>
+            </tr>
+        `;
     });
     
     html += '</tbody></table></div>';
@@ -1023,18 +568,10 @@ async function exportAnalysis(analysisType) {
     filters.format = 'csv';
     
     const endpoints = {
-        'clutch': 'comprehensive-clutch-analysis',
-        'trade': 'enhanced-trade-kill-optimization',
-        'first-kill': 'first-blood-impact-analysis',
-        'economy': 'economic-efficiency-analysis',
-        'position': 'positioning-intelligence',
-        'comprehensive-clutch': 'comprehensive-clutch-analysis',
-        'weapons': 'weapon-mastery-analytics',
-        'grenades': 'grenade-impact-quantification',
-        'momentum': 'round-momentum-tracking',
-        'coordination': 'team-coordination-metrics',
-        'consistency': 'performance-consistency-profiling',
-        'damage': 'damage-efficiency-analytics'
+        'detailed-clutch': 'detailed-clutch-intelligence',
+        'flash-analytics': 'flash-usage-analytics',
+        'enhanced-weapons': 'enhanced-weapon-performance',
+        'positioning-intelligence': 'advanced-positioning-intelligence'
     };
     
     const endpoint = endpoints[analysisType];
@@ -1045,7 +582,7 @@ async function exportAnalysis(analysisType) {
 }
 
 function showError(message) {
-    const containers = ['clutchResults', 'tradeResults', 'firstKillResults', 'economyResults', 'positionResults', 'comprehensiveClutchResults', 'weaponsResults', 'grenadesResults', 'momentumResults', 'coordinationResults', 'consistencyResults', 'damageResults'];
+    const containers = ['detailedClutchResults', 'flashAnalyticsResults', 'enhancedWeaponsResults', 'positioningIntelligenceResults'];
     containers.forEach(containerId => {
         document.getElementById(containerId).innerHTML = `<div class="alert alert-danger">${message}</div>`;
     });
