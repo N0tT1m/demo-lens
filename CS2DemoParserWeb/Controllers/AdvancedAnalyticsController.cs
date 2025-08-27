@@ -28,44 +28,53 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    -- DIAGNOSTIC QUERY - Check what data exists
-                    SELECT TOP 20
+                    SELECT 
                         'DemoFiles' as TableName,
-                        d.Id as DemoId,
-                        d.FileName,
-                        d.MapName,
-                        d.ParsedAt,
-                        COUNT(DISTINCT r.Id) as RoundCount,
-                        COUNT(DISTINCT k.Id) as KillCount,
-                        MAX(p.PlayerName) as SamplePlayer
-                    FROM DemoFiles d
-                    LEFT JOIN Rounds r ON r.DemoFileId = d.Id
-                    LEFT JOIN Kills k ON k.RoundId = r.Id
-                    LEFT JOIN Players p ON k.KillerId = p.Id
-                    WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                        AND (@MapName IS NULL OR d.MapName = @MapName)
-                    GROUP BY d.Id, d.FileName, d.MapName, d.ParsedAt
+                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
+                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
+                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
+                        CAST('Total demo files in database' AS VARCHAR) as Description
+                    FROM DemoFiles
                     
                     UNION ALL
                     
-                    SELECT TOP 10
-                        'Basic Stats' as TableName,
-                        d.Id as DemoId,
-                        d.FileName,
-                        d.MapName,
-                        d.ParsedAt,
-                        COUNT(DISTINCT prs.Id) as PlayerRoundStatCount,
-                        COUNT(DISTINCT k.Id) as KillCount,
-                        'N/A' as SamplePlayer
-                    FROM DemoFiles d
-                    LEFT JOIN Rounds r ON r.DemoFileId = d.Id
-                    LEFT JOIN PlayerRoundStats prs ON prs.RoundId = r.Id
-                    LEFT JOIN Kills k ON k.RoundId = r.Id
-                    WHERE (@DemoId IS NULL OR d.Id = @DemoId)
-                        AND (@MapName IS NULL OR d.MapName = @MapName)
-                    GROUP BY d.Id, d.FileName, d.MapName, d.ParsedAt
+                    SELECT 
+                        'Rounds' as TableName,
+                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
+                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
+                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
+                        CAST('Total rounds parsed' AS VARCHAR) as Description
+                    FROM Rounds
                     
-                    ORDER BY ParsedAt DESC"; 
+                    UNION ALL
+                    
+                    SELECT 
+                        'Players' as TableName,
+                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
+                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
+                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
+                        CAST('Total players found' AS VARCHAR) as Description
+                    FROM Players
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        'Kills' as TableName,
+                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
+                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
+                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
+                        CAST('Total kills recorded' AS VARCHAR) as Description
+                    FROM Kills
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        'PlayerRoundStats' as TableName,
+                        CAST(COUNT(*) AS VARCHAR) as RecordCount,
+                        CAST(ISNULL(MAX(Id), 0) AS VARCHAR) as MaxId,
+                        CAST(ISNULL(MIN(Id), 0) AS VARCHAR) as MinId,
+                        CAST('Total player round statistics' AS VARCHAR) as Description
+                    FROM PlayerRoundStats"; 
                 
                 /*
                     WITH RoundPlayerCounts AS (
