@@ -904,12 +904,12 @@ namespace CS2DemoParserWeb.Controllers
                             p.Team,
                             d.MapName,
                             g.GrenadeType,
-                            g.ThrowPosX,
-                            g.ThrowPosY,
-                            g.ThrowPosZ,
-                            g.DetonatePosX,
-                            g.DetonatePosY,
-                            g.DetonatePosZ,
+                            g.ThrowPositionX,
+                            g.ThrowPositionY,
+                            g.ThrowPositionZ,
+                            g.DetonatePositionX,
+                            g.DetonatePositionY,
+                            g.DetonatePositionZ,
                             g.ThrowTick,
                             g.DetonateTick,
                             r.RoundNumber,
@@ -917,23 +917,23 @@ namespace CS2DemoParserWeb.Controllers
                             CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
                             -- Calculate throw distance
                             SQRT(
-                                POWER(CAST(g.DetonatePosX - g.ThrowPosX AS FLOAT), 2) +
-                                POWER(CAST(g.DetonatePosY - g.ThrowPosY AS FLOAT), 2)
+                                POWER(CAST(g.DetonatePositionX - g.ThrowPositionX AS FLOAT), 2) +
+                                POWER(CAST(g.DetonatePositionY - g.ThrowPositionY AS FLOAT), 2)
                             ) as ThrowDistance,
                             -- Categorize map areas
                             CASE 
                                 WHEN d.MapName = 'de_dust2' THEN
                                     CASE 
-                                        WHEN g.DetonatePosY > 1000 THEN 'A Site'
-                                        WHEN g.DetonatePosY < -1000 THEN 'B Site'
-                                        WHEN g.DetonatePosX > 0 THEN 'Upper Tunnels'
+                                        WHEN g.DetonatePositionY > 1000 THEN 'A Site'
+                                        WHEN g.DetonatePositionY < -1000 THEN 'B Site'
+                                        WHEN g.DetonatePositionX > 0 THEN 'Upper Tunnels'
                                         ELSE 'Mid/Lower'
                                     END
                                 WHEN d.MapName = 'de_mirage' THEN
                                     CASE 
-                                        WHEN g.DetonatePosX > 1000 THEN 'A Site'
-                                        WHEN g.DetonatePosX < -1000 THEN 'B Site'
-                                        WHEN ABS(g.DetonatePosX) < 500 THEN 'Mid'
+                                        WHEN g.DetonatePositionX > 1000 THEN 'A Site'
+                                        WHEN g.DetonatePositionX < -1000 THEN 'B Site'
+                                        WHEN ABS(g.DetonatePositionX) < 500 THEN 'Mid'
                                         ELSE 'Connector'
                                     END
                                 ELSE 'Unknown Area'
@@ -1872,11 +1872,11 @@ namespace CS2DemoParserWeb.Controllers
                             g.ThrowPositionY,
                             COUNT(*) OVER (PARTITION BY g.RoundId, p.Team, g.GrenadeType 
                                           ORDER BY g.ThrowTime 
-                                          RANGE BETWEEN 0 PRECEDING AND 3 FOLLOWING) as UtilityCombos,
+                                          ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) as UtilityCombos,
                             -- Detect synchronized utility (multiple grenades within 3 seconds)
                             CASE WHEN COUNT(*) OVER (PARTITION BY g.RoundId, p.Team 
                                                     ORDER BY g.ThrowTime 
-                                                    RANGE BETWEEN 0 PRECEDING AND 3 FOLLOWING) > 1 
+                                                    ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) > 1 
                                  THEN 1 ELSE 0 END as IsSynchronizedUtility
                         FROM Grenades g
                         INNER JOIN Players p ON g.PlayerId = p.Id
@@ -2271,7 +2271,7 @@ namespace CS2DemoParserWeb.Controllers
                             -- Multi-target engagement detection (within 5 seconds)
                             COUNT(*) OVER (PARTITION BY dba.AttackerName, dba.RoundId 
                                           ORDER BY dba.GameTime 
-                                          RANGE BETWEEN 0 PRECEDING AND 5 FOLLOWING) as MultiTargetWindow
+                                          ROWS BETWEEN CURRENT ROW AND 5 FOLLOWING) as MultiTargetWindow
                         FROM DamageBreakdownAnalysis dba
                         GROUP BY dba.AttackerName, dba.AttackerTeam, dba.MapName, dba.RoundId, dba.GameTime
                     ),
