@@ -33,6 +33,11 @@ public class CS2DemoContext : DbContext
     public DbSet<WeaponState> WeaponStates { get; set; } = null!;
     public DbSet<FlashEvent> FlashEvents { get; set; } = null!;
     
+    // Enhanced tracking tables for advanced analytics
+    public DbSet<PlayerInput> PlayerInputs { get; set; } = null!;
+    public DbSet<WeaponStateChange> WeaponStateChanges { get; set; } = null!;
+    public DbSet<EnhancedPlayerPosition> EnhancedPlayerPositions { get; set; } = null!;
+    
     // Advanced entity tracking tables
     public DbSet<EntityLifecycle> EntityLifecycles { get; set; } = null!;
     public DbSet<EntityInteraction> EntityInteractions { get; set; } = null!;

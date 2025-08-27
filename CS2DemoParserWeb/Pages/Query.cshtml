@@ -181,7 +181,8 @@ function setupQueryBuilder() {
         }
         
         if (limit) {
-            sql += ` LIMIT ${limit}`;
+            // SQL Server uses TOP instead of LIMIT
+            sql = sql.replace('SELECT', `SELECT TOP ${limit}`);
         }
         
         sqlPreview.value = sql;

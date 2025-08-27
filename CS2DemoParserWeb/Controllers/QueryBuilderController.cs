@@ -546,6 +546,57 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpPost("execute")]
+        public async Task<IActionResult> ExecuteSimpleQuery([FromBody] SimpleQueryRequest request)
+        {
+            try
+            {
+                var sanitizedSql = ValidateAndSanitizeQuery(request.Sql);
+                if (sanitizedSql == null)
+                {
+                    return BadRequest("Invalid or unsafe SQL query. Only SELECT statements with approved tables and columns are allowed.");
+                }
+
+                _logger.LogInformation("Executing simple SQL query: {SQL}", sanitizedSql);
+                
+                var results = await ExecuteSafeQuery(sanitizedSql, new Dictionary<string, object>());
+                
+                return Ok(results);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing simple query: {Error}", ex.Message);
+                return BadRequest($"Query error: {ex.Message}");
+            }
+        }
+
+        [HttpPost("export")]
+        public async Task<IActionResult> ExportQueryResults([FromBody] SimpleQueryRequest request)
+        {
+            try
+            {
+                var sanitizedSql = ValidateAndSanitizeQuery(request.Sql);
+                if (sanitizedSql == null)
+                {
+                    return BadRequest("Invalid or unsafe SQL query. Only SELECT statements with approved tables and columns are allowed.");
+                }
+
+                _logger.LogInformation("Exporting query results: {SQL}", sanitizedSql);
+                
+                var results = await ExecuteSafeQuery(sanitizedSql, new Dictionary<string, object>());
+                var csv = ConvertToCsv(results);
+                var fileName = $"query_export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                
+                Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error exporting query: {Error}", ex.Message);
+                return BadRequest($"Query error: {ex.Message}");
+            }
+        }
+
         private string BuildSqlFromVisualQuery(VisualQueryRequest request)
         {
             var sql = new StringBuilder("SELECT ");
@@ -839,5 +890,10 @@ namespace CS2DemoParserWeb.Controllers
     public class QueryValidationRequest
     {
         public string SqlQuery { get; set; } = "";
+    }
+
+    public class SimpleQueryRequest
+    {
+        public string Sql { get; set; } = "";
     }
 }

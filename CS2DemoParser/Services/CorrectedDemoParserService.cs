@@ -39,6 +39,11 @@ public class CorrectedDemoParserService
     private readonly ConcurrentBag<Models.WeaponState> _weaponStates = new();
     private readonly ConcurrentBag<Models.FlashEvent> _flashEvents = new();
     
+    // Enhanced analytics collections for advanced gameplay insights
+    private readonly ConcurrentBag<Models.PlayerInput> _playerInputs = new();
+    private readonly ConcurrentBag<Models.WeaponStateChange> _weaponStateChanges = new();
+    private readonly ConcurrentBag<Models.EnhancedPlayerPosition> _enhancedPlayerPositions = new();
+    
     // Advanced entity tracking collections
     private readonly ConcurrentBag<Models.EntityLifecycle> _entityLifecycles = new();
     private readonly ConcurrentBag<Models.EntityInteraction> _entityInteractions = new();
@@ -684,6 +689,10 @@ public class CorrectedDemoParserService
         // Get positions using correct API
         var attackerPos = e.AttackerPawn?.Origin;
         var victimPos = e.PlayerPawn?.Origin;
+        
+        // Get view angles using correct API
+        var attackerAngles = e.AttackerPawn?.EyeAngles;
+        var victimAngles = e.PlayerPawn?.EyeAngles;
 
         if (attackerPos != null)
         {
@@ -698,6 +707,19 @@ public class CorrectedDemoParserService
             kill.VictimPositionY = (decimal)victimPos.Value.Y;
             kill.VictimPositionZ = (decimal)victimPos.Value.Z;
         }
+        
+        // Capture view angles for crosshair placement analysis
+        if (attackerAngles.HasValue)
+        {
+            kill.KillerViewAngleX = (decimal)attackerAngles.Value.Pitch;
+            kill.KillerViewAngleY = (decimal)attackerAngles.Value.Yaw;
+        }
+        
+        if (victimAngles.HasValue)
+        {
+            kill.VictimViewAngleX = (decimal)victimAngles.Value.Pitch;
+            kill.VictimViewAngleY = (decimal)victimAngles.Value.Yaw;
+        }
 
         if (attackerPos != null && victimPos != null)
         {
@@ -705,6 +727,33 @@ public class CorrectedDemoParserService
             var dy = attackerPos.Value.Y - victimPos.Value.Y;
             var dz = attackerPos.Value.Z - victimPos.Value.Z;
             kill.Distance = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+        
+        // Enhanced data from demofile-net Source1PlayerDeathEvent
+        kill.IsRevengeKill = e.Revenge > 0;
+        kill.IsDominating = e.Dominated > 0;
+        kill.IsRevenge = e.Revenge > 0;
+        kill.VictimBlind = false; // Property not available in current version
+        kill.AttackerBlind = e.Attackerblind;
+        kill.FlashDuration = 0; // Flash duration tracking - simplified for now
+        
+        // Enhanced assist tracking
+        if (e.Assistedflash && e.Assister != null)
+        {
+            kill.AssistType = "Flash Assist";
+            // Calculate assist distance if both positions are available
+            var assisterPos = e.AssisterPawn?.Origin;
+            if (assisterPos != null && victimPos != null)
+            {
+                var adx = assisterPos.Value.X - victimPos.Value.X;
+                var ady = assisterPos.Value.Y - victimPos.Value.Y;
+                var adz = assisterPos.Value.Z - victimPos.Value.Z;
+                kill.AssistDistance = (float)Math.Sqrt(adx * adx + ady * ady + adz * adz);
+            }
+        }
+        else if (e.Assister != null)
+        {
+            kill.AssistType = "Damage Assist";
         }
 
         _kills.Add(kill);
@@ -726,6 +775,7 @@ public class CorrectedDemoParserService
 
         LogGameEvent(_demo, "player_death", $"{e.Player.PlayerName} killed by {e.Attacker?.PlayerName} with {e.Weapon}");
     }
+
 
     private void OnPlayerHurt(Source1PlayerHurtEvent e)
     {
@@ -827,6 +877,36 @@ public class CorrectedDemoParserService
         {
             roundStats.ShotsFired++;
         }
+
+        // Enhanced weapon state change tracking - simplified for current API
+        var weaponStateChange = new Models.WeaponStateChange
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = GetDisplayRoundNumber(),
+            Player = player,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            WeaponName = e.Weapon,
+            WeaponClass = "Unknown", // WeaponClass not easily available in fire event
+            EventType = "Fire",
+            AmmoClip = 0, // Ammo info not available in fire event
+            AmmoReserve = 0,
+            IsReloading = false,
+            IsZoomed = e.PlayerPawn?.IsScoped ?? false,
+            PositionX = weaponFire.PositionX,
+            PositionY = weaponFire.PositionY,
+            PositionZ = weaponFire.PositionZ
+        };
+
+        // Capture view angles for weapon fire analysis
+        var eyeAngles = e.PlayerPawn?.EyeAngles;
+        if (eyeAngles.HasValue)
+        {
+            weaponStateChange.ViewAngleX = (decimal)eyeAngles.Value.Pitch;
+            weaponStateChange.ViewAngleY = (decimal)eyeAngles.Value.Yaw;
+        }
+
+        _weaponStateChanges.Add(weaponStateChange);
 
         // Track player positions when weapons are fired
         TrackPlayerPositions();
@@ -1356,6 +1436,11 @@ public class CorrectedDemoParserService
             await SaveInBatchesAsync(_advancedUserMessages, batchSize, "Advanced User Messages");
             await SaveInBatchesAsync(_playerBehaviorEvents, batchSize, "Player Behavior Events");
             await SaveInBatchesAsync(_infernoEvents, batchSize, "Inferno Events");
+            
+            // Save enhanced analytics collections for advanced gameplay insights
+            await SaveInBatchesAsync(_playerInputs, batchSize, "Player Inputs");
+            await SaveInBatchesAsync(_weaponStateChanges, batchSize, "Weapon State Changes");
+            await SaveInBatchesAsync(_enhancedPlayerPositions, batchSize, "Enhanced Player Positions");
 
             await CalculateAndSavePlayerMatchStats();
 
