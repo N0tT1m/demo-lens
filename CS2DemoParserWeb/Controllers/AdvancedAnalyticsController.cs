@@ -283,18 +283,15 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 var sql = @"
-                    WITH FirstKills AS (
+                    WITH RoundFirstKills AS (
                         SELECT 
                             k.RoundId,
                             k.GameTime,
                             killer.PlayerName as FirstKiller,
                             killer.Team as FirstKillerTeam,
-                            victim.PlayerName as FirstVictim,
-                            victim.Team as FirstVictimTeam,
                             k.Weapon,
                             k.IsHeadshot,
                             r.WinnerTeam,
-                            r.RoundNumber,
                             d.FileName,
                             d.MapName,
                             -- Determine if first kill team won the round
@@ -304,24 +301,24 @@ namespace CS2DemoParserWeb.Controllers
                                 WHEN k.IsHeadshot = 1 THEN 'Headshot'
                                 WHEN k.Weapon LIKE '%awp%' THEN 'AWP Pick'
                                 WHEN k.Distance > 1500 THEN 'Long Range'
-                                WHEN k.IsWallbang = 1 THEN 'Wallbang'
                                 ELSE 'Standard'
-                            END as FirstKillType
+                            END as FirstKillType,
+                            ROW_NUMBER() OVER (PARTITION BY k.RoundId ORDER BY k.GameTime ASC) as KillOrder
                         FROM Kills k
                         INNER JOIN Players killer ON k.KillerId = killer.Id
-                        INNER JOIN Players victim ON k.VictimId = victim.Id
                         INNER JOIN Rounds r ON k.RoundId = r.Id
                         INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
-                        WHERE k.IsFirstKill = 1
+                        WHERE killer.PlayerName IS NOT NULL
                             AND (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
                             AND (@PlayerName IS NULL OR killer.PlayerName = @PlayerName)
-                            AND (@StartDate IS NULL OR d.ParsedAt >= @StartDate)
-                            AND (@EndDate IS NULL OR d.ParsedAt <= @EndDate)
+                    ),
+                    FirstKills AS (
+                        SELECT * FROM RoundFirstKills WHERE KillOrder = 1
                     )
                     SELECT 
-                        FirstKiller as Player,
-                        FirstKillerTeam as Team,
+                        FirstKiller,
+                        FirstKillerTeam,
                         MapName,
                         FirstKillType,
                         COUNT(*) as TotalFirstKills,
@@ -334,7 +331,7 @@ namespace CS2DemoParserWeb.Controllers
                     FROM FirstKills
                     WHERE (@Team IS NULL OR FirstKillerTeam = @Team)
                     GROUP BY FirstKiller, FirstKillerTeam, MapName, FirstKillType
-                    HAVING COUNT(*) >= 3 -- Only show players with at least 3 first kills
+                    HAVING COUNT(*) >= 1 -- Show all first kills
                     ORDER BY FirstKillWinPercentage DESC, TotalFirstKills DESC";
 
                 var data = await ExecuteAnalyticsQuery(sql, query);
