@@ -3979,5 +3979,911 @@ namespace CS2DemoParserWeb.Controllers
                 return StatusCode(500, $"Error generating situation analysis: {ex.Message}");
             }
         }
+
+        [HttpGet("economy-intelligence-enhanced")]
+        public async Task<IActionResult> GetEconomyIntelligenceEnhanced([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH EconomyAnalysis AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            r.WinnerTeam,
+                            
+                            -- ECONOMY EVENTS DATA
+                            e.EventType,
+                            e.ItemName,
+                            e.ItemCost,
+                            e.MoneyBefore,
+                            e.MoneyAfter,
+                            e.MoneyBefore - e.MoneyAfter as MoneySpent,
+                            
+                            -- ROUND CONTEXT
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            prs.Kills as RoundKills,
+                            prs.Deaths as RoundDeaths,
+                            prs.Damage as RoundDamage,
+                            
+                            -- EQUIPMENT CLASSIFICATION
+                            CASE 
+                                WHEN e.ItemName LIKE '%ak47%' OR e.ItemName LIKE '%m4a%' THEN 'Rifle'
+                                WHEN e.ItemName LIKE '%awp%' OR e.ItemName LIKE '%ssg08%' THEN 'Sniper'
+                                WHEN e.ItemName LIKE '%glock%' OR e.ItemName LIKE '%usp%' OR e.ItemName LIKE '%p250%' THEN 'Pistol'
+                                WHEN e.ItemName LIKE '%he%' OR e.ItemName LIKE '%smoke%' OR e.ItemName LIKE '%flash%' THEN 'Utility'
+                                WHEN e.ItemName LIKE '%vest%' OR e.ItemName LIKE '%helmet%' THEN 'Armor'
+                                ELSE 'Other'
+                            END as ItemCategory,
+                            
+                            -- MONEY MANAGEMENT
+                            CASE 
+                                WHEN e.MoneyBefore >= 10000 THEN 'Full_Buy'
+                                WHEN e.MoneyBefore >= 5000 THEN 'Force_Buy'
+                                WHEN e.MoneyBefore >= 2000 THEN 'Eco_Buy'
+                                ELSE 'Save_Round'
+                            END as EconomyState
+                            
+                        FROM EconomyEvents e
+                        INNER JOIN Players p ON e.PlayerId = p.Id
+                        INNER JOIN DemoFiles d ON e.DemoFileId = d.Id
+                        INNER JOIN Rounds r ON e.RoundNumber = r.RoundNumber AND r.DemoFileId = d.Id
+                        LEFT JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId AND r.Id = prs.RoundId";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        ItemCategory,
+                        EconomyState,
+                        
+                        -- SPENDING ANALYSIS
+                        COUNT(*) as PurchaseCount,
+                        SUM(ItemCost) as TotalSpent,
+                        ROUND(AVG(CAST(ItemCost AS FLOAT)), 2) as AvgItemCost,
+                        ROUND(AVG(CAST(MoneyBefore AS FLOAT)), 2) as AvgMoneyBefore,
+                        ROUND(AVG(CAST(MoneyAfter AS FLOAT)), 2) as AvgMoneyAfter,
+                        
+                        -- ROI ANALYSIS
+                        SUM(RoundWon) as RoundsWon,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRateWithPurchase,
+                        SUM(RoundKills) as TotalKills,
+                        SUM(RoundDamage) as TotalDamage,
+                        ROUND(SUM(RoundKills) * 1.0 / NULLIF(SUM(ItemCost), 0) * 1000, 2) as KillsPerThousandSpent,
+                        ROUND(SUM(RoundDamage) * 1.0 / NULLIF(SUM(ItemCost), 0), 2) as DamagePerDollarSpent,
+                        
+                        -- MONEY MANAGEMENT SCORE
+                        CASE 
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 70 AND ItemCategory = 'Rifle' THEN 95
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 60 AND EconomyState = 'Force_Buy' THEN 85
+                            WHEN ROUND(SUM(RoundKills) * 1.0 / NULLIF(SUM(ItemCost), 0) * 1000, 2) >= 0.5 THEN 80
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 50 THEN 70
+                            ELSE 50
+                        END as MoneyManagementScore
+                        
+                    FROM EconomyAnalysis
+                    GROUP BY PlayerName, Team, MapName, ItemCategory, EconomyState
+                    HAVING COUNT(*) >= 2
+                    ORDER BY MoneyManagementScore DESC, WinRateWithPurchase DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"economy_intelligence_enhanced_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Enhanced Economy Intelligence",
+                    Description = "Advanced economic analysis including ROI, money management, and purchase effectiveness",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating enhanced economy intelligence");
+                return StatusCode(500, $"Error generating enhanced economy intelligence: {ex.Message}");
+            }
+        }
+
+        [HttpGet("movement-positioning")]
+        public async Task<IActionResult> GetMovementPositioning([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PositionData AS (
+                        SELECT 
+                            d.MapName,
+                            victim.PlayerName as PlayerName,
+                            victim.Team,
+                            r.RoundNumber,
+                            
+                            -- DEATH POSITIONS
+                            k.VictimPositionX as DeathX,
+                            k.VictimPositionY as DeathY,
+                            k.VictimPositionZ as DeathZ,
+                            
+                            -- KILLER POSITIONS  
+                            k.KillerPositionX as KillerX,
+                            k.KillerPositionY as KillerY,
+                            k.KillerPositionZ as KillerZ,
+                            
+                            -- DISTANCE AND ANGLE
+                            k.Distance,
+                            k.Weapon,
+                            k.IsHeadshot,
+                            
+                            -- MAP AREA CLASSIFICATION
+                            CASE 
+                                WHEN d.MapName = 'de_dust2' THEN
+                                    CASE 
+                                        WHEN k.VictimPositionY > 1000 THEN 'A_Site'
+                                        WHEN k.VictimPositionY < -1000 THEN 'B_Site'
+                                        WHEN k.VictimPositionX > 0 AND ABS(k.VictimPositionY) < 1000 THEN 'Mid'
+                                        WHEN k.VictimPositionX < 0 THEN 'Tunnels'
+                                        ELSE 'Other'
+                                    END
+                                WHEN d.MapName = 'de_mirage' THEN
+                                    CASE 
+                                        WHEN k.VictimPositionX > 1000 THEN 'A_Site'
+                                        WHEN k.VictimPositionX < -1000 THEN 'B_Site'
+                                        WHEN ABS(k.VictimPositionX) < 500 THEN 'Mid'
+                                        WHEN k.VictimPositionY > 500 THEN 'Connector'
+                                        ELSE 'Other'
+                                    END
+                                WHEN d.MapName = 'de_inferno' THEN
+                                    CASE 
+                                        WHEN k.VictimPositionY > 1000 THEN 'A_Site'
+                                        WHEN k.VictimPositionY < -1000 THEN 'B_Site'
+                                        WHEN ABS(k.VictimPositionY) < 500 THEN 'Mid'
+                                        ELSE 'Other'
+                                    END
+                                ELSE 'Unknown_Map'
+                            END as MapArea,
+                            
+                            -- POSITIONING ADVANTAGE
+                            CASE 
+                                WHEN k.Distance > 1000 THEN 'Long_Range_Position'
+                                WHEN k.Distance < 300 THEN 'Close_Range_Position'
+                                WHEN ABS(k.KillerPositionZ - k.VictimPositionZ) > 100 THEN 'Elevation_Advantage'
+                                ELSE 'Standard_Position'
+                            END as PositionType
+                            
+                        FROM Kills k
+                        INNER JOIN Players victim ON k.VictimId = victim.Id
+                        INNER JOIN Rounds r ON k.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        WHERE k.VictimPositionX != 0 AND k.VictimPositionY != 0";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " AND d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += " AND victim.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += " AND victim.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += " AND r.RoundNumber = @RoundNumber";
+
+                sql += @"
+                    )
+                    SELECT 
+                        MapName,
+                        MapArea,
+                        PositionType,
+                        
+                        -- DEATH ZONE ANALYSIS
+                        COUNT(*) as DeathCount,
+                        COUNT(DISTINCT PlayerName) as PlayersAffected,
+                        ROUND(AVG(DeathX), 2) as AvgDeathX,
+                        ROUND(AVG(DeathY), 2) as AvgDeathY,
+                        ROUND(AVG(DeathZ), 2) as AvgDeathZ,
+                        
+                        -- POSITION DANGER METRICS
+                        ROUND(AVG(Distance), 2) as AvgKillDistance,
+                        COUNT(CASE WHEN IsHeadshot = 1 THEN 1 END) as HeadshotDeaths,
+                        ROUND(COUNT(CASE WHEN IsHeadshot = 1 THEN 1 END) * 100.0 / COUNT(*), 2) as HeadshotDeathRate,
+                        
+                        -- WEAPON EFFECTIVENESS BY POSITION
+                        COUNT(DISTINCT Weapon) as WeaponsUsed,
+                        
+                        -- POSITION DANGER SCORE
+                        CASE 
+                            WHEN COUNT(*) >= 20 AND ROUND(COUNT(CASE WHEN IsHeadshot = 1 THEN 1 END) * 100.0 / COUNT(*), 2) >= 60 THEN 95
+                            WHEN COUNT(*) >= 15 AND ROUND(AVG(Distance), 2) < 500 THEN 85
+                            WHEN COUNT(*) >= 10 THEN 70
+                            WHEN COUNT(*) >= 5 THEN 55
+                            ELSE 40
+                        END as PositionDangerScore
+                        
+                    FROM PositionData
+                    GROUP BY MapName, MapArea, PositionType
+                    HAVING COUNT(*) >= 3
+                    ORDER BY PositionDangerScore DESC, DeathCount DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"movement_positioning_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Movement & Positioning Analytics",
+                    Description = "Analysis of death zones, positioning advantages, and map control patterns",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating movement positioning analysis");
+                return StatusCode(500, $"Error generating movement positioning analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("timing-tempo")]
+        public async Task<IActionResult> GetTimingTempo([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH TimingData AS (
+                        SELECT 
+                            d.MapName,
+                            p.PlayerName,
+                            p.Team,
+                            r.RoundNumber,
+                            r.WinnerTeam,
+                            
+                            -- ROUND TIMING
+                            k.GameTime,
+                            LAG(k.GameTime) OVER (PARTITION BY r.Id ORDER BY k.GameTime) as PrevKillTime,
+                            k.GameTime - LAG(k.GameTime) OVER (PARTITION BY r.Id ORDER BY k.GameTime) as TimeBetweenKills,
+                            
+                            -- KILL SEQUENCE
+                            ROW_NUMBER() OVER (PARTITION BY r.Id ORDER BY k.GameTime) as KillSequence,
+                            COUNT(*) OVER (PARTITION BY r.Id) as TotalRoundKills,
+                            
+                            -- ROUND PHASE
+                            CASE 
+                                WHEN k.GameTime <= 30 THEN 'Opening'
+                                WHEN k.GameTime <= 60 THEN 'Mid_Round'
+                                WHEN k.GameTime <= 90 THEN 'Late_Round'
+                                ELSE 'Overtime'
+                            END as RoundPhase,
+                            
+                            -- TEMPO CLASSIFICATION
+                            CASE 
+                                WHEN k.GameTime <= 15 THEN 'Aggressive_Rush'
+                                WHEN k.GameTime <= 45 THEN 'Standard_Execute'
+                                WHEN k.GameTime <= 75 THEN 'Slow_Default'
+                                ELSE 'Late_Round_Play'
+                            END as TempoStyle,
+                            
+                            k.Weapon,
+                            k.IsHeadshot,
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                            
+                        FROM Kills k
+                        INNER JOIN Players p ON k.KillerId = p.Id
+                        INNER JOIN Rounds r ON k.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " WHERE d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " r.RoundNumber = @RoundNumber";
+
+                sql += @"
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        RoundPhase,
+                        TempoStyle,
+                        
+                        -- TIMING METRICS
+                        COUNT(*) as KillsInPhase,
+                        ROUND(AVG(GameTime), 2) as AvgKillTiming,
+                        ROUND(AVG(TimeBetweenKills), 2) as AvgTimeBetweenKills,
+                        
+                        -- SEQUENCE ANALYSIS
+                        COUNT(CASE WHEN KillSequence = 1 THEN 1 END) as FirstKills,
+                        COUNT(CASE WHEN KillSequence = TotalRoundKills THEN 1 END) as LastKills,
+                        ROUND(AVG(CAST(KillSequence AS FLOAT)), 2) as AvgKillSequence,
+                        
+                        -- TEMPO SUCCESS
+                        SUM(RoundWon) as RoundsWon,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(DISTINCT RoundNumber), 2) as TempoWinRate,
+                        
+                        -- EXECUTION EFFICIENCY
+                        COUNT(CASE WHEN IsHeadshot = 1 THEN 1 END) as HeadshotKills,
+                        ROUND(COUNT(CASE WHEN IsHeadshot = 1 THEN 1 END) * 100.0 / COUNT(*), 2) as HeadshotRate,
+                        COUNT(DISTINCT Weapon) as WeaponsUsed,
+                        
+                        -- TEMPO MASTERY SCORE
+                        CASE 
+                            WHEN TempoStyle = 'Aggressive_Rush' AND ROUND(SUM(RoundWon) * 100.0 / COUNT(DISTINCT RoundNumber), 2) >= 70 THEN 95
+                            WHEN TempoStyle = 'Late_Round_Play' AND COUNT(CASE WHEN KillSequence = TotalRoundKills THEN 1 END) >= 5 THEN 90
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(DISTINCT RoundNumber), 2) >= 60 THEN 80
+                            WHEN COUNT(CASE WHEN KillSequence = 1 THEN 1 END) >= 3 THEN 70
+                            ELSE 55
+                        END as TempoMasteryScore
+                        
+                    FROM TimingData
+                    GROUP BY PlayerName, Team, MapName, RoundPhase, TempoStyle
+                    HAVING COUNT(*) >= 3
+                    ORDER BY TempoMasteryScore DESC, TempoWinRate DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"timing_tempo_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Timing & Tempo Analytics",
+                    Description = "Analysis of round timing patterns, execution speed, and tempo effectiveness",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating timing tempo analysis");
+                return StatusCode(500, $"Error generating timing tempo analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("weapon-mastery")]
+        public async Task<IActionResult> GetWeaponMastery([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH WeaponMasteryData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            k.Weapon,
+                            
+                            -- WEAPON CLASSIFICATION
+                            CASE 
+                                WHEN k.Weapon LIKE '%ak47%' OR k.Weapon LIKE '%m4a%' THEN 'Assault_Rifle'
+                                WHEN k.Weapon LIKE '%awp%' OR k.Weapon LIKE '%ssg08%' THEN 'Sniper_Rifle'
+                                WHEN k.Weapon LIKE '%glock%' OR k.Weapon LIKE '%usp%' OR k.Weapon LIKE '%p250%' OR k.Weapon LIKE '%deagle%' THEN 'Pistol'
+                                WHEN k.Weapon LIKE '%mp%' OR k.Weapon LIKE '%mac10%' OR k.Weapon LIKE '%ump%' THEN 'SMG'
+                                WHEN k.Weapon LIKE '%knife%' THEN 'Knife'
+                                ELSE 'Other'
+                            END as WeaponClass,
+                            
+                            -- PERFORMANCE METRICS
+                            k.Distance,
+                            k.IsHeadshot,
+                            k.GameTime,
+                            r.RoundNumber,
+                            
+                            -- SITUATIONAL CONTEXT
+                            CASE 
+                                WHEN k.Distance > 1200 THEN 'Long_Range'
+                                WHEN k.Distance > 600 THEN 'Medium_Range'
+                                WHEN k.Distance > 300 THEN 'Short_Range'
+                                ELSE 'Close_Range'
+                            END as EngagementRange,
+                            
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                            
+                        FROM Kills k
+                        INNER JOIN Players p ON k.KillerId = p.Id
+                        INNER JOIN Rounds r ON k.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " WHERE d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " r.RoundNumber = @RoundNumber";
+
+                sql += @"
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        WeaponClass,
+                        Weapon,
+                        EngagementRange,
+                        
+                        -- USAGE STATISTICS
+                        COUNT(*) as KillsWithWeapon,
+                        ROUND(AVG(Distance), 2) as AvgKillDistance,
+                        MIN(Distance) as MinKillDistance,
+                        MAX(Distance) as MaxKillDistance,
+                        
+                        -- ACCURACY METRICS
+                        SUM(CAST(IsHeadshot AS INT)) as HeadshotKills,
+                        ROUND(SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*), 2) as HeadshotPercentage,
+                        
+                        -- EFFECTIVENESS METRICS
+                        SUM(RoundWon) as RoundsWonWithWeapon,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRateWithWeapon,
+                        
+                        -- PROGRESSION ANALYSIS
+                        ROUND(AVG(GameTime), 2) as AvgKillTiming,
+                        COUNT(DISTINCT RoundNumber) as RoundsUsed,
+                        
+                        -- WEAPON MASTERY SCORE
+                        CASE 
+                            WHEN WeaponClass = 'Sniper_Rifle' AND ROUND(SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*), 2) >= 80 THEN 100
+                            WHEN WeaponClass = 'Assault_Rifle' AND ROUND(SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*), 2) >= 60 AND COUNT(*) >= 20 THEN 95
+                            WHEN WeaponClass = 'Pistol' AND ROUND(SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*), 2) >= 70 THEN 90
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 70 AND COUNT(*) >= 10 THEN 85
+                            WHEN ROUND(SUM(CAST(IsHeadshot AS INT)) * 100.0 / COUNT(*), 2) >= 40 AND COUNT(*) >= 5 THEN 75
+                            WHEN COUNT(*) >= 10 THEN 65
+                            ELSE 50
+                        END as WeaponMasteryScore,
+                        
+                        -- VERSATILITY BONUS
+                        COUNT(DISTINCT EngagementRange) as RangeVersatility
+                        
+                    FROM WeaponMasteryData
+                    GROUP BY PlayerName, Team, MapName, WeaponClass, Weapon, EngagementRange
+                    HAVING COUNT(*) >= 2
+                    ORDER BY WeaponMasteryScore DESC, HeadshotPercentage DESC, KillsWithWeapon DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"weapon_mastery_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Weapon Mastery Analytics",
+                    Description = "Detailed weapon performance analysis including accuracy, versatility, and progression",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating weapon mastery analysis");
+                return StatusCode(500, $"Error generating weapon mastery analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("match-flow")]
+        public async Task<IActionResult> GetMatchFlow([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH MatchFlowData AS (
+                        SELECT 
+                            d.MapName,
+                            d.Id as DemoFileId,
+                            r.RoundNumber,
+                            r.WinnerTeam,
+                            p.PlayerName,
+                            p.Team,
+                            
+                            -- ROUND OUTCOME
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            
+                            -- MOMENTUM CALCULATION
+                            LAG(CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END, 1) OVER 
+                                (PARTITION BY d.Id, p.Team ORDER BY r.RoundNumber) as PrevRoundWon,
+                            LAG(CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END, 2) OVER 
+                                (PARTITION BY d.Id, p.Team ORDER BY r.RoundNumber) as TwoRoundsAgo,
+                            
+                            -- STREAK DETECTION
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE -1 END as StreakValue,
+                            
+                            -- PLAYER PERFORMANCE
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Damage,
+                            
+                            -- SCORE CONTEXT  
+                            SUM(CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END) OVER 
+                                (PARTITION BY d.Id, p.Team ORDER BY r.RoundNumber ROWS UNBOUNDED PRECEDING) as TeamScore,
+                            SUM(CASE WHEN p.Team != r.WinnerTeam THEN 1 ELSE 0 END) OVER 
+                                (PARTITION BY d.Id, p.Team ORDER BY r.RoundNumber ROWS UNBOUNDED PRECEDING) as OpponentScore
+                            
+                        FROM Rounds r
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        INNER JOIN PlayerRoundStats prs ON r.Id = prs.RoundId
+                        INNER JOIN Players p ON prs.PlayerId = p.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " WHERE d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " r.RoundNumber = @RoundNumber";
+
+                sql += @"
+                    ),
+                    MomentumAnalysis AS (
+                        SELECT *,
+                            -- MOMENTUM CLASSIFICATION
+                            CASE 
+                                WHEN RoundWon = 1 AND PrevRoundWon = 1 AND TwoRoundsAgo = 1 THEN 'Hot_Streak'
+                                WHEN RoundWon = 1 AND PrevRoundWon = 1 THEN 'Building_Momentum'
+                                WHEN RoundWon = 0 AND PrevRoundWon = 0 AND TwoRoundsAgo = 0 THEN 'Cold_Streak'
+                                WHEN RoundWon = 0 AND PrevRoundWon = 0 THEN 'Losing_Momentum'
+                                WHEN RoundWon = 1 AND PrevRoundWon = 0 THEN 'Comeback_Round'
+                                WHEN RoundWon = 0 AND PrevRoundWon = 1 THEN 'Momentum_Lost'
+                                ELSE 'Neutral'
+                            END as MomentumState,
+                            
+                            -- PRESSURE SITUATION
+                            CASE 
+                                WHEN ABS(TeamScore - OpponentScore) <= 1 THEN 'Close_Game'
+                                WHEN TeamScore - OpponentScore >= 3 THEN 'Leading'
+                                WHEN OpponentScore - TeamScore >= 3 THEN 'Trailing'
+                                ELSE 'Balanced'
+                            END as GameState
+                            
+                        FROM MatchFlowData
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        MomentumState,
+                        GameState,
+                        
+                        -- MOMENTUM METRICS
+                        COUNT(*) as RoundsInState,
+                        SUM(RoundWon) as RoundsWonInState,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRateInState,
+                        
+                        -- PERFORMANCE UNDER PRESSURE
+                        ROUND(AVG(CAST(Kills AS FLOAT)), 2) as AvgKillsInState,
+                        ROUND(AVG(CAST(Deaths AS FLOAT)), 2) as AvgDeathsInState,
+                        ROUND(AVG(CAST(Damage AS FLOAT)), 2) as AvgDamageInState,
+                        
+                        -- CLUTCH FACTOR
+                        COUNT(CASE WHEN Kills > Deaths AND RoundWon = 1 THEN 1 END) as ClutchRounds,
+                        COUNT(CASE WHEN GameState = 'Close_Game' AND RoundWon = 1 THEN 1 END) as CloseGameWins,
+                        
+                        -- MOMENTUM MASTERY SCORE
+                        CASE 
+                            WHEN MomentumState = 'Comeback_Round' AND ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 70 THEN 100
+                            WHEN MomentumState = 'Hot_Streak' AND ROUND(AVG(CAST(Kills AS FLOAT)), 2) >= 2.0 THEN 95
+                            WHEN GameState = 'Close_Game' AND ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 60 THEN 90
+                            WHEN MomentumState = 'Building_Momentum' AND COUNT(*) >= 5 THEN 85
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 50 THEN 70
+                            ELSE 50
+                        END as MomentumMasteryScore
+                        
+                    FROM MomentumAnalysis
+                    GROUP BY PlayerName, Team, MapName, MomentumState, GameState
+                    HAVING COUNT(*) >= 3
+                    ORDER BY MomentumMasteryScore DESC, WinRateInState DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"match_flow_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Match Flow Analytics",
+                    Description = "Analysis of momentum patterns, comeback potential, and performance under pressure",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating match flow analysis");
+                return StatusCode(500, $"Error generating match flow analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("performance-trends")]
+        public async Task<IActionResult> GetPerformanceTrends([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH PerformanceData AS (
+                        SELECT 
+                            p.PlayerName,
+                            p.Team,
+                            d.MapName,
+                            d.ParsedAt,
+                            r.RoundNumber,
+                            
+                            -- PERFORMANCE METRICS
+                            prs.Kills,
+                            prs.Deaths,
+                            prs.Damage,
+                            prs.Assists,
+                            CASE WHEN prs.Deaths = 0 THEN prs.Kills ELSE CAST(prs.Kills AS FLOAT) / prs.Deaths END as KDRatio,
+                            
+                            -- TIME-BASED GROUPING
+                            ROW_NUMBER() OVER (PARTITION BY p.Id ORDER BY d.ParsedAt, r.RoundNumber) as ChronologicalOrder,
+                            NTILE(5) OVER (PARTITION BY p.Id ORDER BY d.ParsedAt, r.RoundNumber) as TimeQuintile,
+                            
+                            -- MAP EXPERIENCE
+                            ROW_NUMBER() OVER (PARTITION BY p.Id, d.MapName ORDER BY d.ParsedAt, r.RoundNumber) as MapExperience,
+                            
+                            -- ROUND OUTCOME
+                            CASE WHEN p.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon
+                            
+                        FROM PlayerRoundStats prs
+                        INNER JOIN Players p ON prs.PlayerId = p.Id
+                        INNER JOIN Rounds r ON prs.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " WHERE d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p.Team = @Team";
+
+                sql += @"
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        TimeQuintile,
+                        
+                        -- PERFORMANCE PROGRESSION
+                        COUNT(*) as RoundsInPeriod,
+                        ROUND(AVG(CAST(Kills AS FLOAT)), 2) as AvgKills,
+                        ROUND(AVG(CAST(Deaths AS FLOAT)), 2) as AvgDeaths,
+                        ROUND(AVG(CAST(Damage AS FLOAT)), 2) as AvgDamage,
+                        ROUND(AVG(KDRatio), 2) as AvgKDRatio,
+                        
+                        -- WIN RATE TRENDS
+                        SUM(RoundWon) as RoundsWon,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as WinRate,
+                        
+                        -- CONSISTENCY METRICS
+                        ROUND(STDEV(CAST(Kills AS FLOAT)), 2) as KillsStdDev,
+                        ROUND(STDEV(CAST(Damage AS FLOAT)), 2) as DamageStdDev,
+                        
+                        -- MAP LEARNING CURVE
+                        MAX(MapExperience) as MaxMapExperience,
+                        
+                        -- IMPROVEMENT SCORE
+                        CASE 
+                            WHEN TimeQuintile = 5 THEN
+                                CASE 
+                                    WHEN ROUND(AVG(CAST(Kills AS FLOAT)), 2) >= 1.5 AND ROUND(AVG(KDRatio), 2) >= 1.2 THEN 95
+                                    WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 60 THEN 85
+                                    WHEN ROUND(AVG(CAST(Damage AS FLOAT)), 2) >= 80 THEN 75
+                                    ELSE 60
+                                END
+                            WHEN TimeQuintile >= 3 THEN 70
+                            ELSE 50
+                        END as TrendScore
+                        
+                    FROM PerformanceData
+                    GROUP BY PlayerName, Team, MapName, TimeQuintile
+                    HAVING COUNT(*) >= 5
+                    ORDER BY TrendScore DESC, TimeQuintile DESC, AvgKDRatio DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"performance_trends_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Performance Trends Analytics",
+                    Description = "Analysis of player improvement over time, consistency metrics, and learning curves",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating performance trends analysis");
+                return StatusCode(500, $"Error generating performance trends analysis: {ex.Message}");
+            }
+        }
+
+        [HttpGet("team-dynamics")]
+        public async Task<IActionResult> GetTeamDynamics([FromQuery] AnalyticsQuery query)
+        {
+            try
+            {
+                var sql = @"
+                    WITH TeamDynamicsData AS (
+                        SELECT 
+                            p1.PlayerName as PlayerName,
+                            p1.Team,
+                            d.MapName,
+                            r.RoundNumber,
+                            
+                            -- PLAYER PERFORMANCE
+                            prs1.Kills as PlayerKills,
+                            prs1.Deaths as PlayerDeaths,
+                            prs1.Damage as PlayerDamage,
+                            prs1.Assists as PlayerAssists,
+                            
+                            -- TEAMMATE PERFORMANCE
+                            p2.PlayerName as TeammateName,
+                            prs2.Kills as TeammateKills,
+                            prs2.Deaths as TeammateDeaths,
+                            prs2.Damage as TeammateDamage,
+                            prs2.Assists as TeammateAssists,
+                            
+                            -- ROUND OUTCOME
+                            CASE WHEN p1.Team = r.WinnerTeam THEN 1 ELSE 0 END as RoundWon,
+                            
+                            -- KILL TIMING ANALYSIS
+                            k1.GameTime as PlayerKillTime,
+                            k2.GameTime as TeammateKillTime,
+                            ABS(k1.GameTime - k2.GameTime) as KillTimeDifference,
+                            
+                            -- SUPPORT DETECTION
+                            CASE 
+                                WHEN ABS(k1.GameTime - k2.GameTime) <= 3.0 AND k1.GameTime IS NOT NULL AND k2.GameTime IS NOT NULL THEN 1
+                                ELSE 0
+                            END as TradeKill,
+                            
+                            CASE 
+                                WHEN prs1.Assists > 0 AND prs2.Kills > prs2.Deaths THEN 1
+                                ELSE 0
+                            END as SupportPlay
+                            
+                        FROM PlayerRoundStats prs1
+                        INNER JOIN Players p1 ON prs1.PlayerId = p1.Id
+                        INNER JOIN Rounds r ON prs1.RoundId = r.Id
+                        INNER JOIN DemoFiles d ON r.DemoFileId = d.Id
+                        
+                        -- Join with teammates in same round
+                        INNER JOIN PlayerRoundStats prs2 ON r.Id = prs2.RoundId AND prs2.PlayerId != prs1.PlayerId
+                        INNER JOIN Players p2 ON prs2.PlayerId = p2.Id AND p2.Team = p1.Team
+                        
+                        -- Optional kill timing data
+                        LEFT JOIN Kills k1 ON p1.Id = k1.KillerId AND k1.RoundId = r.Id
+                        LEFT JOIN Kills k2 ON p2.Id = k2.KillerId AND k2.RoundId = r.Id";
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(query.MapName))
+                    sql += " WHERE d.MapName = @MapName";
+                if (!string.IsNullOrEmpty(query.PlayerName))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p1.PlayerName = @PlayerName";
+                if (!string.IsNullOrEmpty(query.Team))
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " p1.Team = @Team";
+                if (query.RoundNumber.HasValue)
+                    sql += (sql.Contains("WHERE") ? " AND" : " WHERE") + " r.RoundNumber = @RoundNumber";
+
+                sql += @"
+                    )
+                    SELECT 
+                        PlayerName,
+                        Team,
+                        MapName,
+                        TeammateName,
+                        
+                        -- COLLABORATION METRICS
+                        COUNT(*) as RoundsPlayedTogether,
+                        SUM(RoundWon) as RoundsWonTogether,
+                        ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) as TeamWinRate,
+                        
+                        -- INDIVIDUAL PERFORMANCE WITH TEAMMATE
+                        ROUND(AVG(CAST(PlayerKills AS FLOAT)), 2) as AvgKillsWithTeammate,
+                        ROUND(AVG(CAST(PlayerDeaths AS FLOAT)), 2) as AvgDeathsWithTeammate,
+                        ROUND(AVG(CAST(PlayerDamage AS FLOAT)), 2) as AvgDamageWithTeammate,
+                        ROUND(AVG(CAST(PlayerAssists AS FLOAT)), 2) as AvgAssistsWithTeammate,
+                        
+                        -- TEAMMATE SYNERGY
+                        ROUND(AVG(CAST(TeammateKills AS FLOAT)), 2) as TeammateAvgKills,
+                        ROUND(AVG(CAST(TeammateDamage AS FLOAT)), 2) as TeammateAvgDamage,
+                        
+                        -- COORDINATION METRICS
+                        SUM(TradeKill) as TradeKillsExecuted,
+                        ROUND(SUM(TradeKill) * 100.0 / NULLIF(COUNT(CASE WHEN PlayerKillTime IS NOT NULL THEN 1 END), 0), 2) as TradeKillRate,
+                        SUM(SupportPlay) as SupportPlays,
+                        ROUND(AVG(KillTimeDifference), 2) as AvgKillCoordination,
+                        
+                        -- TEAM CHEMISTRY SCORE
+                        CASE 
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 70 AND SUM(TradeKill) >= 5 THEN 100
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 60 AND SUM(SupportPlay) >= 10 THEN 90
+                            WHEN SUM(TradeKill) >= 3 AND ROUND(AVG(KillTimeDifference), 2) <= 5.0 THEN 85
+                            WHEN ROUND(SUM(RoundWon) * 100.0 / COUNT(*), 2) >= 50 THEN 75
+                            WHEN COUNT(*) >= 20 THEN 65
+                            ELSE 50
+                        END as TeamChemistryScore
+                        
+                    FROM TeamDynamicsData
+                    GROUP BY PlayerName, Team, MapName, TeammateName
+                    HAVING COUNT(*) >= 10
+                    ORDER BY TeamChemistryScore DESC, TeamWinRate DESC, TradeKillsExecuted DESC";
+
+                var data = await ExecuteAnalyticsQuery(sql, query);
+                
+                if (query.Format?.ToLower() == "csv")
+                {
+                    var csv = ConvertToCsv(data);
+                    var fileName = $"team_dynamics_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                    return File(Encoding.UTF8.GetBytes(csv), "text/csv");
+                }
+
+                return Ok(new
+                {
+                    Title = "Advanced Team Dynamics",
+                    Description = "Analysis of player partnerships, trade kills, support plays, and team chemistry",
+                    Data = data,
+                    TotalRecords = data.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating team dynamics analysis");
+                return StatusCode(500, $"Error generating team dynamics analysis: {ex.Message}");
+            }
+        }
     }
 }

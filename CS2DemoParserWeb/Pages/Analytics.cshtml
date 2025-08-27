@@ -146,6 +146,41 @@
                     💪 Pressure Metrics
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="economy-enhanced-tab" data-bs-toggle="tab" data-bs-target="#economy-enhanced" type="button" role="tab">
+                    💎 Economy Enhanced
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="movement-positioning-tab" data-bs-toggle="tab" data-bs-target="#movement-positioning" type="button" role="tab">
+                    🏃 Movement & Positioning
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="timing-tempo-tab" data-bs-toggle="tab" data-bs-target="#timing-tempo" type="button" role="tab">
+                    ⏱️ Timing & Tempo
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="weapon-mastery-tab" data-bs-toggle="tab" data-bs-target="#weapon-mastery" type="button" role="tab">
+                    ⚔️ Weapon Mastery
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="match-flow-tab" data-bs-toggle="tab" data-bs-target="#match-flow" type="button" role="tab">
+                    📈 Match Flow
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="performance-trends-tab" data-bs-toggle="tab" data-bs-target="#performance-trends" type="button" role="tab">
+                    📊 Performance Trends
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="team-dynamics-tab" data-bs-toggle="tab" data-bs-target="#team-dynamics" type="button" role="tab">
+                    👥 Team Dynamics
+                </button>
+            </li>
         </ul>
         
         <!-- Tab Content -->
@@ -474,6 +509,160 @@
                             <div class="text-center text-muted">
                                 <i class="fas fa-heartbeat fa-3x mb-3"></i>
                                 <p>Performance under pressure and mental resilience analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Economy Enhanced -->
+            <div class="tab-pane fade" id="economy-enhanced" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">💎 Enhanced Economy Intelligence</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('economy-enhanced')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Enhanced Economy:</strong> 
+                            ROI analysis, money management efficiency, purchase effectiveness, and economic decision-making patterns with detailed spending breakdown.
+                        </div>
+                        <div id="economyEnhancedResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-coins fa-3x mb-3"></i>
+                                <p>Advanced economic analysis with ROI and money management</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Movement & Positioning -->
+            <div class="tab-pane fade" id="movement-positioning" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">🏃 Movement & Positioning Analytics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('movement-positioning')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Positioning Analysis:</strong> 
+                            Death zone mapping, positioning advantages, map control patterns, and tactical positioning effectiveness with danger scoring.
+                        </div>
+                        <div id="movementPositioningResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
+                                <p>Death zones, positioning advantages, and map control analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timing & Tempo -->
+            <div class="tab-pane fade" id="timing-tempo" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">⏱️ Timing & Tempo Analytics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('timing-tempo')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Timing Analysis:</strong> 
+                            Round timing patterns, execution speed, tempo effectiveness, kill sequence analysis, and round phase performance metrics.
+                        </div>
+                        <div id="timingTempoResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-clock fa-3x mb-3"></i>
+                                <p>Round timing patterns and execution speed analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weapon Mastery -->
+            <div class="tab-pane fade" id="weapon-mastery" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">⚔️ Weapon Mastery Analytics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('weapon-mastery')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Weapon Mastery:</strong> 
+                            Detailed weapon performance, accuracy metrics, range effectiveness, progression analysis, and versatility scoring across all weapon categories.
+                        </div>
+                        <div id="weaponMasteryResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-crosshairs fa-3x mb-3"></i>
+                                <p>Weapon performance, accuracy, and mastery analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Match Flow -->
+            <div class="tab-pane fade" id="match-flow" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">📈 Match Flow Analytics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('match-flow')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Match Flow:</strong> 
+                            Momentum analysis, comeback potential, performance under pressure, streak patterns, and clutch factor evaluation with mastery scoring.
+                        </div>
+                        <div id="matchFlowResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-chart-line fa-3x mb-3"></i>
+                                <p>Momentum patterns and comeback potential analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Trends -->
+            <div class="tab-pane fade" id="performance-trends" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">📊 Performance Trends</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('performance-trends')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Performance Trends:</strong> 
+                            Player improvement over time, consistency metrics, learning curves, map experience progression, and trend scoring analysis.
+                        </div>
+                        <div id="performanceTrendsResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-trending-up fa-3x mb-3"></i>
+                                <p>Player improvement and consistency analysis over time</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Dynamics -->
+            <div class="tab-pane fade" id="team-dynamics" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">👥 Advanced Team Dynamics</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('team-dynamics')">📥 Export CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Team Dynamics:</strong> 
+                            Player partnerships, trade kill effectiveness, support play analysis, team chemistry scoring, and coordination metrics evaluation.
+                        </div>
+                        <div id="teamDynamicsResults">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-users fa-3x mb-3"></i>
+                                <p>Player partnerships and team chemistry analysis</p>
                             </div>
                         </div>
                     </div>
@@ -1069,7 +1258,7 @@ async function refreshAnalytics() {
     showLoading();
     
     try {
-        // Load all 15 analytics in parallel
+        // Load all 22 analytics in parallel
         await Promise.all([
             loadClutchAnalysis(filters),
             loadTradeKillAnalysis(filters),
@@ -1085,7 +1274,14 @@ async function refreshAnalytics() {
             loadCircumstantialCombat(filters),
             loadTeamCoordination(filters),
             loadEconomicIntelligence(filters),
-            loadPressureMetrics(filters)
+            loadPressureMetrics(filters),
+            loadEconomyEnhanced(filters),
+            loadMovementPositioning(filters),
+            loadTimingTempo(filters),
+            loadWeaponMastery(filters),
+            loadMatchFlow(filters),
+            loadPerformanceTrends(filters),
+            loadTeamDynamics(filters)
         ]);
     } catch (error) {
         console.error('Error refreshing analytics:', error);
@@ -1917,8 +2113,92 @@ function clearFilters() {
     // refreshAnalytics();
 }
 
+async function loadEconomyEnhanced(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/economy-intelligence-enhanced?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'economyEnhancedResults');
+    } else {
+        document.getElementById('economyEnhancedResults').innerHTML = '<div class="alert alert-danger">Failed to load enhanced economy intelligence</div>';
+    }
+}
+
+async function loadMovementPositioning(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/movement-positioning?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'movementPositioningResults');
+    } else {
+        document.getElementById('movementPositioningResults').innerHTML = '<div class="alert alert-danger">Failed to load movement positioning analysis</div>';
+    }
+}
+
+async function loadTimingTempo(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/timing-tempo?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'timingTempoResults');
+    } else {
+        document.getElementById('timingTempoResults').innerHTML = '<div class="alert alert-danger">Failed to load timing tempo analysis</div>';
+    }
+}
+
+async function loadWeaponMastery(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/weapon-mastery?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'weaponMasteryResults');
+    } else {
+        document.getElementById('weaponMasteryResults').innerHTML = '<div class="alert alert-danger">Failed to load weapon mastery analysis</div>';
+    }
+}
+
+async function loadMatchFlow(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/match-flow?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'matchFlowResults');
+    } else {
+        document.getElementById('matchFlowResults').innerHTML = '<div class="alert alert-danger">Failed to load match flow analysis</div>';
+    }
+}
+
+async function loadPerformanceTrends(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/performance-trends?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'performanceTrendsResults');
+    } else {
+        document.getElementById('performanceTrendsResults').innerHTML = '<div class="alert alert-danger">Failed to load performance trends analysis</div>';
+    }
+}
+
+async function loadTeamDynamics(filters) {
+    const params = buildQueryString(filters);
+    const response = await fetch(`/api/advanced-analytics/team-dynamics?${params}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        displayGenericResults(data, 'teamDynamicsResults');
+    } else {
+        document.getElementById('teamDynamicsResults').innerHTML = '<div class="alert alert-danger">Failed to load team dynamics analysis</div>';
+    }
+}
+
 function showError(message) {
-    const containers = ['clutchResults', 'tradeKillResults', 'firstKillResults', 'economyResults', 'performanceResults', 'positionResults', 'masterAnalyticsResults', 'situationResults', 'inventoryResults', 'positioningResults', 'weaponIntelligenceResults', 'circumstantialResults', 'teamCoordinationResults', 'economicIntelligenceResults', 'pressureMetricsResults'];
+    const containers = ['clutchResults', 'tradeKillResults', 'firstKillResults', 'economyResults', 'performanceResults', 'positionResults', 'masterAnalyticsResults', 'situationResults', 'inventoryResults', 'positioningResults', 'weaponIntelligenceResults', 'circumstantialResults', 'teamCoordinationResults', 'economicIntelligenceResults', 'pressureMetricsResults', 'economyEnhancedResults', 'movementPositioningResults', 'timingTempoResults', 'weaponMasteryResults', 'matchFlowResults', 'performanceTrendsResults', 'teamDynamicsResults'];
     containers.forEach(containerId => {
         document.getElementById(containerId).innerHTML = `<div class="alert alert-danger">${message}</div>`;
     });
