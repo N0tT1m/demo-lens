@@ -158,7 +158,7 @@ namespace CS2DemoParserWeb.Controllers
             try
             {
                 query = await PopulateDemoSourceAsync(query);
-                var heatmapData = await _heatmapService.GetBombEventsHeatmapAsync(query);
+                var heatmapData = await _heatmapService.GetBombSiteHeatmapAsync(query);
                 return Ok(heatmapData);
             }
             catch (Exception ex)
