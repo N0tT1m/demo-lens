@@ -833,10 +833,10 @@ namespace CS2DemoParserWeb.Services
 
             return eventType.ToLower() switch
             {
-                "begin_plant" => new SKColor(220, 20, 60),     // Crimson red for bomb plants
-                "planted" => new SKColor(220, 20, 60),         // Crimson red for bomb plants
-                "begin_defuse" => new SKColor(50, 205, 50),    // Lime green for defuses
-                "defused" => new SKColor(50, 205, 50),         // Lime green for defuses
+                "begin_plant" => new SKColor(255, 69, 0),      // Red-orange for begin plant (lighter)
+                "planted" => new SKColor(220, 20, 60),         // Dark crimson for completed plant
+                "begin_defuse" => new SKColor(124, 252, 0),    // Light green for begin defuse
+                "defused" => new SKColor(50, 205, 50),         // Dark lime green for completed defuse
                 "exploded" => new SKColor(255, 140, 0),        // Dark orange for explosions
                 "dropped" => new SKColor(255, 215, 0),         // Gold for drops
                 "pickup" => new SKColor(30, 144, 255),         // Dodger blue for pickups
