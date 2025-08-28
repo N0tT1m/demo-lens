@@ -152,6 +152,22 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpGet("bomb-events")]
+        public async Task<ActionResult<HeatmapData>> GetBombEventsHeatmap([FromQuery] HeatmapQuery query)
+        {
+            try
+            {
+                query = await PopulateDemoSourceAsync(query);
+                var heatmapData = await _heatmapService.GetBombEventsHeatmapAsync(query);
+                return Ok(heatmapData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating bomb events heatmap");
+                return StatusCode(500, "Error generating bomb events heatmap");
+            }
+        }
+
         [HttpGet("weapon-fire")]
         public async Task<ActionResult<HeatmapData>> GetWeaponFireHeatmap([FromQuery] HeatmapQuery query)
         {

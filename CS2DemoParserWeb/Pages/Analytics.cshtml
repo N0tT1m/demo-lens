@@ -794,7 +794,8 @@
                                     <li><a class="dropdown-item active" href="#" onclick="changeHeatmapType('position')"><i class="fas fa-crosshairs me-2"></i>Player Positions</a></li>
                                     <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('kills')"><i class="fas fa-skull me-2"></i>Kill Locations</a></li>
                                     <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('deaths')"><i class="fas fa-heart-broken me-2"></i>Death Locations</a></li>
-                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('utility')"><i class="fas fa-bomb me-2"></i>Utility Usage</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('utility')"><i class="fas fa-grenade me-2"></i>Utility Usage</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('bomb_events')"><i class="fas fa-bomb me-2"></i>Bomb Events</a></li>
                                     <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('clutch')"><i class="fas fa-target me-2"></i>Clutch Positions</a></li>
                                     <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('first-kills')"><i class="fas fa-trophy me-2"></i>First Kill Impact</a></li>
                                 </ul>
@@ -3583,6 +3584,7 @@ function getHeatmapEndpoint(type) {
         'kills': 'deaths', // Backend uses 'deaths' for kill locations
         'deaths': 'deaths',
         'utility': 'utility',
+        'bomb_events': 'bomb-events',
         'clutch': 'player-positions', // Use position data filtered by clutch situations
         'first-kills': 'deaths' // Use death/kill data filtered by first kills
     };
@@ -3619,6 +3621,9 @@ function displayHeatmapData(data) {
     
     // Add individual markers for detailed information
     addDetailMarkers(data.points);
+    
+    // Update legend based on heatmap type
+    updateHeatmapLegend();
     
     // Update info panel
     updateHeatmapStats(data);
@@ -3714,6 +3719,7 @@ function getHeatmapGradient(type) {
         'kills': {0.4: 'purple', 0.6: 'red', 0.7: 'orange', 0.8: 'yellow', 1.0: 'white'},
         'deaths': {0.4: 'darkblue', 0.6: 'blue', 0.7: 'cyan', 0.8: 'lime', 1.0: 'red'},
         'utility': {0.4: 'green', 0.6: 'lime', 0.7: 'yellow', 0.8: 'orange', 1.0: 'red'},
+        'bomb_events': {0.4: 'darkred', 0.6: 'red', 0.7: 'orange', 0.8: 'yellow', 1.0: 'white'},
         'clutch': {0.4: 'gold', 0.6: 'orange', 0.7: 'red', 0.8: 'purple', 1.0: 'white'},
         'first-kills': {0.4: 'darkgreen', 0.6: 'green', 0.7: 'lime', 0.8: 'yellow', 1.0: 'gold'}
     };
@@ -3730,14 +3736,10 @@ function addDetailMarkers(points) {
     const sampledPoints = points.slice(0, sampleSize);
     
     sampledPoints.forEach((point, index) => {
-        const marker = L.circleMarker([transformY(point.y), transformX(point.x)], {
-            radius: 3,
-            fillColor: 'rgba(255,255,255,0.7)',
-            color: '#333',
-            weight: 1,
-            opacity: 0.8,
-            fillOpacity: 0.6
-        });
+        // Get marker style based on event type for bomb events
+        const markerStyle = getBombEventMarkerStyle(point);
+        
+        const marker = L.circleMarker([transformY(point.y), transformX(point.x)], markerStyle);
         
         marker.on('click', () => showPointDetails(point));
         
@@ -3749,6 +3751,102 @@ function addDetailMarkers(points) {
             marker.addTo(heatmapMap);
         }
     });
+}
+
+// Get marker style for bomb events with distinct colors and shapes
+function getBombEventMarkerStyle(point) {
+    // Default marker style for non-bomb events
+    const defaultStyle = {
+        radius: 3,
+        fillColor: 'rgba(255,255,255,0.7)',
+        color: '#333',
+        weight: 1,
+        opacity: 0.8,
+        fillOpacity: 0.6
+    };
+    
+    // Check if this is a bomb event
+    if (currentHeatmapType !== 'bomb_events' || !point.eventType) {
+        return defaultStyle;
+    }
+    
+    // Define bomb event styles
+    const bombEventStyles = {
+        'plant': {
+            radius: 6,
+            fillColor: '#ff4444', // Red for bomb plants
+            color: '#cc0000',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        },
+        'defuse': {
+            radius: 5,
+            fillColor: '#44ff44', // Green for defuses
+            color: '#00cc00',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        },
+        'explode': {
+            radius: 8,
+            fillColor: '#ffaa00', // Orange for explosions
+            color: '#cc6600',
+            weight: 3,
+            opacity: 1,
+            fillOpacity: 0.9
+        },
+        'drop': {
+            radius: 4,
+            fillColor: '#ffff44', // Yellow for drops
+            color: '#cccc00',
+            weight: 1,
+            opacity: 0.9,
+            fillOpacity: 0.7
+        },
+        'pickup': {
+            radius: 4,
+            fillColor: '#44ffff', // Cyan for pickups
+            color: '#00cccc',
+            weight: 1,
+            opacity: 0.9,
+            fillOpacity: 0.7
+        }
+    };
+    
+    const eventType = point.eventType?.toLowerCase();
+    return bombEventStyles[eventType] || defaultStyle;
+}
+
+// Update heatmap legend based on type
+function updateHeatmapLegend() {
+    const legend = document.getElementById('heatmapLegend');
+    if (!legend) return;
+    
+    if (currentHeatmapType === 'bomb_events') {
+        // Show bomb event legend
+        legend.innerHTML = `
+            <small class="text-muted fw-bold">Bomb Events:</small><br>
+            <small class="d-block mt-1">
+                <i class="fas fa-circle" style="color: #ff4444;"></i> Plant
+                <i class="fas fa-circle ms-2" style="color: #44ff44;"></i> Defuse
+            </small>
+            <small class="d-block">
+                <i class="fas fa-circle" style="color: #ffaa00;"></i> Explode
+                <i class="fas fa-circle ms-2" style="color: #ffff44;"></i> Drop
+                <i class="fas fa-circle ms-2" style="color: #44ffff;"></i> Pickup
+            </small>
+        `;
+    } else {
+        // Default heatmap legend
+        legend.innerHTML = `
+            <small class="text-muted">
+                <i class="fas fa-circle text-danger"></i> High Activity
+                <i class="fas fa-circle text-warning ms-2"></i> Medium
+                <i class="fas fa-circle text-success ms-2"></i> Low
+            </small>
+        `;
+    }
 }
 
 // Clear all heatmap layers
@@ -3863,6 +3961,9 @@ function changeHeatmapType(type) {
         });
         dropdown.querySelector(`[onclick="changeHeatmapType('${type}')"]`)?.classList.add('active');
     }
+    
+    // Update legend for new type
+    updateHeatmapLegend();
     
     // Refresh data with new type
     refreshHeatmapData();
@@ -3982,7 +4083,36 @@ function showHeatmapError(message) {
 
 function showPointDetails(point) {
     console.log('Point details:', point);
-    // Implement detailed point information modal
+    
+    // Show info panel with point details
+    const infoPanel = document.getElementById('heatmapInfoPanel');
+    const infoContent = document.getElementById('heatmapInfoContent');
+    
+    if (!infoPanel || !infoContent) return;
+    
+    let content = `
+        <strong>Position:</strong><br>
+        X: ${Math.round(point.x)}, Y: ${Math.round(point.y)}<br>
+        <strong>Player:</strong> ${point.playerName || 'Unknown'}<br>
+        <strong>Team:</strong> ${point.team || 'Unknown'}<br>
+        <strong>Round:</strong> ${point.roundNumber || 'Unknown'}<br>
+    `;
+    
+    // Add bomb event specific details
+    if (currentHeatmapType === 'bomb_events' && point.eventType) {
+        const eventTypeDisplay = point.eventType.charAt(0).toUpperCase() + point.eventType.slice(1);
+        content += `<strong>Event:</strong> Bomb ${eventTypeDisplay}<br>`;
+    }
+    
+    content += `<strong>Event Count:</strong> ${point.eventCount || 1}`;
+    
+    infoContent.innerHTML = content;
+    infoPanel.style.display = 'block';
+    
+    // Hide panel after 5 seconds
+    setTimeout(() => {
+        infoPanel.style.display = 'none';
+    }, 5000);
 }
 
 // Initialize interactive features when DOM is loaded
