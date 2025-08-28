@@ -389,6 +389,174 @@ html {
   text-align: start;
 }
 
+/* Analytics page enhancements */
+.clickable-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-row:hover {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  transform: translateX(2px);
+}
+
+[data-theme="dark"] .clickable-row:hover {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+}
+
+.filters-card {
+  background: var(--gradient);
+  color: white;
+  border: none;
+}
+
+.filters-card .form-label {
+  color: white !important;
+  font-weight: 500;
+}
+
+.filters-card .form-control,
+.filters-card .form-select {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #333;
+}
+
+.filters-card .form-control:focus,
+.filters-card .form-select:focus {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+}
+
+/* Chart containers */
+.chart-container {
+  position: relative;
+  height: 300px;
+  margin-bottom: 2rem;
+}
+
+/* Tab enhancements */
+.nav-tabs .nav-link {
+  border: none;
+  border-radius: 8px 8px 0 0;
+  margin-right: 0.25rem;
+  transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+  background: var(--gradient);
+  color: white;
+  border-color: transparent;
+}
+
+.nav-tabs .nav-link:hover {
+  border-color: transparent;
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="dark"] .nav-tabs .nav-link {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .nav-tabs .nav-link:hover {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+/* Modal enhancements */
+.modal-content {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .modal-content {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .modal-header {
+  border-bottom: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .btn-close {
+  filter: invert(1);
+}
+
+/* Loading states */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 8px;
+}
+
+[data-theme="dark"] .loading-overlay {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+/* Auto-refresh indicator */
+.auto-refresh-active {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Metric cards */
+.metric-card {
+  text-align: center;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--shadow);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px var(--shadow);
+}
+
+[data-theme="dark"] .metric-card {
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+.metric-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+.metric-label {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Badge enhancements */
+.badge {
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+}
+
 /* Responsive improvements */
 @media (max-width: 768px) {
   .theme-toggle {
@@ -405,4 +573,322 @@ html {
   .container {
     padding: 0 15px;
   }
+  
+  .metric-card {
+    padding: 1rem;
+  }
+  
+  .metric-value {
+    font-size: 2rem;
+  }
+  
+  .chart-container {
+    height: 250px;
+  }
+  
+  .nav-tabs .nav-link {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
 }
+
+/* UX Enhancement Styles */
+
+/* Dashboard Grid & Sortable Widgets */
+.dashboard-grid {
+  min-height: 400px;
+}
+
+.sortable-widget {
+  transition: all 0.3s ease;
+}
+
+.sortable-ghost {
+  opacity: 0.5;
+  background: var(--accent-color);
+  transform: rotate(2deg);
+}
+
+.sortable-chosen {
+  cursor: grabbing !important;
+}
+
+.sortable-drag {
+  transform: rotate(5deg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.widget-card {
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.widget-card:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--shadow);
+}
+
+.widget-drag-handle {
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.widget-drag-handle:hover {
+  color: var(--accent-color);
+}
+
+.widget-controls .dropdown-toggle {
+  border: none;
+  box-shadow: none;
+}
+
+.widget-controls .dropdown-toggle:focus {
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+}
+
+/* Masonry Layout */
+.masonry-container {
+  column-count: 3;
+  column-gap: 1rem;
+  column-fill: balance;
+}
+
+.masonry-container .sortable-widget {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
+
+/* Widget Size Variations */
+.widget-size-compact {
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.widget-size-compact .card-body {
+  padding: 0.75rem;
+}
+
+.widget-size-large {
+  min-height: 500px;
+}
+
+.widget-size-large .card-body {
+  padding: 2rem;
+}
+
+/* Dashboard Customization Panel */
+#dashboardCustomizationPanel {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border: 2px solid var(--accent-color);
+}
+
+#dashboardCustomizationPanel .card-header {
+  background: var(--accent-color);
+  color: white;
+}
+
+/* Saved Views Dropdown */
+.dropdown-item.d-flex {
+  padding: 0.5rem 1rem;
+}
+
+.dropdown-item.d-flex:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.dropdown-item.d-flex .btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.dropdown-item.d-flex:hover .btn {
+  opacity: 1;
+}
+
+/* Export Buttons */
+.export-dropdown {
+  min-width: 200px;
+}
+
+.export-dropdown .dropdown-item {
+  transition: all 0.2s ease;
+}
+
+.export-dropdown .dropdown-item:hover {
+  background: linear-gradient(90deg, var(--accent-color), rgba(99, 102, 241, 0.8));
+  color: white;
+  transform: translateX(5px);
+}
+
+/* Notification Toast */
+.notification-toast {
+  animation: slideInRight 0.3s ease, fadeOut 0.3s ease 4.7s;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border: none;
+  border-left: 4px solid;
+}
+
+.notification-toast.alert-success {
+  border-left-color: var(--success-color);
+}
+
+.notification-toast.alert-info {
+  border-left-color: var(--info-color);
+}
+
+.notification-toast.alert-warning {
+  border-left-color: var(--warning-color);
+}
+
+.notification-toast.alert-danger {
+  border-left-color: var(--danger-color);
+}
+
+/* Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Share Modal */
+.modal-content.share-modal {
+  border-radius: 15px;
+  border: none;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header.share-header {
+  background: var(--gradient);
+  color: white;
+  border-radius: 15px 15px 0 0;
+}
+
+/* Button Group Enhancements */
+.btn-group-enhanced .btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-group-enhanced .btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-group-enhanced .btn:hover::before {
+  left: 100%;
+}
+
+/* Layout Toggle Buttons */
+.layout-toggle-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.layout-toggle-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--border-color);
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.layout-toggle-btn.active {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.layout-toggle-btn:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+}
+
+/* Widget Animation States */
+.widget-entering {
+  animation: widgetSlideIn 0.5s ease;
+}
+
+.widget-leaving {
+  animation: widgetSlideOut 0.3s ease;
+}
+
+@keyframes widgetSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes widgetSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+}
+
+/* Dark mode adjustments for UX elements */
+[data-theme="dark"] .widget-card {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .widget-card:hover {
+  border-color: var(--accent-color);
+  background-color: rgba(99, 102, 241, 0.05);
+}
+
+[data-theme="dark"] .sortable-ghost {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+[data-theme="dark"] .notification-toast {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .dropdown-item.d-flex:hover {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+[data-theme="dark"] .export-dropdown .dropdown-item:hover {
+  background: linear-gradient(90deg, var(--accent-color), rgba(99, 102, 241, 0.6));
+}}

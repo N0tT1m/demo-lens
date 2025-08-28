@@ -248,6 +248,50 @@ This application processes CS2 demo files which may contain:
 - Use **"Show Available Tables"** to explore database structure
 - Review console logs for detailed error messages
 
+## 📋 TODO - Future Improvements
+
+### 🔮 **Advanced Analytics Enhancements** (Priority: High)
+- **Prediction Models**: Implement win probability calculation based on current game state
+- **Anomaly Detection**: Identify unusual performance patterns and outliers
+- **Machine Learning Insights**: Performance prediction and personalized improvement suggestions
+- **Cross-match Analysis**: Performance trends and correlation analysis across multiple demos
+
+### 🎨 **User Experience Improvements** (Priority: Low)
+- **Advanced Export Options**: Enhanced PowerPoint integration with native .pptx generation
+- **Team Collaboration**: Real-time collaborative analytics sessions with shared cursors
+- **User Preferences**: Advanced theme customization and layout presets
+- **Keyboard Shortcuts**: Power-user keyboard shortcuts for all major functions
+
+### 📊 **Missing Report Types** (Priority: Medium)
+- **Team Synergy Reports**: Communication patterns analysis and synchronized play detection
+- **Map-specific Analytics**: Site control analysis, rotation patterns, and map-specific strategies
+- **Utility Usage Reports**: Detailed grenade effectiveness, smoke/flash impact analysis
+- **Momentum Analysis**: Round streak impacts, momentum shifts, and psychological factors
+
+### 🏗️ **Technical Enhancements** (Priority: Low)
+- **Performance Optimization**: Database indexing and query optimization for large datasets
+- **Batch Processing**: Support for bulk demo uploads and background processing queues
+- **API Development**: RESTful API for third-party integrations and mobile apps
+- **Cloud Integration**: Optional cloud storage and synchronization features
+
+### 📱 **Mobile & Accessibility** (Priority: Low)
+- **Progressive Web App**: Offline capabilities and mobile app-like experience
+- **Accessibility Compliance**: WCAG 2.1 AA compliance for screen readers and keyboard navigation
+- **Touch Optimizations**: Improved mobile gesture support for charts and heatmaps
+- **Voice Commands**: Voice-activated analytics queries and report generation
+
+### 🔧 **Recently Completed Improvements** ✅
+- ✅ **Interactive Visualizations**: Added Chart.js integration with clickable charts
+- ✅ **Real-time Dashboard**: Auto-refresh functionality every 30 seconds (double-click to toggle)
+- ✅ **Interactive Filtering**: Filter changes automatically trigger updates when auto-refresh is enabled
+- ✅ **Drill-down Capability**: Click on players in tables/charts to see detailed modal with individual stats
+- ✅ **Dashboard Customization**: Drag-and-drop widget layouts with Grid/Masonry/Tabs view modes
+- ✅ **Saved Views**: Save and restore favorite filter combinations and dashboard configurations
+- ✅ **Export Formats**: PDF report generation with charts and tables, HTML export for PowerPoint
+- ✅ **Sharing Features**: Generate shareable links to specific analytics views and configurations
+
+*Last Updated: August 28, 2025*
+
 ## 📄 License
 
 Demo Lens is open source software. See LICENSE file for details.

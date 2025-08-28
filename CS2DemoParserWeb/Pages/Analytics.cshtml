@@ -61,6 +61,71 @@
                     <button type="button" class="btn btn-secondary btn-sm px-4 clear-filters-btn" onclick="clearFilters()">
                         <i class="fas fa-eraser me-2"></i>Clear Filters
                     </button>
+                    <button type="button" class="btn btn-info btn-sm px-4" onclick="toggleDashboardCustomization()">
+                        <i class="fas fa-cogs me-2"></i>Customize Dashboard
+                    </button>
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-success btn-sm dropdown-toggle px-4" type="button" id="savedViewsDropdown" data-bs-toggle="dropdown">
+                            <i class="fas fa-bookmark me-2"></i>Saved Views
+                        </button>
+                        <ul class="dropdown-menu" id="savedViewsList">
+                            <li><a class="dropdown-item" href="#" onclick="saveCurrentView()"><i class="fas fa-plus me-2"></i>Save Current View</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><span class="dropdown-item-text text-muted">No saved views yet</span></li>
+                        </ul>
+                    </div>
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-warning btn-sm dropdown-toggle px-4" type="button" id="exportDropdown" data-bs-toggle="dropdown">
+                            <i class="fas fa-download me-2"></i>Export
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportToPDF()"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportToPowerPoint()"><i class="fas fa-file-powerpoint me-2"></i>Export to PowerPoint</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="generateShareableLink()"><i class="fas fa-link me-2"></i>Generate Share Link</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Customization Panel -->
+    <div class="card mb-4 d-none" id="dashboardCustomizationPanel">
+        <div class="card-header">
+            <h6 class="mb-0">
+                <i class="fas fa-palette me-2"></i>Dashboard Customization
+            </h6>
+        </div>
+        <div class="card-body py-3">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label class="form-label">Layout Style</label>
+                    <select class="form-select form-select-sm" id="layoutStyle" onchange="applyLayoutStyle()">
+                        <option value="grid">Grid Layout</option>
+                        <option value="masonry">Masonry Layout</option>
+                        <option value="tabs">Tabbed Layout</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Widget Size</label>
+                    <select class="form-select form-select-sm" id="widgetSize" onchange="applyWidgetSize()">
+                        <option value="compact">Compact</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="large">Large</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="enableDragDrop" onchange="toggleDragDrop()" checked>
+                        <label class="form-check-label" for="enableDragDrop">
+                            Enable Drag & Drop
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-primary btn-sm" onclick="resetDashboardLayout()">
+                        <i class="fas fa-undo me-2"></i>Reset Layout
+                    </button>
                 </div>
             </div>
         </div>
@@ -185,12 +250,35 @@
         
         <!-- Tab Content -->
         <div class="tab-content" id="analyticsTabContent">
+            <!-- Dashboard Grid View (Alternative to tabs) -->
+            <div class="dashboard-grid d-none" id="dashboardGrid">
+                <div class="row sortable-widgets" id="sortableWidgets">
+                    <!-- Widgets will be dynamically generated here -->
+                </div>
+            </div>
             <!-- Clutch Analysis -->
-            <div class="tab-pane fade show active" id="clutch" role="tabpanel">
-                <div class="card">
+            <div class="tab-pane fade show active analytics-widget" id="clutch" role="tabpanel" data-widget-id="clutch" data-widget-title="Clutch Analysis" data-widget-icon="🎯">
+                <div class="card widget-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">🎯 Clutch Situation Analysis</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('clutch')">📥 Export CSV</button>
+                        <h5 class="card-title mb-0">
+                            <span class="widget-drag-handle me-2" style="cursor: move; display: none;">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                            🎯 Clutch Situation Analysis
+                        </h5>
+                        <div class="widget-controls">
+                            <div class="dropdown d-inline-block me-2">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="toggleWidgetSize('clutch')"><i class="fas fa-expand-arrows-alt me-2"></i>Toggle Size</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="hideWidget('clutch')"><i class="fas fa-eye-slash me-2"></i>Hide Widget</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="refreshWidget('clutch')"><i class="fas fa-sync-alt me-2"></i>Refresh</a></li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="exportAnalysis('clutch')">📥 Export CSV</button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-info mb-3">
@@ -1291,10 +1379,10 @@ async function refreshAnalytics() {
 
 function getFilters() {
     return {
-        demoId: document.getElementById('demoSelect').value || null,
-        mapName: document.getElementById('mapSelect').value || null,
-        playerName: document.getElementById('playerSelect').value || null,
-        team: document.getElementById('teamSelect').value || null
+        DemoId: document.getElementById('demoSelect').value || null,
+        MapName: document.getElementById('mapSelect').value || null,
+        PlayerName: document.getElementById('playerSelect').value || null,
+        Team: document.getElementById('teamSelect').value || null
     };
 }
 
@@ -1431,14 +1519,35 @@ async function loadInventoryAnalysis(filters) {
 }
 
 function displayClutchResults(response) {
-    const container = document.getElementById('clutchResults');
-    
-    if (!response.data || response.data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No clutch data found for the selected filters.</div>';
+    if (!response.Data || response.Data.length === 0) {
+        updateWidgetContent('clutchResults', '<div class="alert alert-info">No clutch data found for the selected filters.</div>');
         return;
     }
-    
+
+    // Create charts and table layout
     let html = `
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Clutch Success Rate by Player</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="clutchSuccessChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Clutch Attempts vs Wins</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="clutchAttemptsChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
@@ -1456,12 +1565,12 @@ function displayClutchResults(response) {
                 <tbody>
     `;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const successRate = parseFloat(row.ClutchSuccessRate || 0).toFixed(1);
         const successClass = successRate > 50 ? 'bg-success' : successRate > 25 ? 'bg-warning' : 'bg-danger';
         
         html += `
-            <tr>
+            <tr class="clickable-row" onclick="showPlayerDetails('${row.ClutchPlayer}', 'clutch')">
                 <td><strong>${row.ClutchPlayer}</strong></td>
                 <td><span class="badge ${row.ClutchTeam === 'CT' ? 'bg-primary' : 'bg-danger'}">${row.ClutchTeam}</span></td>
                 <td>${row.MapName}</td>
@@ -1475,13 +1584,19 @@ function displayClutchResults(response) {
     });
     
     html += '</tbody></table></div>';
-    container.innerHTML = html;
+    updateWidgetContent('clutchResults', html);
+
+    // Store data for grid view recreation and create charts
+    window.lastClutchData = response.Data;
+    setTimeout(() => {
+        createClutchCharts(response.Data);
+    }, 100);
 }
 
 function displayTradeKillResults(response) {
     const container = document.getElementById('tradeKillResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No trade kill data found for the selected filters.</div>';
         return;
     }
@@ -1504,7 +1619,7 @@ function displayTradeKillResults(response) {
                 <tbody>
     `;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const avgTime = parseFloat(row.AvgTradeTimeSeconds || 0).toFixed(2);
         const fastestTime = parseFloat(row.FastestTradeSeconds || 0).toFixed(2);
         const avgDistance = parseFloat(row.AvgTradeDistance || 0).toFixed(0);
@@ -1531,7 +1646,7 @@ function displayTradeKillResults(response) {
 function displayEconomyResults(response) {
     const container = document.getElementById('economyResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No economy data found for the selected filters.</div>';
         return;
     }
@@ -1554,7 +1669,7 @@ function displayEconomyResults(response) {
                 <tbody>
     `;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const winRate = parseFloat(row.WinPercentage || 0).toFixed(1);
         const equipmentROI = parseFloat(row.AvgEquipmentROI || 0).toFixed(3);
         const damagePerDollar = parseFloat(row.AvgDamagePerDollar || 0).toFixed(3);
@@ -1585,7 +1700,7 @@ function displayEconomyResults(response) {
 function displayPerformanceResults(response) {
     const container = document.getElementById('performanceResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No performance data found for the selected filters.</div>';
         return;
     }
@@ -1608,7 +1723,7 @@ function displayPerformanceResults(response) {
                 <tbody>
     `;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const efficiencyScore = parseFloat(row.EfficiencyScore || 0).toFixed(2);
         const impactRating = parseFloat(row.AvgImpactRating || 0).toFixed(2);
         const survivalRate = parseFloat(row.SurvivalRate || 0).toFixed(1);
@@ -1639,7 +1754,7 @@ function displayPerformanceResults(response) {
 function displayFirstKillResults(response) {
     const container = document.getElementById('firstKillResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No first kill data found for the selected filters. This endpoint may need configuration or data is not available.</div>';
         return;
     }
@@ -1662,7 +1777,7 @@ function displayFirstKillResults(response) {
                 <tbody>
     `;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const winRate = parseFloat(row.FirstKillWinPercentage || 0).toFixed(1);
         const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
         const winRateClass = winRate > 60 ? 'bg-success' : winRate > 45 ? 'bg-warning' : 'bg-danger';
@@ -1688,7 +1803,7 @@ function displayFirstKillResults(response) {
 function displayPositionResults(response) {
     const container = document.getElementById('positionResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No position data found for the selected filters.</div>';
         return;
     }
@@ -1710,7 +1825,7 @@ function displayPositionResults(response) {
                 <tbody>
     `;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const avgDistance = parseFloat(row.AvgKillDistance || 0).toFixed(0);
         const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
         
@@ -1763,7 +1878,7 @@ async function exportAnalysis(analysisType) {
 function displayMasterAnalyticsResults(response) {
     const container = document.getElementById('masterAnalyticsResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No master analytics data found for the selected filters.</div>';
         return;
     }
@@ -1790,7 +1905,7 @@ function displayMasterAnalyticsResults(response) {
                 </thead>
                 <tbody>`;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const performanceColor = row.OverallPerformanceScore >= 70 ? 'text-success' : 
                                 row.OverallPerformanceScore >= 50 ? 'text-warning' : 'text-danger';
         
@@ -1825,7 +1940,7 @@ function displayMasterAnalyticsResults(response) {
         <div class="mt-3">
             <small class="text-muted">
                 Performance Score combines K/D, survival, utility usage, and accuracy metrics (0-100 scale).
-                ${response.data.length} players analyzed with comprehensive multi-dimensional metrics.
+                ${response.Data.length} players analyzed with comprehensive multi-dimensional metrics.
             </small>
         </div>`;
     
@@ -1835,7 +1950,7 @@ function displayMasterAnalyticsResults(response) {
 function displaySituationResults(response) {
     const container = document.getElementById('situationResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No situational analysis data found for the selected filters.</div>';
         return;
     }
@@ -1859,7 +1974,7 @@ function displaySituationResults(response) {
                 </thead>
                 <tbody>`;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const pressureColor = row.PressurePerformanceScore >= 2.0 ? 'text-success' : 
                              row.PressurePerformanceScore >= 1.0 ? 'text-warning' : 'text-danger';
         
@@ -1901,7 +2016,7 @@ function displaySituationResults(response) {
 function displayInventoryResults(response) {
     const container = document.getElementById('inventoryResults');
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No inventory data found for the selected filters.</div>';
         return;
     }
@@ -1925,7 +2040,7 @@ function displayInventoryResults(response) {
                 </thead>
                 <tbody>`;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         const categoryColor = {
             'Full Buy': 'bg-success',
             'Buy Round': 'bg-primary', 
@@ -2040,13 +2155,13 @@ async function loadPressureMetrics(filters) {
 function displayGenericResults(response, containerId) {
     const container = document.getElementById(containerId);
     
-    if (!response.data || response.data.length === 0) {
+    if (!response.Data || response.Data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No data found for the selected filters.</div>';
         return;
     }
 
     // Create table with dynamic headers
-    const firstRow = response.data[0];
+    const firstRow = response.Data[0];
     const headers = Object.keys(firstRow);
     
     let html = `
@@ -2057,7 +2172,7 @@ function displayGenericResults(response, containerId) {
                 </thead>
                 <tbody>`;
     
-    response.data.forEach(row => {
+    response.Data.forEach(row => {
         html += '<tr>';
         headers.forEach(header => {
             let value = row[header];
@@ -2203,4 +2318,996 @@ function showError(message) {
         document.getElementById(containerId).innerHTML = `<div class="alert alert-danger">${message}</div>`;
     });
 }
+
+// Universal widget update helper
+function updateWidgetContent(containerId, html) {
+    const tabContainer = document.getElementById(containerId);
+    const gridContainer = document.querySelector(`.grid-widget-body[data-original-id="${containerId}"]`);
+    
+    if (tabContainer) tabContainer.innerHTML = html;
+    if (gridContainer) gridContainer.innerHTML = html;
+}
+
+// Chart creation functions
+let clutchCharts = {};
+
+function createClutchCharts(data) {
+    // Destroy existing charts
+    if (clutchCharts.success) clutchCharts.success.destroy();
+    if (clutchCharts.attempts) clutchCharts.attempts.destroy();
+    
+    // Find charts in both tab and grid views
+    const successCtx = document.getElementById('clutchSuccessChart') || 
+                      document.querySelector('.grid-widget-body[data-original-id="clutchResults"] #clutchSuccessChart');
+    
+    if (successCtx) {
+        const players = data.map(d => d.ClutchPlayer).slice(0, 10);
+        const successRates = data.map(d => parseFloat(d.ClutchSuccessRate || 0)).slice(0, 10);
+        
+        clutchCharts.success = new Chart(successCtx, {
+            type: 'bar',
+            data: {
+                labels: players,
+                datasets: [{
+                    label: 'Success Rate (%)',
+                    data: successRates,
+                    backgroundColor: successRates.map(rate => 
+                        rate > 50 ? '#28a745' : rate > 25 ? '#ffc107' : '#dc3545'
+                    ),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { callback: value => value + '%' }
+                    }
+                },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        showPlayerDetails(players[index], 'clutch');
+                    }
+                }
+            }
+        });
+    }
+    
+    // Attempts vs Wins Chart
+    const attemptsCtx = document.getElementById('clutchAttemptsChart') ||
+                       document.querySelector('.grid-widget-body[data-original-id="clutchResults"] #clutchAttemptsChart');
+    
+    if (attemptsCtx) {
+        const topPlayers = data.slice(0, 8);
+        
+        clutchCharts.attempts = new Chart(attemptsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: topPlayers.map(d => d.ClutchPlayer),
+                datasets: [{
+                    data: topPlayers.map(d => parseInt(d.ClutchAttempts || 0)),
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                        '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'right' }
+                },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        showPlayerDetails(topPlayers[index].ClutchPlayer, 'clutch');
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Real-time auto-refresh functionality
+let autoRefreshInterval = null;
+let isAutoRefreshEnabled = false;
+
+function toggleAutoRefresh() {
+    const button = document.querySelector('.btn-primary');
+    
+    if (isAutoRefreshEnabled) {
+        clearInterval(autoRefreshInterval);
+        isAutoRefreshEnabled = false;
+        button.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Auto-Refresh: OFF';
+        button.classList.remove('btn-success');
+        button.classList.add('btn-primary');
+    } else {
+        autoRefreshInterval = setInterval(() => {
+            refreshAnalytics();
+        }, 30000); // Refresh every 30 seconds
+        isAutoRefreshEnabled = true;
+        button.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Auto-Refresh: ON';
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-success');
+    }
+}
+
+// Interactive filtering without page reloads
+function setupInteractiveFilters() {
+    const filterElements = ['demoSelect', 'mapSelect', 'playerSelect', 'teamSelect'];
+    
+    filterElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener('change', () => {
+                if (isAutoRefreshEnabled) {
+                    refreshAnalytics();
+                }
+            });
+        }
+    });
+}
+
+// Drill-down capability for metrics
+function showPlayerDetails(playerName, analysisType) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Player Details: ${playerName}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="playerDetailsContent">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status"></div>
+                            <p class="mt-2">Loading player details...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    
+    // Load detailed player data
+    loadPlayerDetails(playerName, analysisType);
+    
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+async function loadPlayerDetails(playerName, analysisType) {
+    try {
+        const filters = getFilters();
+        filters.PlayerName = playerName;
+        
+        const endpoints = {
+            'clutch': 'clutch-analysis',
+            'performance': 'advanced-player-performance',
+            'economy': 'economy-intelligence-dashboard'
+        };
+        
+        const endpoint = endpoints[analysisType] || 'clutch-analysis';
+        const params = buildQueryString(filters);
+        const response = await fetch(`/api/advanced-analytics/${endpoint}?${params}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            displayPlayerDetails(data, playerName, analysisType);
+        } else {
+            document.getElementById('playerDetailsContent').innerHTML = 
+                '<div class="alert alert-warning">Unable to load detailed data for this player.</div>';
+        }
+    } catch (error) {
+        document.getElementById('playerDetailsContent').innerHTML = 
+            '<div class="alert alert-danger">Error loading player details.</div>';
+    }
+}
+
+function displayPlayerDetails(data, playerName, analysisType) {
+    const content = document.getElementById('playerDetailsContent');
+    
+    if (!data.Data || data.Data.length === 0) {
+        content.innerHTML = '<div class="alert alert-info">No detailed data available for this player.</div>';
+        return;
+    }
+    
+    const playerData = data.Data.filter(d => 
+        d.ClutchPlayer === playerName || 
+        d.PlayerName === playerName ||
+        d.Player === playerName
+    );
+    
+    if (playerData.length === 0) {
+        content.innerHTML = '<div class="alert alert-info">No detailed data found for this player.</div>';
+        return;
+    }
+    
+    let html = `
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Performance Summary</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="playerDetailsChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Detailed Stats</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+    `;
+    
+    // Display key metrics based on analysis type
+    const firstRow = playerData[0];
+    Object.keys(firstRow).forEach(key => {
+        if (key !== 'ClutchPlayer' && key !== 'PlayerName' && key !== 'Player') {
+            html += `<tr><td><strong>${key}:</strong></td><td>${firstRow[key]}</td></tr>`;
+        }
+    });
+    
+    html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+    
+    // Create mini chart for player details
+    setTimeout(() => {
+        createPlayerDetailsChart(playerData, analysisType);
+    }, 100);
+}
+
+function createPlayerDetailsChart(playerData, analysisType) {
+    const ctx = document.getElementById('playerDetailsChart');
+    if (!ctx) return;
+    
+    let chartConfig = {
+        type: 'line',
+        data: {
+            labels: ['Performance'],
+            datasets: [{
+                label: 'Metrics',
+                data: [100],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    };
+    
+    new Chart(ctx, chartConfig);
+}
+
+// Dashboard Customization Functions
+let sortableInstance = null;
+let dashboardCustomizationEnabled = false;
+let savedViews = JSON.parse(localStorage.getItem('cs2-analytics-saved-views') || '[]');
+let dashboardLayout = JSON.parse(localStorage.getItem('cs2-dashboard-layout') || '{"style": "tabs", "widgetOrder": [], "hiddenWidgets": [], "widgetSizes": {}}');
+
+// Toggle Dashboard Customization Panel
+function toggleDashboardCustomization() {
+    const panel = document.getElementById('dashboardCustomizationPanel');
+    dashboardCustomizationEnabled = !dashboardCustomizationEnabled;
+    
+    if (dashboardCustomizationEnabled) {
+        panel.classList.remove('d-none');
+        enableDragHandles();
+        
+        // Switch to grid view if in masonry or grid mode
+        const layoutStyle = document.getElementById('layoutStyle').value;
+        if (layoutStyle !== 'tabs') {
+            switchToGridView();
+        }
+    } else {
+        panel.classList.add('d-none');
+        disableDragHandles();
+        applyLayoutStyle(); // Revert to selected layout
+    }
+}
+
+// Apply Layout Style
+function applyLayoutStyle() {
+    const style = document.getElementById('layoutStyle').value;
+    const tabContent = document.getElementById('analyticsTabContent');
+    const tabsNav = document.getElementById('analyticsTab');
+    const dashboardGrid = document.getElementById('dashboardGrid');
+    
+    dashboardLayout.style = style;
+    saveDashboardLayout();
+    
+    switch (style) {
+        case 'grid':
+            tabsNav.style.display = 'none';
+            switchToGridView();
+            break;
+        case 'masonry':
+            tabsNav.style.display = 'none';
+            switchToMasonryView();
+            break;
+        case 'tabs':
+        default:
+            tabsNav.style.display = 'flex';
+            dashboardGrid.classList.add('d-none');
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.style.display = '';
+            });
+            break;
+    }
+}
+
+// Switch to Grid View
+function switchToGridView() {
+    const dashboardGrid = document.getElementById('dashboardGrid');
+    const sortableContainer = document.getElementById('sortableWidgets');
+    
+    dashboardGrid.classList.remove('d-none');
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.style.display = 'none';
+    });
+    
+    // Move widgets to grid
+    createGridWidgets();
+    
+    // Initialize sortable if enabled
+    if (dashboardCustomizationEnabled && document.getElementById('enableDragDrop').checked) {
+        initializeSortable();
+    }
+}
+
+// Switch to Masonry View
+function switchToMasonryView() {
+    switchToGridView(); // Use grid as base
+    // Add masonry-specific styling
+    const container = document.getElementById('sortableWidgets');
+    container.className = 'masonry-container';
+    
+    // Apply masonry layout
+    setTimeout(() => {
+        arrangeMasonryLayout();
+    }, 100);
+}
+
+// Create Grid Widgets
+function createGridWidgets() {
+    const container = document.getElementById('sortableWidgets');
+    const widgets = document.querySelectorAll('.analytics-widget');
+    container.innerHTML = '';
+    
+    widgets.forEach(widget => {
+        if (dashboardLayout.hiddenWidgets.includes(widget.dataset.widgetId)) return;
+        
+        const widgetId = widget.dataset.widgetId;
+        const widgetTitle = widget.dataset.widgetTitle;
+        const widgetIcon = widget.dataset.widgetIcon;
+        const originalCardBody = widget.querySelector('.card-body');
+        const originalResultsId = originalCardBody.id;
+        
+        const size = dashboardLayout.widgetSizes[widgetId] || 'normal';
+        const colClass = size === 'compact' ? 'col-md-4' : size === 'large' ? 'col-12' : 'col-md-6';
+        
+        const gridWidget = document.createElement('div');
+        gridWidget.className = `${colClass} mb-4 sortable-widget`;
+        gridWidget.dataset.widgetId = widgetId;
+        
+        gridWidget.innerHTML = `
+            <div class="card widget-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0">
+                        <span class="widget-drag-handle me-2" style="cursor: move;">
+                            <i class="fas fa-grip-vertical"></i>
+                        </span>
+                        ${widgetIcon} ${widgetTitle}
+                    </h6>
+                    <div class="widget-controls">
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="toggleWidgetSize('${widgetId}')"><i class="fas fa-expand-arrows-alt me-2"></i>Toggle Size</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="hideWidget('${widgetId}')"><i class="fas fa-eye-slash me-2"></i>Hide Widget</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="refreshWidget('${widgetId}')"><i class="fas fa-sync-alt me-2"></i>Refresh</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body grid-widget-body" data-original-id="${originalResultsId}">
+                    <div class="text-center text-muted">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        Loading ${widgetTitle} data...
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(gridWidget);
+    });
+    
+    // After creating grid widgets, refresh data for visible widgets
+    setTimeout(() => {
+        refreshGridWidgetData();
+    }, 100);
+}
+
+// Refresh data for all grid widgets
+function refreshGridWidgetData() {
+    const gridWidgets = document.querySelectorAll('.sortable-widget');
+    gridWidgets.forEach(widget => {
+        const widgetId = widget.dataset.widgetId;
+        const gridBody = widget.querySelector('.grid-widget-body');
+        const originalData = document.getElementById(`${widgetId}Results`);
+        
+        if (originalData && gridBody && originalData.innerHTML.trim() !== '') {
+            // Copy current data from tab to grid
+            gridBody.innerHTML = originalData.innerHTML;
+            
+            // Recreate any charts if they exist
+            const canvas = gridBody.querySelector('canvas');
+            if (canvas && widgetId === 'clutch') {
+                // Need to trigger chart recreation for this specific canvas
+                setTimeout(() => {
+                    // Find data in original container and recreate chart
+                    const tabContainer = document.getElementById('clutchResults');
+                    if (tabContainer.innerHTML.includes('clutchSuccessChart')) {
+                        // Charts will be recreated by the existing chart creation logic
+                        createClutchCharts(window.lastClutchData || []);
+                    }
+                }, 50);
+            }
+        }
+    });
+}
+
+// Initialize Sortable
+function initializeSortable() {
+    const container = document.getElementById('sortableWidgets');
+    if (sortableInstance) {
+        sortableInstance.destroy();
+    }
+    
+    sortableInstance = Sortable.create(container, {
+        handle: '.widget-drag-handle',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        onEnd: function(evt) {
+            saveDashboardOrder();
+        }
+    });
+}
+
+// Widget Control Functions
+function toggleWidgetSize(widgetId) {
+    const currentSize = dashboardLayout.widgetSizes[widgetId] || 'normal';
+    const newSize = currentSize === 'compact' ? 'normal' : 
+                   currentSize === 'normal' ? 'large' : 'compact';
+    
+    dashboardLayout.widgetSizes[widgetId] = newSize;
+    saveDashboardLayout();
+    
+    if (document.getElementById('layoutStyle').value !== 'tabs') {
+        createGridWidgets();
+        if (sortableInstance) initializeSortable();
+    }
+}
+
+function hideWidget(widgetId) {
+    dashboardLayout.hiddenWidgets.push(widgetId);
+    saveDashboardLayout();
+    
+    if (document.getElementById('layoutStyle').value !== 'tabs') {
+        createGridWidgets();
+        if (sortableInstance) initializeSortable();
+    } else {
+        document.getElementById(widgetId).style.display = 'none';
+        // Hide corresponding tab
+        const tab = document.querySelector(`[data-bs-target="#${widgetId}"]`);
+        if (tab) tab.closest('.nav-item').style.display = 'none';
+    }
+}
+
+function refreshWidget(widgetId) {
+    // Show loading state in grid widget
+    const gridContainer = document.querySelector(`.grid-widget-body[data-original-id="${widgetId}Results"]`);
+    if (gridContainer) {
+        gridContainer.innerHTML = '<div class="text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Refreshing data...</div>';
+    }
+    
+    // Refresh specific widget data
+    const filters = getFilters();
+    
+    const widgetFunctions = {
+        'clutch': () => loadClutchAnalysis(filters),
+        'trade-kill': () => loadTradeKillAnalysis(filters),
+        'economy': () => loadEconomyIntelligence(filters),
+        'performance': () => loadPlayerPerformance(filters),
+        'first-kill': () => loadFirstKillAnalysis(filters),
+        'position': () => loadPositionAnalysis(filters)
+    };
+    
+    if (widgetFunctions[widgetId]) {
+        widgetFunctions[widgetId]();
+    }
+}
+
+function resetDashboardLayout() {
+    dashboardLayout = {
+        style: "tabs",
+        widgetOrder: [],
+        hiddenWidgets: [],
+        widgetSizes: {}
+    };
+    saveDashboardLayout();
+    
+    // Reset UI
+    document.getElementById('layoutStyle').value = 'tabs';
+    document.getElementById('widgetSize').value = 'normal';
+    
+    // Show all widgets and tabs
+    document.querySelectorAll('.analytics-widget, .nav-item').forEach(el => {
+        el.style.display = '';
+    });
+    
+    applyLayoutStyle();
+}
+
+// Enable/Disable Drag Handles
+function enableDragHandles() {
+    document.querySelectorAll('.widget-drag-handle').forEach(handle => {
+        handle.style.display = 'inline-block';
+    });
+}
+
+function disableDragHandles() {
+    document.querySelectorAll('.widget-drag-handle').forEach(handle => {
+        handle.style.display = 'none';
+    });
+}
+
+function toggleDragDrop() {
+    const enabled = document.getElementById('enableDragDrop').checked;
+    if (enabled && document.getElementById('layoutStyle').value !== 'tabs') {
+        initializeSortable();
+    } else if (sortableInstance) {
+        sortableInstance.destroy();
+        sortableInstance = null;
+    }
+}
+
+// Saved Views Functions
+function saveCurrentView() {
+    const viewName = prompt('Enter a name for this view:');
+    if (!viewName) return;
+    
+    const currentView = {
+        id: Date.now().toString(),
+        name: viewName,
+        filters: getFilters(),
+        layout: dashboardLayout,
+        timestamp: new Date().toISOString()
+    };
+    
+    savedViews.push(currentView);
+    localStorage.setItem('cs2-analytics-saved-views', JSON.stringify(savedViews));
+    updateSavedViewsDropdown();
+    
+    showNotification('View saved successfully!', 'success');
+}
+
+function loadSavedView(viewId) {
+    const view = savedViews.find(v => v.id === viewId);
+    if (!view) return;
+    
+    // Apply filters
+    Object.keys(view.filters).forEach(key => {
+        const element = document.getElementById(key === 'DemoId' ? 'demoSelect' : 
+                                             key === 'MapName' ? 'mapSelect' :
+                                             key === 'PlayerName' ? 'playerSelect' :
+                                             key === 'Team' ? 'teamSelect' : '');
+        if (element && view.filters[key]) {
+            element.value = view.filters[key];
+        }
+    });
+    
+    // Apply dashboard layout
+    dashboardLayout = {...view.layout};
+    document.getElementById('layoutStyle').value = dashboardLayout.style;
+    applyLayoutStyle();
+    
+    // Refresh analytics with new filters
+    refreshAnalytics();
+    
+    showNotification(`Loaded view: ${view.name}`, 'info');
+}
+
+function deleteSavedView(viewId) {
+    savedViews = savedViews.filter(v => v.id !== viewId);
+    localStorage.setItem('cs2-analytics-saved-views', JSON.stringify(savedViews));
+    updateSavedViewsDropdown();
+    
+    showNotification('View deleted', 'warning');
+}
+
+function updateSavedViewsDropdown() {
+    const dropdown = document.getElementById('savedViewsList');
+    
+    // Keep the "Save Current View" option and divider
+    const staticItems = dropdown.querySelectorAll('li:nth-child(1), li:nth-child(2)');
+    dropdown.innerHTML = '';
+    staticItems.forEach(item => dropdown.appendChild(item));
+    
+    if (savedViews.length === 0) {
+        const emptyItem = document.createElement('li');
+        emptyItem.innerHTML = '<span class="dropdown-item-text text-muted">No saved views yet</span>';
+        dropdown.appendChild(emptyItem);
+    } else {
+        savedViews.forEach(view => {
+            const item = document.createElement('li');
+            item.innerHTML = `
+                <div class="dropdown-item d-flex justify-content-between align-items-center">
+                    <span onclick="loadSavedView('${view.id}')" style="cursor: pointer;">
+                        <i class="fas fa-bookmark me-2"></i>${view.name}
+                    </span>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSavedView('${view.id}')" title="Delete">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `;
+            dropdown.appendChild(item);
+        });
+    }
+}
+
+// Export Functions
+async function exportToPDF() {
+    showNotification('Generating PDF report...', 'info');
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation
+        
+        // Add title
+        doc.setFontSize(20);
+        doc.text('CS2 Analytics Report', 20, 20);
+        
+        // Add timestamp
+        doc.setFontSize(12);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
+        
+        // Add current filters info
+        const filters = getFilters();
+        let filterText = 'Filters: ';
+        Object.keys(filters).forEach(key => {
+            if (filters[key]) {
+                filterText += `${key}: ${filters[key]}, `;
+            }
+        });
+        doc.text(filterText, 20, 40);
+        
+        let yPosition = 60;
+        
+        // Capture visible charts and tables
+        const activeWidgets = document.querySelectorAll('.tab-pane.active, .sortable-widget:not(.d-none)');
+        
+        for (let widget of activeWidgets) {
+            const canvas = widget.querySelector('canvas');
+            const table = widget.querySelector('table');
+            
+            if (canvas) {
+                // Add chart to PDF
+                const imgData = canvas.toDataURL('image/png');
+                doc.addImage(imgData, 'PNG', 20, yPosition, 100, 60);
+                yPosition += 70;
+            }
+            
+            if (table && yPosition < 180) {
+                // Add table summary (first few rows)
+                doc.text(`Table: ${widget.querySelector('.card-title')?.textContent || 'Analytics'}`, 20, yPosition);
+                yPosition += 10;
+                
+                const rows = table.querySelectorAll('tbody tr');
+                for (let i = 0; i < Math.min(5, rows.length); i++) {
+                    const cells = rows[i].querySelectorAll('td');
+                    let rowText = '';
+                    for (let j = 0; j < Math.min(3, cells.length); j++) {
+                        rowText += cells[j].textContent + ' | ';
+                    }
+                    doc.text(rowText, 25, yPosition);
+                    yPosition += 5;
+                }
+                yPosition += 10;
+            }
+            
+            // Add new page if needed
+            if (yPosition > 180) {
+                doc.addPage();
+                yPosition = 20;
+            }
+        }
+        
+        // Save PDF
+        doc.save(`cs2-analytics-report-${new Date().toISOString().split('T')[0]}.pdf`);
+        showNotification('PDF report generated successfully!', 'success');
+        
+    } catch (error) {
+        console.error('PDF export error:', error);
+        showNotification('Failed to generate PDF report', 'danger');
+    }
+}
+
+async function exportToPowerPoint() {
+    showNotification('PowerPoint export coming soon!', 'info');
+    
+    // For now, create a simple HTML export that can be opened in PowerPoint
+    try {
+        const filters = getFilters();
+        let html = `
+        <html>
+        <head>
+            <title>CS2 Analytics Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .slide { page-break-after: always; margin-bottom: 50px; }
+                .chart-container { text-align: center; margin: 20px 0; }
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+            </style>
+        </head>
+        <body>
+            <div class="slide">
+                <h1>CS2 Analytics Report</h1>
+                <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+                <p><strong>Filters Applied:</strong></p>
+                <ul>
+        `;
+        
+        Object.keys(filters).forEach(key => {
+            if (filters[key]) {
+                html += `<li>${key}: ${filters[key]}</li>`;
+            }
+        });
+        
+        html += `</ul></div>`;
+        
+        // Add slides for each widget
+        const activeWidgets = document.querySelectorAll('.tab-pane.active, .sortable-widget:not(.d-none)');
+        activeWidgets.forEach(widget => {
+            const title = widget.querySelector('.card-title')?.textContent || 'Analytics';
+            html += `
+                <div class="slide">
+                    <h2>${title}</h2>
+                    <div class="chart-container">
+                        ${widget.querySelector('.card-body')?.innerHTML || ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</body></html>';
+        
+        // Create and download HTML file
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `cs2-analytics-report-${new Date().toISOString().split('T')[0]}.html`;
+        link.click();
+        
+        showNotification('HTML report generated! Open in PowerPoint to convert.', 'success');
+        
+    } catch (error) {
+        console.error('PowerPoint export error:', error);
+        showNotification('Failed to generate PowerPoint export', 'danger');
+    }
+}
+
+function generateShareableLink() {
+    const filters = getFilters();
+    const layout = dashboardLayout;
+    
+    // Create shareable data
+    const shareData = {
+        filters: filters,
+        layout: layout,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Encode data for URL
+    const encoded = btoa(JSON.stringify(shareData));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        showNotification('Shareable link copied to clipboard!', 'success');
+    }).catch(err => {
+        // Fallback: show link in modal
+        showShareModal(shareUrl);
+    });
+}
+
+function showShareModal(url) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Share Analytics View</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Copy this link to share your current analytics view:</p>
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="${url}" readonly id="shareUrlInput">
+                        <button class="btn btn-outline-secondary" onclick="copyShareUrl()">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+function copyShareUrl() {
+    const input = document.getElementById('shareUrlInput');
+    input.select();
+    document.execCommand('copy');
+    showNotification('Link copied to clipboard!', 'success');
+}
+
+// Load shared view from URL
+function loadSharedView() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareData = urlParams.get('share');
+    
+    if (shareData) {
+        try {
+            const decoded = JSON.parse(atob(shareData));
+            
+            // Apply filters
+            Object.keys(decoded.filters).forEach(key => {
+                const element = document.getElementById(key === 'DemoId' ? 'demoSelect' : 
+                                                     key === 'MapName' ? 'mapSelect' :
+                                                     key === 'PlayerName' ? 'playerSelect' :
+                                                     key === 'Team' ? 'teamSelect' : '');
+                if (element && decoded.filters[key]) {
+                    element.value = decoded.filters[key];
+                }
+            });
+            
+            // Apply layout
+            if (decoded.layout) {
+                dashboardLayout = decoded.layout;
+                document.getElementById('layoutStyle').value = dashboardLayout.style;
+                applyLayoutStyle();
+            }
+            
+            // Refresh analytics
+            setTimeout(() => {
+                refreshAnalytics();
+            }, 1000);
+            
+            showNotification('Shared view loaded successfully!', 'success');
+            
+        } catch (error) {
+            console.error('Error loading shared view:', error);
+            showNotification('Invalid share link', 'danger');
+        }
+    }
+}
+
+// Utility Functions
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} notification-toast`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+function saveDashboardLayout() {
+    localStorage.setItem('cs2-dashboard-layout', JSON.stringify(dashboardLayout));
+}
+
+function saveDashboardOrder() {
+    const widgets = Array.from(document.querySelectorAll('.sortable-widget'));
+    dashboardLayout.widgetOrder = widgets.map(widget => widget.dataset.widgetId);
+    saveDashboardLayout();
+}
+
+function arrangeMasonryLayout() {
+    // Simple masonry-like layout using CSS flexbox
+    const container = document.getElementById('sortableWidgets');
+    container.style.display = 'flex';
+    container.style.flexWrap = 'wrap';
+    container.style.alignItems = 'flex-start';
+    
+    const widgets = container.querySelectorAll('.sortable-widget');
+    widgets.forEach(widget => {
+        widget.style.flex = '0 0 calc(33.333% - 1rem)';
+        widget.style.margin = '0.5rem';
+    });
+}
+
+// Initialize interactive features when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    loadDropdownData();
+    setupInteractiveFilters();
+    
+    // Initialize UX features
+    updateSavedViewsDropdown();
+    loadSharedView();
+    
+    // Apply saved layout
+    if (dashboardLayout.style !== 'tabs') {
+        document.getElementById('layoutStyle').value = dashboardLayout.style;
+        applyLayoutStyle();
+    }
+    
+    // Add auto-refresh toggle button
+    const refreshButton = document.querySelector('[onclick="refreshAnalytics()"]');
+    if (refreshButton) {
+        refreshButton.addEventListener('dblclick', toggleAutoRefresh);
+        refreshButton.title = 'Click to refresh, double-click to toggle auto-refresh';
+    }
+});
 </script>
