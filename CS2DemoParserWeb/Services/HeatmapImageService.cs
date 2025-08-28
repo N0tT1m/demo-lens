@@ -252,7 +252,7 @@ namespace CS2DemoParserWeb.Services
         {
             if (string.IsNullOrEmpty(eventType)) return false;
             
-            var bombEventTypes = new[] { "plant", "defuse", "explode", "drop", "pickup" };
+            var bombEventTypes = new[] { "begin_plant", "planted", "begin_defuse", "defused", "exploded", "dropped", "pickup" };
             return bombEventTypes.Contains(eventType.ToLower());
         }
 
@@ -833,12 +833,14 @@ namespace CS2DemoParserWeb.Services
 
             return eventType.ToLower() switch
             {
-                "plant" => new SKColor(220, 20, 60),     // Crimson red for bomb plants
-                "defuse" => new SKColor(50, 205, 50),    // Lime green for defuses
-                "explode" => new SKColor(255, 140, 0),   // Dark orange for explosions
-                "drop" => new SKColor(255, 215, 0),      // Gold for drops
-                "pickup" => new SKColor(30, 144, 255),   // Dodger blue for pickups
-                _ => new SKColor(128, 128, 128)          // Default gray
+                "begin_plant" => new SKColor(220, 20, 60),     // Crimson red for bomb plants
+                "planted" => new SKColor(220, 20, 60),         // Crimson red for bomb plants
+                "begin_defuse" => new SKColor(50, 205, 50),    // Lime green for defuses
+                "defused" => new SKColor(50, 205, 50),         // Lime green for defuses
+                "exploded" => new SKColor(255, 140, 0),        // Dark orange for explosions
+                "dropped" => new SKColor(255, 215, 0),         // Gold for drops
+                "pickup" => new SKColor(30, 144, 255),         // Dodger blue for pickups
+                _ => new SKColor(128, 128, 128)                // Default gray
             };
         }
 
@@ -848,11 +850,13 @@ namespace CS2DemoParserWeb.Services
             
             return eventType.ToLower() switch
             {
-                "plant" => "Bomb Plant",
-                "defuse" => "Bomb Defuse",
-                "explode" => "Bomb Explode",
-                "drop" => "Bomb Drop",
-                "pickup" => "Bomb Pickup",
+                "begin_plant" => "Begin Plant",
+                "planted" => "Planted",
+                "begin_defuse" => "Begin Defuse", 
+                "defused" => "Defused",
+                "exploded" => "Exploded",
+                "dropped" => "Dropped",
+                "pickup" => "Pickup",
                 _ => eventType
             };
         }
@@ -980,11 +984,13 @@ namespace CS2DemoParserWeb.Services
         {
             return friendlyName switch
             {
-                "Bomb Plant" => "plant",
-                "Bomb Defuse" => "defuse",
-                "Bomb Explode" => "explode",
-                "Bomb Drop" => "drop",
-                "Bomb Pickup" => "pickup",
+                "Begin Plant" => "begin_plant",
+                "Planted" => "planted",
+                "Begin Defuse" => "begin_defuse",
+                "Defused" => "defused",
+                "Exploded" => "exploded",
+                "Dropped" => "dropped",
+                "Pickup" => "pickup",
                 _ => null
             };
         }
