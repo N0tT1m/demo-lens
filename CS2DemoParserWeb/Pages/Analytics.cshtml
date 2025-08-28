@@ -246,6 +246,11 @@
                     👥 Team Dynamics
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="interactive-heatmap-tab" data-bs-toggle="tab" data-bs-target="#interactive-heatmap" type="button" role="tab">
+                    🗺️ Interactive Heatmap
+                </button>
+            </li>
         </ul>
         
         <!-- Tab Content -->
@@ -751,6 +756,132 @@
                             <div class="text-center text-muted">
                                 <i class="fas fa-users fa-3x mb-3"></i>
                                 <p>Player partnerships and team chemistry analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Heatmap -->
+            <div class="tab-pane fade analytics-widget" id="interactive-heatmap" role="tabpanel" data-widget-id="interactive-heatmap" data-widget-title="Interactive Heatmap" data-widget-icon="🗺️">
+                <div class="card widget-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <span class="widget-drag-handle me-2" style="cursor: move; display: none;">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                            🗺️ Interactive Heatmap
+                        </h5>
+                        <div class="widget-controls">
+                            <div class="dropdown d-inline-block me-2">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="toggleWidgetSize('interactive-heatmap')"><i class="fas fa-expand-arrows-alt me-2"></i>Toggle Size</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="hideWidget('interactive-heatmap')"><i class="fas fa-eye-slash me-2"></i>Hide Widget</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="refreshWidget('interactive-heatmap')"><i class="fas fa-sync-alt me-2"></i>Refresh</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" onclick="toggleHeatmapLayers()"><i class="fas fa-layer-group me-2"></i>Toggle Layers</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="exportHeatmapImage()"><i class="fas fa-camera me-2"></i>Export Image</a></li>
+                                </ul>
+                            </div>
+                            <div class="dropdown d-inline-block me-2">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-filter me-2"></i>Heatmap Type
+                                </button>
+                                <ul class="dropdown-menu" id="heatmapTypeDropdown">
+                                    <li><a class="dropdown-item active" href="#" onclick="changeHeatmapType('position')"><i class="fas fa-crosshairs me-2"></i>Player Positions</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('kills')"><i class="fas fa-skull me-2"></i>Kill Locations</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('deaths')"><i class="fas fa-heart-broken me-2"></i>Death Locations</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('utility')"><i class="fas fa-bomb me-2"></i>Utility Usage</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('clutch')"><i class="fas fa-target me-2"></i>Clutch Positions</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="changeHeatmapType('first-kills')"><i class="fas fa-trophy me-2"></i>First Kill Impact</a></li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-sm btn-outline-success" onclick="toggleHeatmapAnimation()">
+                                <i class="fas fa-play me-2"></i>Timeline
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Interactive Heatmap:</strong> 
+                            Pan, zoom, and click on the map to explore player positions, kills, utility usage, and tactical patterns with real-time analytics integration.
+                        </div>
+                        
+                        <!-- Heatmap Controls Panel -->
+                        <div class="heatmap-controls mb-3" id="heatmapControls">
+                            <div class="row align-items-center">
+                                <div class="col-md-3">
+                                    <label for="mapSelector" class="form-label">Map</label>
+                                    <select class="form-select form-select-sm" id="mapSelector" onchange="changeHeatmapMap()">
+                                        <option value="">Auto-detect from filters</option>
+                                        <option value="de_dust2">Dust2</option>
+                                        <option value="de_mirage">Mirage</option>
+                                        <option value="de_inferno">Inferno</option>
+                                        <option value="de_ancient">Ancient</option>
+                                        <option value="de_anubis">Anubis</option>
+                                        <option value="de_nuke">Nuke</option>
+                                        <option value="de_overpass">Overpass</option>
+                                        <option value="de_train">Train</option>
+                                        <option value="de_vertigo">Vertigo</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="heatmapIntensity" class="form-label">Intensity</label>
+                                    <input type="range" class="form-range" id="heatmapIntensity" min="0.1" max="2" step="0.1" value="1" onchange="updateHeatmapIntensity()">
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="heatmapRadius" class="form-label">Radius</label>
+                                    <input type="range" class="form-range" id="heatmapRadius" min="5" max="50" step="5" value="20" onchange="updateHeatmapRadius()">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Layers</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <input type="checkbox" class="btn-check" id="layerTeams" checked onchange="toggleLayer('teams')">
+                                        <label class="btn btn-outline-primary btn-sm" for="layerTeams">Teams</label>
+                                        <input type="checkbox" class="btn-check" id="layerRounds" checked onchange="toggleLayer('rounds')">
+                                        <label class="btn btn-outline-secondary btn-sm" for="layerRounds">Rounds</label>
+                                        <input type="checkbox" class="btn-check" id="layerTime" onchange="toggleLayer('time')">
+                                        <label class="btn btn-outline-success btn-sm" for="layerTime">Timeline</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-primary btn-sm w-100" onclick="refreshHeatmapData()">
+                                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Interactive Map Container -->
+                        <div id="interactiveHeatmapResults">
+                            <div class="heatmap-container" style="height: 600px; position: relative; border: 2px solid var(--border-color); border-radius: 8px;">
+                                <div id="heatmapMap" style="height: 100%; width: 100%; border-radius: 6px;"></div>
+                                
+                                <!-- Map Loading Overlay -->
+                                <div class="heatmap-loading" id="heatmapLoading" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; border-radius: 6px;">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                        <p class="mt-2 mb-0">Loading interactive heatmap...</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Map Info Panel -->
+                                <div class="heatmap-info-panel" id="heatmapInfoPanel" style="position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 200px; display: none;">
+                                    <h6 class="mb-2">Position Details</h6>
+                                    <div id="heatmapInfoContent"></div>
+                                </div>
+                                
+                                <!-- Map Legend -->
+                                <div class="heatmap-legend" id="heatmapLegend" style="position: absolute; bottom: 10px; left: 10px; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                                    <small class="text-muted">
+                                        <i class="fas fa-circle text-danger"></i> High Activity
+                                        <i class="fas fa-circle text-warning ms-2"></i> Medium
+                                        <i class="fas fa-circle text-success ms-2"></i> Low
+                                    </small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2855,7 +2986,8 @@ function refreshWidget(widgetId) {
         'economy': () => loadEconomyIntelligence(filters),
         'performance': () => loadPlayerPerformance(filters),
         'first-kill': () => loadFirstKillAnalysis(filters),
-        'position': () => loadPositionAnalysis(filters)
+        'position': () => loadPositionAnalysis(filters),
+        'interactive-heatmap': () => refreshHeatmapData()
     };
     
     if (widgetFunctions[widgetId]) {
@@ -3288,6 +3420,571 @@ function arrangeMasonryLayout() {
     });
 }
 
+// Interactive Heatmap Functions
+let heatmapMap = null;
+let heatmapLayers = {};
+let heatmapData = {};
+let currentHeatmapType = 'position';
+let isHeatmapAnimating = false;
+let heatmapAnimation = null;
+
+// Map configurations for CS2 maps (coordinate transformations)
+const mapConfigs = {
+    'de_dust2': { 
+        name: 'Dust2', 
+        bounds: [[-2476, -3239], [1024, 3239]],
+        image: '/images/maps/de_dust2.jpg'
+    },
+    'de_mirage': { 
+        name: 'Mirage', 
+        bounds: [[-3230, -1713], [1024, 1713]],
+        image: '/images/maps/de_mirage.jpg'
+    },
+    'de_inferno': { 
+        name: 'Inferno', 
+        bounds: [[-2087, -3870], [1024, 3870]],
+        image: '/images/maps/de_inferno.jpg'
+    },
+    'de_ancient': { 
+        name: 'Ancient', 
+        bounds: [[-2953, -2164], [1024, 2164]],
+        image: '/images/maps/de_ancient.jpg'
+    },
+    'de_anubis': { 
+        name: 'Anubis', 
+        bounds: [[-2796, -3328], [1024, 3328]],
+        image: '/images/maps/de_anubis.jpg'
+    },
+    'de_nuke': { 
+        name: 'Nuke', 
+        bounds: [[-3453, -2887], [1024, 2887]],
+        image: '/images/maps/de_nuke.jpg'
+    }
+};
+
+// Initialize interactive heatmap
+function initializeInteractiveHeatmap() {
+    if (heatmapMap) {
+        heatmapMap.remove();
+    }
+    
+    const mapContainer = document.getElementById('heatmapMap');
+    if (!mapContainer) return;
+    
+    // Create Leaflet map with custom coordinate system
+    heatmapMap = L.map('heatmapMap', {
+        crs: L.CRS.Simple,
+        minZoom: -2,
+        maxZoom: 3,
+        zoomControl: true,
+        attributionControl: false
+    });
+    
+    // Set initial view
+    const bounds = [[-1024, -1024], [1024, 1024]];
+    heatmapMap.fitBounds(bounds);
+    
+    // Add map click handler for position analysis
+    heatmapMap.on('click', onMapClick);
+    
+    // Initialize with default map
+    const selectedMap = getSelectedMap();
+    if (selectedMap) {
+        loadMapBackground(selectedMap);
+        loadInitialHeatmapData();
+    }
+    
+    showHeatmapLoading(false);
+}
+
+// Get currently selected map from filters or heatmap controls
+function getSelectedMap() {
+    const mapSelector = document.getElementById('mapSelector');
+    const mapFromSelector = mapSelector?.value;
+    
+    if (mapFromSelector) return mapFromSelector;
+    
+    // Fallback to main analytics filters
+    const mapSelect = document.getElementById('mapSelect');
+    return mapSelect?.value || 'de_dust2'; // Default to dust2
+}
+
+// Load map background image
+function loadMapBackground(mapName) {
+    const config = mapConfigs[mapName];
+    if (!config || !heatmapMap) return;
+    
+    // Clear existing layers
+    heatmapMap.eachLayer(layer => {
+        if (layer instanceof L.ImageOverlay) {
+            heatmapMap.removeLayer(layer);
+        }
+    });
+    
+    // Add map image overlay
+    const imageOverlay = L.imageOverlay(config.image, config.bounds, {
+        opacity: 0.8,
+        interactive: false
+    }).addTo(heatmapMap);
+    
+    // Fit map to bounds
+    heatmapMap.fitBounds(config.bounds);
+    
+    // Store current map config
+    heatmapData.currentMap = mapName;
+    heatmapData.currentConfig = config;
+}
+
+// Load initial heatmap data
+async function loadInitialHeatmapData() {
+    await refreshHeatmapData();
+}
+
+// Refresh heatmap data from backend
+async function refreshHeatmapData() {
+    showHeatmapLoading(true);
+    
+    try {
+        const filters = getFilters();
+        const selectedMap = getSelectedMap();
+        
+        if (selectedMap) {
+            filters.MapName = selectedMap;
+        }
+        
+        // Load data based on current heatmap type
+        const endpoint = getHeatmapEndpoint(currentHeatmapType);
+        const params = buildQueryString(filters);
+        
+        const response = await fetch(`/api/heatmap/${endpoint}?${params}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            displayHeatmapData(data);
+            
+            // Also load analytics data for enhanced overlays
+            await loadAnalyticsOverlay(filters);
+        } else {
+            showHeatmapError('Failed to load heatmap data');
+        }
+        
+    } catch (error) {
+        console.error('Heatmap data load error:', error);
+        showHeatmapError('Error loading heatmap data');
+    } finally {
+        showHeatmapLoading(false);
+    }
+}
+
+// Get appropriate heatmap endpoint for data type
+function getHeatmapEndpoint(type) {
+    const endpoints = {
+        'position': 'player-positions',
+        'kills': 'deaths', // Backend uses 'deaths' for kill locations
+        'deaths': 'deaths',
+        'utility': 'utility',
+        'clutch': 'player-positions', // Use position data filtered by clutch situations
+        'first-kills': 'deaths' // Use death/kill data filtered by first kills
+    };
+    
+    return endpoints[type] || 'player-positions';
+}
+
+// Display heatmap data on the map
+function displayHeatmapData(data) {
+    if (!heatmapMap || !data.points || data.points.length === 0) {
+        return;
+    }
+    
+    // Clear existing heatmap layers
+    clearHeatmapLayers();
+    
+    // Convert backend coordinates to Leaflet coordinates
+    const heatPoints = data.points.map(point => [
+        transformY(point.y),
+        transformX(point.x),
+        point.intensity || 1
+    ]);
+    
+    // Create heatmap layer
+    const heatLayer = L.heatLayer(heatPoints, {
+        radius: parseInt(document.getElementById('heatmapRadius')?.value || 20),
+        blur: 15,
+        maxZoom: 3,
+        max: parseFloat(document.getElementById('heatmapIntensity')?.value || 1),
+        gradient: getHeatmapGradient(currentHeatmapType)
+    }).addTo(heatmapMap);
+    
+    heatmapLayers.heat = heatLayer;
+    
+    // Add individual markers for detailed information
+    addDetailMarkers(data.points);
+    
+    // Update info panel
+    updateHeatmapStats(data);
+}
+
+// Load analytics overlay data
+async function loadAnalyticsOverlay(filters) {
+    try {
+        // Load clutch data for overlay
+        if (currentHeatmapType === 'clutch') {
+            const clutchParams = buildQueryString(filters);
+            const clutchResponse = await fetch(`/api/advanced-analytics/clutch-analysis?${clutchParams}`);
+            
+            if (clutchResponse.ok) {
+                const clutchData = await clutchResponse.json();
+                addClutchOverlay(clutchData.Data);
+            }
+        }
+        
+        // Load first kill data for overlay
+        if (currentHeatmapType === 'first-kills') {
+            const firstKillParams = buildQueryString(filters);
+            const firstKillResponse = await fetch(`/api/advanced-analytics/first-kill-impact?${firstKillParams}`);
+            
+            if (firstKillResponse.ok) {
+                const firstKillData = await firstKillResponse.json();
+                addFirstKillOverlay(firstKillData.Data);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Analytics overlay load error:', error);
+    }
+}
+
+// Add clutch situation overlay
+function addClutchOverlay(clutchData) {
+    if (!clutchData || clutchData.length === 0) return;
+    
+    // Create clutch markers showing success rates
+    clutchData.forEach(clutch => {
+        if (clutch.ClutchPlayer && clutch.ClutchSuccessRate) {
+            const successRate = parseFloat(clutch.ClutchSuccessRate);
+            const color = successRate > 50 ? '#28a745' : successRate > 25 ? '#ffc107' : '#dc3545';
+            
+            // Add a hypothetical clutch position marker (would need actual position data)
+            // This is a placeholder - real implementation would need position coordinates
+            const marker = L.circleMarker([0, 0], {
+                radius: 8,
+                fillColor: color,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.7
+            }).addTo(heatmapMap);
+            
+            marker.bindPopup(`
+                <strong>${clutch.ClutchPlayer}</strong><br>
+                Success Rate: ${successRate}%<br>
+                Attempts: ${clutch.ClutchAttempts}<br>
+                Wins: ${clutch.ClutchWins}
+            `);
+            
+            if (!heatmapLayers.clutch) heatmapLayers.clutch = [];
+            heatmapLayers.clutch.push(marker);
+        }
+    });
+}
+
+// Add first kill impact overlay
+function addFirstKillOverlay(firstKillData) {
+    if (!firstKillData || firstKillData.length === 0) return;
+    
+    // Similar to clutch overlay but for first kill impacts
+    // Implementation would depend on available position data
+}
+
+// Transform coordinate systems
+function transformX(gameX) {
+    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
+    return (gameX - config.bounds[0][0]) / (config.bounds[1][0] - config.bounds[0][0]) * 1024 - 512;
+}
+
+function transformY(gameY) {
+    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
+    return (gameY - config.bounds[0][1]) / (config.bounds[1][1] - config.bounds[0][1]) * 1024 - 512;
+}
+
+// Get color gradient for heatmap type
+function getHeatmapGradient(type) {
+    const gradients = {
+        'position': {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1.0: 'red'},
+        'kills': {0.4: 'purple', 0.6: 'red', 0.7: 'orange', 0.8: 'yellow', 1.0: 'white'},
+        'deaths': {0.4: 'darkblue', 0.6: 'blue', 0.7: 'cyan', 0.8: 'lime', 1.0: 'red'},
+        'utility': {0.4: 'green', 0.6: 'lime', 0.7: 'yellow', 0.8: 'orange', 1.0: 'red'},
+        'clutch': {0.4: 'gold', 0.6: 'orange', 0.7: 'red', 0.8: 'purple', 1.0: 'white'},
+        'first-kills': {0.4: 'darkgreen', 0.6: 'green', 0.7: 'lime', 0.8: 'yellow', 1.0: 'gold'}
+    };
+    
+    return gradients[type] || gradients['position'];
+}
+
+// Add detail markers for click interactions
+function addDetailMarkers(points) {
+    if (!points || points.length === 0) return;
+    
+    // Sample a subset of points for performance
+    const sampleSize = Math.min(points.length, 50);
+    const sampledPoints = points.slice(0, sampleSize);
+    
+    sampledPoints.forEach((point, index) => {
+        const marker = L.circleMarker([transformY(point.y), transformX(point.x)], {
+            radius: 3,
+            fillColor: 'rgba(255,255,255,0.7)',
+            color: '#333',
+            weight: 1,
+            opacity: 0.8,
+            fillOpacity: 0.6
+        });
+        
+        marker.on('click', () => showPointDetails(point));
+        
+        if (!heatmapLayers.markers) heatmapLayers.markers = [];
+        heatmapLayers.markers.push(marker);
+        
+        // Only add to map if markers layer is enabled
+        if (document.getElementById('layerRounds')?.checked) {
+            marker.addTo(heatmapMap);
+        }
+    });
+}
+
+// Clear all heatmap layers
+function clearHeatmapLayers() {
+    Object.keys(heatmapLayers).forEach(layerKey => {
+        const layer = heatmapLayers[layerKey];
+        if (Array.isArray(layer)) {
+            layer.forEach(l => heatmapMap.removeLayer(l));
+        } else if (layer) {
+            heatmapMap.removeLayer(layer);
+        }
+    });
+    heatmapLayers = {};
+}
+
+// Map click handler for position analysis
+function onMapClick(e) {
+    const latlng = e.latlng;
+    showPositionAnalysis(latlng.lng, latlng.lat);
+}
+
+// Show analysis for clicked position
+function showPositionAnalysis(x, y) {
+    const panel = document.getElementById('heatmapInfoPanel');
+    const content = document.getElementById('heatmapInfoContent');
+    
+    if (!panel || !content) return;
+    
+    // Convert coordinates back to game coordinates
+    const gameX = reverseTransformX(x);
+    const gameY = reverseTransformY(y);
+    
+    content.innerHTML = `
+        <div class="small">
+            <strong>Position:</strong> (${Math.round(gameX)}, ${Math.round(gameY)})<br>
+            <strong>Map:</strong> ${heatmapData.currentMap}<br>
+            <strong>Type:</strong> ${currentHeatmapType}<br>
+            <hr class="my-2">
+            <em>Loading detailed analysis...</em>
+        </div>
+    `;
+    
+    panel.style.display = 'block';
+    
+    // Load detailed analytics for this position
+    loadPositionAnalytics(gameX, gameY);
+}
+
+// Load analytics for specific position
+async function loadPositionAnalytics(x, y) {
+    try {
+        const filters = getFilters();
+        filters.MapName = getSelectedMap();
+        
+        // Add position-based filtering (if backend supports it)
+        const params = buildQueryString(filters);
+        
+        // For now, show general stats - could be enhanced with position-specific queries
+        const content = document.getElementById('heatmapInfoContent');
+        content.innerHTML = `
+            <div class="small">
+                <strong>Position:</strong> (${Math.round(x)}, ${Math.round(y)})<br>
+                <strong>Map:</strong> ${heatmapData.currentMap}<br>
+                <strong>Type:</strong> ${currentHeatmapType}<br>
+                <hr class="my-2">
+                <div class="text-muted">
+                    Click elsewhere to analyze different positions<br>
+                    <small>Position-specific analytics coming soon</small>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Position analytics error:', error);
+    }
+}
+
+// Reverse coordinate transforms
+function reverseTransformX(leafletX) {
+    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
+    return ((leafletX + 512) / 1024) * (config.bounds[1][0] - config.bounds[0][0]) + config.bounds[0][0];
+}
+
+function reverseTransformY(leafletY) {
+    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
+    return ((leafletY + 512) / 1024) * (config.bounds[1][1] - config.bounds[0][1]) + config.bounds[0][1];
+}
+
+// Update heatmap statistics panel
+function updateHeatmapStats(data) {
+    const legend = document.getElementById('heatmapLegend');
+    if (!legend || !data.stats) return;
+    
+    legend.innerHTML = `
+        <small class="text-muted">
+            <strong>${data.stats.totalPoints || 0}</strong> data points<br>
+            <i class="fas fa-circle text-danger"></i> High Activity
+            <i class="fas fa-circle text-warning ms-2"></i> Medium
+            <i class="fas fa-circle text-success ms-2"></i> Low
+        </small>
+    `;
+}
+
+// Heatmap control functions
+function changeHeatmapType(type) {
+    currentHeatmapType = type;
+    
+    // Update dropdown UI
+    const dropdown = document.getElementById('heatmapTypeDropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        dropdown.querySelector(`[onclick="changeHeatmapType('${type}')"]`)?.classList.add('active');
+    }
+    
+    // Refresh data with new type
+    refreshHeatmapData();
+}
+
+function changeHeatmapMap() {
+    const selectedMap = getSelectedMap();
+    if (selectedMap) {
+        loadMapBackground(selectedMap);
+        refreshHeatmapData();
+    }
+}
+
+function updateHeatmapIntensity() {
+    const intensity = parseFloat(document.getElementById('heatmapIntensity')?.value || 1);
+    if (heatmapLayers.heat) {
+        heatmapLayers.heat.setOptions({max: intensity});
+    }
+}
+
+function updateHeatmapRadius() {
+    const radius = parseInt(document.getElementById('heatmapRadius')?.value || 20);
+    if (heatmapLayers.heat) {
+        heatmapLayers.heat.setOptions({radius: radius});
+    }
+}
+
+function toggleLayer(layerType) {
+    const isEnabled = document.getElementById(`layer${layerType.charAt(0).toUpperCase() + layerType.slice(1)}`)?.checked;
+    
+    if (layerType === 'rounds' && heatmapLayers.markers) {
+        heatmapLayers.markers.forEach(marker => {
+            if (isEnabled) {
+                marker.addTo(heatmapMap);
+            } else {
+                heatmapMap.removeLayer(marker);
+            }
+        });
+    }
+}
+
+function toggleHeatmapLayers() {
+    // Toggle all layers on/off
+    const layerControls = ['layerTeams', 'layerRounds', 'layerTime'];
+    const allEnabled = layerControls.every(id => document.getElementById(id)?.checked);
+    
+    layerControls.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) {
+            checkbox.checked = !allEnabled;
+            checkbox.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
+function toggleHeatmapAnimation() {
+    if (isHeatmapAnimating) {
+        stopHeatmapAnimation();
+    } else {
+        startHeatmapAnimation();
+    }
+}
+
+function startHeatmapAnimation() {
+    if (!heatmapData.currentMap) return;
+    
+    isHeatmapAnimating = true;
+    const button = document.querySelector('[onclick="toggleHeatmapAnimation()"]');
+    if (button) {
+        button.innerHTML = '<i class="fas fa-stop me-2"></i>Stop';
+        button.classList.add('btn-outline-danger');
+        button.classList.remove('btn-outline-success');
+    }
+    
+    // Implement timeline animation (placeholder)
+    console.log('Starting heatmap animation...');
+}
+
+function stopHeatmapAnimation() {
+    isHeatmapAnimating = false;
+    const button = document.querySelector('[onclick="toggleHeatmapAnimation()"]');
+    if (button) {
+        button.innerHTML = '<i class="fas fa-play me-2"></i>Timeline';
+        button.classList.remove('btn-outline-danger');
+        button.classList.add('btn-outline-success');
+    }
+    
+    if (heatmapAnimation) {
+        clearInterval(heatmapAnimation);
+        heatmapAnimation = null;
+    }
+}
+
+function exportHeatmapImage() {
+    if (!heatmapMap) return;
+    
+    // Use Leaflet's built-in screenshot capability
+    showNotification('Heatmap image export feature coming soon!', 'info');
+}
+
+function showHeatmapLoading(show) {
+    const loading = document.getElementById('heatmapLoading');
+    if (loading) {
+        loading.style.display = show ? 'flex' : 'none';
+    }
+}
+
+function showHeatmapError(message) {
+    const container = document.getElementById('interactiveHeatmapResults');
+    if (container) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger';
+        errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>${message}`;
+        container.appendChild(errorDiv);
+    }
+}
+
+function showPointDetails(point) {
+    console.log('Point details:', point);
+    // Implement detailed point information modal
+}
+
 // Initialize interactive features when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     loadDropdownData();
@@ -3301,6 +3998,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (dashboardLayout.style !== 'tabs') {
         document.getElementById('layoutStyle').value = dashboardLayout.style;
         applyLayoutStyle();
+    }
+    
+    // Initialize interactive heatmap when its tab becomes active
+    document.addEventListener('shown.bs.tab', function(e) {
+        if (e.target.id === 'interactive-heatmap-tab') {
+            setTimeout(() => {
+                initializeInteractiveHeatmap();
+            }, 100);
+        }
+    });
+    
+    // Also initialize if heatmap tab is already active on page load
+    const heatmapTab = document.getElementById('interactive-heatmap-tab');
+    if (heatmapTab && heatmapTab.classList.contains('active')) {
+        setTimeout(() => {
+            initializeInteractiveHeatmap();
+        }, 500);
     }
     
     // Add auto-refresh toggle button

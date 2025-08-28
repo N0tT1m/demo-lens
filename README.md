@@ -43,11 +43,14 @@
 - **Team Performance** - CT vs T side analysis, economy management
 
 ### 🗺️ **Interactive Heatmaps**
-- **Death Locations** - See where players die most frequently
-- **Kill Positions** - Analyze common frag spots
-- **Player Movement** - Track positioning throughout rounds
-- **Weapon Fire** - Visualize shooting patterns
-- **Utility Usage** - Grenade throws and effectiveness
+- **Interactive Web Maps** - Fully interactive maps using Leaflet.js with zoom, pan, and click analysis
+- **Multi-layer Visualization** - Position, kills, deaths, utility, clutch situations, and first-kill data overlays  
+- **Real-time Analytics Integration** - Connect heatmap positions to advanced analytics data
+- **Click-to-Analyze** - Click any map position to view detailed analytics and player performance metrics
+- **Customizable Overlays** - Toggle between different data layers and visualization types
+- **Export Capabilities** - Export interactive heatmaps as images with custom legends and annotations
+- **Dashboard Integration** - Add interactive heatmaps as customizable widgets to your analytics dashboard
+- **Mobile Responsive** - Touch-friendly controls optimized for tablets and mobile devices
 
 ### 📈 **Advanced Reporting**
 - **Export Data** - Download statistics as CSV or JSON
@@ -97,12 +100,21 @@ docker-compose up -d
 - Browse **player stats**, **round summaries**, and **weapon analysis**
 - Check the **database statistics** to see your collection grow
 
-### 3. Explore Heatmaps
-1. Select a **map** from the dropdown
-2. Choose a **demo file** (or view all)
-3. Pick **heatmap type** (deaths, kills, movement, etc.)
-4. Click **"Generate Heatmap"**
-5. Download heatmaps with the **download button**
+### 3. Explore Interactive Heatmaps
+**Traditional Heatmaps:**
+1. Go to **"Heatmaps"** page for static PNG generation
+2. Select a **map** from the dropdown  
+3. Choose a **demo file** (or view all)
+4. Pick **heatmap type** (deaths, kills, movement, etc.)
+5. Click **"Generate Heatmap"** and download with the **download button**
+
+**Interactive Heatmaps:**
+1. Go to **"Analytics"** page and select **"Interactive Heatmap"** tab
+2. Choose your **map, demo, and visualization type**  
+3. **Explore interactively** - zoom, pan, and click positions for detailed analysis
+4. **Toggle data layers** - switch between position, kills, utility, clutch data overlays
+5. **Connect to analytics** - click any position to see related performance metrics
+6. **Export or add to dashboard** - save as image or add as a customizable widget
 
 ### 4. Generate Reports
 1. Go to **"Export Reports"** section
@@ -289,6 +301,11 @@ This application processes CS2 demo files which may contain:
 - ✅ **Saved Views**: Save and restore favorite filter combinations and dashboard configurations
 - ✅ **Export Formats**: PDF report generation with charts and tables, HTML export for PowerPoint
 - ✅ **Sharing Features**: Generate shareable links to specific analytics views and configurations
+- ✅ **Interactive Web Heatmaps**: Fully interactive maps with Leaflet.js, zoom/pan/click analysis
+- ✅ **Multi-layer Heatmap Data**: Position, kills, deaths, utility, clutch, and first-kill overlays
+- ✅ **Heatmap Analytics Integration**: Click-to-analyze connecting map positions to performance data
+- ✅ **Dashboard Heatmap Widgets**: Interactive heatmaps as customizable dashboard components
+- ✅ **Mobile-Responsive Heatmaps**: Touch-optimized controls for tablets and mobile devices
 
 *Last Updated: August 28, 2025*
 

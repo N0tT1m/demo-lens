@@ -891,4 +891,322 @@ html {
 
 [data-theme="dark"] .export-dropdown .dropdown-item:hover {
   background: linear-gradient(90deg, var(--accent-color), rgba(99, 102, 241, 0.6));
+}
+
+/* Interactive Heatmap Styles */
+
+/* Heatmap Container */
+.heatmap-container {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px var(--shadow);
+  background: var(--card-bg);
+  position: relative;
+}
+
+.heatmap-container .leaflet-container {
+  background: #1a1a1a;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .heatmap-container .leaflet-container {
+  background: #2d2d2d;
+}
+
+/* Heatmap Controls */
+.heatmap-controls {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.heatmap-controls .form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.25rem;
+}
+
+.heatmap-controls .form-range {
+  accent-color: var(--accent-color);
+}
+
+.heatmap-controls .btn-group .btn {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
+}
+
+/* Heatmap Info Panel */
+.heatmap-info-panel {
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .heatmap-info-panel {
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.heatmap-info-panel h6 {
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+/* Heatmap Legend */
+.heatmap-legend {
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .heatmap-legend {
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+/* Heatmap Loading Overlay */
+.heatmap-loading {
+  backdrop-filter: blur(5px);
+}
+
+[data-theme="dark"] .heatmap-loading {
+  background: rgba(30, 30, 30, 0.9) !important;
+  color: var(--text-color);
+}
+
+/* Leaflet Control Customizations */
+.leaflet-control-container .leaflet-control {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .leaflet-control-container .leaflet-control {
+  background: rgba(30, 30, 30, 0.9);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.leaflet-control-zoom a {
+  color: var(--text-color);
+  text-decoration: none;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+/* Heatmap Popup Customizations */
+.leaflet-popup-content-wrapper {
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 25px var(--shadow);
+  border: 1px solid var(--border-color);
+}
+
+.leaflet-popup-tip {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px;
+  font-size: 0.875rem;
+}
+
+.leaflet-popup-content strong {
+  color: var(--accent-color);
+}
+
+/* Heatmap Type Dropdown */
+#heatmapTypeDropdown .dropdown-item {
+  transition: all 0.2s ease;
+}
+
+#heatmapTypeDropdown .dropdown-item:hover {
+  background: linear-gradient(90deg, var(--accent-color), rgba(99, 102, 241, 0.8));
+  color: white;
+  transform: translateX(3px);
+}
+
+#heatmapTypeDropdown .dropdown-item.active {
+  background: var(--accent-color);
+  color: white;
+  font-weight: 600;
+}
+
+/* Layer Toggle Buttons */
+.heatmap-controls .btn-check:checked + .btn-outline-primary {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: white;
+}
+
+.heatmap-controls .btn-check:checked + .btn-outline-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: white;
+}
+
+.heatmap-controls .btn-check:checked + .btn-outline-success {
+  background-color: #198754;
+  border-color: #198754;
+  color: white;
+}
+
+/* Heatmap Animation Controls */
+.heatmap-controls .btn-outline-success {
+  border-color: #198754;
+  color: #198754;
+}
+
+.heatmap-controls .btn-outline-success:hover {
+  background-color: #198754;
+  border-color: #198754;
+  color: white;
+}
+
+.heatmap-controls .btn-outline-danger {
+  border-color: #dc3545;
+  color: #dc3545;
+  animation: pulse 1s infinite;
+}
+
+.heatmap-controls .btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+/* Widget Size Specific Styles */
+.widget-size-compact .heatmap-container {
+  height: 300px !important;
+}
+
+.widget-size-large .heatmap-container {
+  height: 800px !important;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .heatmap-container {
+    height: 400px !important;
+  }
+  
+  .heatmap-controls {
+    padding: 0.75rem;
+  }
+  
+  .heatmap-controls .col-md-3,
+  .heatmap-controls .col-md-2 {
+    margin-bottom: 0.75rem;
+  }
+  
+  .heatmap-info-panel {
+    position: static !important;
+    margin-top: 1rem;
+    width: 100% !important;
+    min-width: auto !important;
+  }
+  
+  .heatmap-legend {
+    position: static !important;
+    margin-top: 0.5rem;
+    text-align: center;
+  }
+  
+  #heatmapTypeDropdown .dropdown-menu {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+}
+
+/* Leaflet Heatmap Layer Customizations */
+.leaflet-heatmap-layer {
+  mix-blend-mode: multiply;
+}
+
+[data-theme="dark"] .leaflet-heatmap-layer {
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+
+/* Map Marker Styles */
+.heatmap-marker {
+  transition: all 0.3s ease;
+}
+
+.heatmap-marker:hover {
+  transform: scale(1.2);
+  z-index: 1000;
+}
+
+/* Custom Scrollbar for Mobile Dropdowns */
+#heatmapTypeDropdown .dropdown-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+#heatmapTypeDropdown .dropdown-menu::-webkit-scrollbar-track {
+  background: var(--border-color);
+}
+
+#heatmapTypeDropdown .dropdown-menu::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 2px;
+}
+
+/* Loading State Animations */
+.heatmap-loading .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  border-width: 0.3rem;
+}
+
+/* Success/Error State Indicators */
+.heatmap-success-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(40, 167, 69, 0.9);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  animation: fadeInOut 3s ease-in-out;
+}
+
+.heatmap-error-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(220, 53, 69, 0.9);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; }
+  20%, 80% { opacity: 1; }
+}
+
+/* Integration with Dashboard Grid */
+.sortable-widget .heatmap-container {
+  height: 400px;
+}
+
+.sortable-widget.col-12 .heatmap-container {
+  height: 600px;
+}
+
+.sortable-widget.col-md-4 .heatmap-container {
+  height: 300px;
 }}
