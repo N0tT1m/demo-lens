@@ -848,9 +848,14 @@
                                         <label class="btn btn-outline-success btn-sm" for="layerTime">Timeline</label>
                                     </div>
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <button class="btn btn-primary btn-sm w-100" onclick="refreshHeatmapData()">
                                         <i class="fas fa-sync-alt me-1"></i>Refresh
+                                    </button>
+                                </div>
+                                <div class="col-md-1">
+                                    <button class="btn btn-outline-secondary btn-sm w-100" onclick="showDemoData()" title="Show demo data">
+                                        <i class="fas fa-eye me-1"></i>Demo
                                     </button>
                                 </div>
                             </div>
@@ -3504,9 +3509,8 @@ function initializeInteractiveHeatmap() {
             attributionControl: false
         });
         
-        // Set initial view
-        const bounds = [[-1024, -1024], [1024, 1024]];
-        heatmapMap.fitBounds(bounds);
+        // Set initial view (will be overridden when map background loads)
+        heatmapMap.setView([0, 0], -1);
         
         // Add map click handler for position analysis
         heatmapMap.on('click', onMapClick);
@@ -3602,6 +3606,12 @@ async function loadInitialHeatmapData() {
 async function refreshHeatmapData() {
     showHeatmapLoading(true);
     
+    // Clear any existing error/info messages
+    const container = document.getElementById('interactiveHeatmapResults');
+    if (container) {
+        container.querySelectorAll('.alert-danger, .alert-info').forEach(el => el.remove());
+    }
+    
     try {
         const filters = getFilters();
         const selectedMap = getSelectedMap();
@@ -3641,7 +3651,16 @@ async function refreshHeatmapData() {
         } else {
             const errorText = await response.text();
             console.error('Heatmap API error:', response.status, errorText);
-            showHeatmapError(`Failed to load heatmap data (${response.status}): ${errorText}`);
+            
+            // If it's a 500 error (likely database connection issue), show demo data
+            if (response.status === 500 && errorText.includes('generating player position heatmap')) {
+                console.log('Database unavailable, showing demo data');
+                displayDemoHeatmapData(selectedMap);
+                updateHeatmapStats({ totalPoints: 50 });
+                showHeatmapInfo('Demo Mode: Showing sample data (database unavailable)');
+            } else {
+                showHeatmapError(`Failed to load heatmap data (${response.status}): ${errorText}`);
+            }
         }
         
     } catch (error) {
@@ -4186,6 +4205,62 @@ function showHeatmapError(message) {
         errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>${message}`;
         container.appendChild(errorDiv);
     }
+}
+
+function showHeatmapInfo(message) {
+    const container = document.getElementById('interactiveHeatmapResults');
+    if (container) {
+        // Remove existing info messages
+        const existingInfo = container.querySelectorAll('.alert-info');
+        existingInfo.forEach(el => el.remove());
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'alert alert-info';
+        infoDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>${message}`;
+        container.appendChild(infoDiv);
+    }
+}
+
+function displayDemoHeatmapData(mapName) {
+    if (!heatmapMap) return;
+    
+    const config = mapConfigs[mapName] || mapConfigs['de_dust2'];
+    
+    // Clear existing layers
+    clearHeatmapLayers();
+    
+    // Generate sample data points within map bounds
+    const sampleData = [];
+    for (let i = 0; i < 50; i++) {
+        const gameX = config.bounds[0][0] + Math.random() * (config.bounds[1][0] - config.bounds[0][0]);
+        const gameY = config.bounds[0][1] + Math.random() * (config.bounds[1][1] - config.bounds[0][1]);
+        
+        sampleData.push([
+            transformY(gameY),
+            transformX(gameX),
+            Math.random()
+        ]);
+    }
+    
+    // Create heatmap layer
+    const heatLayer = L.heatLayer(sampleData, {
+        radius: parseInt(document.getElementById('heatmapRadius')?.value || 20),
+        blur: 15,
+        maxZoom: 3,
+        max: parseFloat(document.getElementById('heatmapIntensity')?.value || 1),
+        gradient: getHeatmapGradient(currentHeatmapType)
+    }).addTo(heatmapMap);
+    
+    heatmapLayers.heat = heatLayer;
+    
+    console.log('Demo heatmap data displayed with', sampleData.length, 'points');
+}
+
+function showDemoData() {
+    const selectedMap = getSelectedMap();
+    displayDemoHeatmapData(selectedMap);
+    updateHeatmapStats({ totalPoints: 50 });
+    showHeatmapInfo('Demo Mode: Showing sample heatmap data');
 }
 
 function showPointDetails(point) {
