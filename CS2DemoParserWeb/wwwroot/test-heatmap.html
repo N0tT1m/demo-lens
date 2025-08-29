@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Interactive Heatmap</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.min.js"></script>
+    <style>
+        #testMap {
+            height: 600px;
+            width: 800px;
+            border: 2px solid #ccc;
+            margin: 20px;
+        }
+        .controls {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>CS2 Interactive Heatmap Test</h1>
+    <div class="controls">
+        <label for="mapSelect">Map: </label>
+        <select id="mapSelect" onchange="changeMap()">
+            <option value="de_dust2">de_dust2</option>
+            <option value="de_mirage">de_mirage</option>
+            <option value="de_inferno">de_inferno</option>
+            <option value="de_ancient">de_ancient</option>
+            <option value="de_anubis">de_anubis</option>
+            <option value="de_nuke">de_nuke</option>
+            <option value="de_vertigo">de_vertigo</option>
+        </select>
+        <button onclick="generateSampleData()">Generate Sample Data</button>
+    </div>
+    <div id="testMap"></div>
+    <div id="info"></div>
+
+    <script>
+        // Map configurations for CS2 maps
+        const mapConfigs = {
+            'de_dust2': { 
+                name: 'Dust2', 
+                bounds: [[-2476, -3239], [1024, 3239]],
+                image: '/maps/de_dust2.png'
+            },
+            'de_mirage': { 
+                name: 'Mirage', 
+                bounds: [[-3230, -1713], [1024, 1713]],
+                image: '/maps/de_mirage.png'
+            },
+            'de_inferno': { 
+                name: 'Inferno', 
+                bounds: [[-2087, -3870], [1024, 3870]],
+                image: '/maps/de_inferno.png'
+            },
+            'de_ancient': { 
+                name: 'Ancient', 
+                bounds: [[-2953, -2164], [1024, 2164]],
+                image: '/maps/de_ancient.png'
+            },
+            'de_anubis': { 
+                name: 'Anubis', 
+                bounds: [[-2796, -3328], [1024, 3328]],
+                image: '/maps/de_anubis.png'
+            },
+            'de_nuke': { 
+                name: 'Nuke', 
+                bounds: [[-3453, -2887], [1024, 2887]],
+                image: '/maps/de_nuke.png'
+            },
+            'de_vertigo': { 
+                name: 'Vertigo', 
+                bounds: [[-3168, -2304], [1152, 2304]],
+                image: '/maps/de_vertigo.png'
+            }
+        };
+
+        let testMap = null;
+        let currentHeatLayer = null;
+
+        function initMap() {
+            if (testMap) {
+                testMap.remove();
+            }
+            
+            testMap = L.map('testMap', {
+                crs: L.CRS.Simple,
+                minZoom: -2,
+                maxZoom: 3,
+                zoomControl: true,
+                attributionControl: false
+            });
+
+            // Load default map
+            changeMap();
+            
+            console.log('Map initialized successfully');
+            document.getElementById('info').innerHTML = 'Map initialized successfully';
+        }
+
+        function changeMap() {
+            const selectedMap = document.getElementById('mapSelect').value;
+            const config = mapConfigs[selectedMap];
+            
+            if (!config || !testMap) return;
+            
+            console.log('Loading map:', selectedMap, config.image);
+            
+            // Clear existing layers
+            testMap.eachLayer(layer => {
+                testMap.removeLayer(layer);
+            });
+            
+            // Add map image overlay
+            const imageOverlay = L.imageOverlay(config.image, config.bounds, {
+                opacity: 0.8,
+                interactive: false
+            });
+            
+            imageOverlay.on('load', function() {
+                console.log('Map image loaded successfully:', selectedMap);
+                document.getElementById('info').innerHTML = `Map ${selectedMap} loaded successfully!`;
+            });
+            
+            imageOverlay.on('error', function() {
+                console.error('Failed to load map image:', config.image);
+                document.getElementById('info').innerHTML = `Failed to load map image: ${selectedMap}`;
+            });
+            
+            imageOverlay.addTo(testMap);
+            
+            // Fit map to bounds
+            testMap.fitBounds(config.bounds);
+        }
+
+        function transformX(gameX, config) {
+            return (gameX - config.bounds[0][0]) / (config.bounds[1][0] - config.bounds[0][0]) * 1024 - 512;
+        }
+
+        function transformY(gameY, config) {
+            return (gameY - config.bounds[0][1]) / (config.bounds[1][1] - config.bounds[0][1]) * 1024 - 512;
+        }
+
+        function generateSampleData() {
+            const selectedMap = document.getElementById('mapSelect').value;
+            const config = mapConfigs[selectedMap];
+            
+            // Clear existing heat layer
+            if (currentHeatLayer) {
+                testMap.removeLayer(currentHeatLayer);
+            }
+            
+            // Generate sample data points within map bounds
+            const sampleData = [];
+            for (let i = 0; i < 50; i++) {
+                const gameX = config.bounds[0][0] + Math.random() * (config.bounds[1][0] - config.bounds[0][0]);
+                const gameY = config.bounds[0][1] + Math.random() * (config.bounds[1][1] - config.bounds[0][1]);
+                
+                sampleData.push([
+                    transformY(gameY, config),
+                    transformX(gameX, config),
+                    Math.random()
+                ]);
+            }
+            
+            // Create heatmap layer
+            currentHeatLayer = L.heatLayer(sampleData, {
+                radius: 25,
+                blur: 15,
+                maxZoom: 17,
+            }).addTo(testMap);
+            
+            console.log('Sample heatmap data generated');
+            document.getElementById('info').innerHTML = `Generated ${sampleData.length} sample data points for ${selectedMap}`;
+        }
+
+        // Initialize when page loads
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>

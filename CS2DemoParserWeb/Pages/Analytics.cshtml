@@ -3434,68 +3434,101 @@ const mapConfigs = {
     'de_dust2': { 
         name: 'Dust2', 
         bounds: [[-2476, -3239], [1024, 3239]],
-        image: '/images/maps/de_dust2.jpg'
+        image: '/maps/de_dust2.png'
     },
     'de_mirage': { 
         name: 'Mirage', 
         bounds: [[-3230, -1713], [1024, 1713]],
-        image: '/images/maps/de_mirage.jpg'
+        image: '/maps/de_mirage.png'
     },
     'de_inferno': { 
         name: 'Inferno', 
         bounds: [[-2087, -3870], [1024, 3870]],
-        image: '/images/maps/de_inferno.jpg'
+        image: '/maps/de_inferno.png'
     },
     'de_ancient': { 
         name: 'Ancient', 
         bounds: [[-2953, -2164], [1024, 2164]],
-        image: '/images/maps/de_ancient.jpg'
+        image: '/maps/de_ancient.png'
     },
     'de_anubis': { 
         name: 'Anubis', 
         bounds: [[-2796, -3328], [1024, 3328]],
-        image: '/images/maps/de_anubis.jpg'
+        image: '/maps/de_anubis.png'
     },
     'de_nuke': { 
         name: 'Nuke', 
         bounds: [[-3453, -2887], [1024, 2887]],
-        image: '/images/maps/de_nuke.jpg'
+        image: '/maps/de_nuke.png'
+    },
+    'de_vertigo': { 
+        name: 'Vertigo', 
+        bounds: [[-3168, -2304], [1152, 2304]],
+        image: '/maps/de_vertigo.png'
+    },
+    'de_overpass': { 
+        name: 'Overpass', 
+        bounds: [[-4831, -3699], [1024, 3699]],
+        image: '/maps/de_overpass.png'
+    },
+    'de_train': { 
+        name: 'Train', 
+        bounds: [[-2477, -2208], [1024, 2208]],
+        image: '/maps/de_train.png'
     }
 };
 
 // Initialize interactive heatmap
 function initializeInteractiveHeatmap() {
-    if (heatmapMap) {
-        heatmapMap.remove();
+    try {
+        if (heatmapMap) {
+            heatmapMap.remove();
+            heatmapMap = null;
+        }
+        
+        const mapContainer = document.getElementById('heatmapMap');
+        if (!mapContainer) {
+            console.error('Heatmap container not found');
+            return;
+        }
+        
+        // Clear the container
+        mapContainer.innerHTML = '';
+        
+        // Create Leaflet map with custom coordinate system
+        heatmapMap = L.map('heatmapMap', {
+            crs: L.CRS.Simple,
+            minZoom: -2,
+            maxZoom: 3,
+            zoomControl: true,
+            attributionControl: false
+        });
+        
+        // Set initial view
+        const bounds = [[-1024, -1024], [1024, 1024]];
+        heatmapMap.fitBounds(bounds);
+        
+        // Add map click handler for position analysis
+        heatmapMap.on('click', onMapClick);
+        
+        // Initialize with default map
+        const selectedMap = getSelectedMap();
+        console.log('Initializing heatmap with map:', selectedMap);
+        
+        if (selectedMap && mapConfigs[selectedMap]) {
+            loadMapBackground(selectedMap);
+            loadInitialHeatmapData();
+        } else {
+            // Default to dust2 if no valid map selected
+            loadMapBackground('de_dust2');
+            loadInitialHeatmapData();
+        }
+        
+        showHeatmapLoading(false);
+    } catch (error) {
+        console.error('Error initializing interactive heatmap:', error);
+        showHeatmapError('Failed to initialize interactive heatmap: ' + error.message);
     }
-    
-    const mapContainer = document.getElementById('heatmapMap');
-    if (!mapContainer) return;
-    
-    // Create Leaflet map with custom coordinate system
-    heatmapMap = L.map('heatmapMap', {
-        crs: L.CRS.Simple,
-        minZoom: -2,
-        maxZoom: 3,
-        zoomControl: true,
-        attributionControl: false
-    });
-    
-    // Set initial view
-    const bounds = [[-1024, -1024], [1024, 1024]];
-    heatmapMap.fitBounds(bounds);
-    
-    // Add map click handler for position analysis
-    heatmapMap.on('click', onMapClick);
-    
-    // Initialize with default map
-    const selectedMap = getSelectedMap();
-    if (selectedMap) {
-        loadMapBackground(selectedMap);
-        loadInitialHeatmapData();
-    }
-    
-    showHeatmapLoading(false);
 }
 
 // Get currently selected map from filters or heatmap controls
@@ -3513,27 +3546,51 @@ function getSelectedMap() {
 // Load map background image
 function loadMapBackground(mapName) {
     const config = mapConfigs[mapName];
-    if (!config || !heatmapMap) return;
+    if (!config || !heatmapMap) {
+        console.error('Cannot load map background - config or heatmapMap missing:', { mapName, config, heatmapMap });
+        return;
+    }
     
-    // Clear existing layers
-    heatmapMap.eachLayer(layer => {
-        if (layer instanceof L.ImageOverlay) {
-            heatmapMap.removeLayer(layer);
-        }
-    });
-    
-    // Add map image overlay
-    const imageOverlay = L.imageOverlay(config.image, config.bounds, {
-        opacity: 0.8,
-        interactive: false
-    }).addTo(heatmapMap);
-    
-    // Fit map to bounds
-    heatmapMap.fitBounds(config.bounds);
-    
-    // Store current map config
-    heatmapData.currentMap = mapName;
-    heatmapData.currentConfig = config;
+    try {
+        // Clear existing layers
+        heatmapMap.eachLayer(layer => {
+            if (layer instanceof L.ImageOverlay) {
+                heatmapMap.removeLayer(layer);
+            }
+        });
+        
+        console.log('Loading map background:', mapName, config.image);
+        
+        // Add map image overlay with error handling
+        const imageOverlay = L.imageOverlay(config.image, config.bounds, {
+            opacity: 0.8,
+            interactive: false
+        });
+        
+        // Add error and load event handlers
+        imageOverlay.on('error', function() {
+            console.error('Failed to load map image:', config.image);
+            showHeatmapError('Failed to load map image: ' + mapName);
+        });
+        
+        imageOverlay.on('load', function() {
+            console.log('Map image loaded successfully:', mapName);
+        });
+        
+        imageOverlay.addTo(heatmapMap);
+        
+        // Fit map to bounds
+        heatmapMap.fitBounds(config.bounds);
+        
+        // Store current map config
+        heatmapData.currentMap = mapName;
+        heatmapData.currentConfig = config;
+        
+        console.log('Map background loaded successfully:', mapName);
+    } catch (error) {
+        console.error('Error loading map background:', error);
+        showHeatmapError('Error loading map background: ' + error.message);
+    }
 }
 
 // Load initial heatmap data
@@ -3556,22 +3613,40 @@ async function refreshHeatmapData() {
         // Load data based on current heatmap type
         const endpoint = getHeatmapEndpoint(currentHeatmapType);
         const params = buildQueryString(filters);
+        const url = `/api/heatmap/${endpoint}?${params}`;
         
-        const response = await fetch(`/api/heatmap/${endpoint}?${params}`);
+        console.log('Fetching heatmap data from:', url);
+        
+        const response = await fetch(url);
         
         if (response.ok) {
             const data = await response.json();
-            displayHeatmapData(data);
+            console.log('Heatmap data received:', data);
             
-            // Also load analytics data for enhanced overlays
-            await loadAnalyticsOverlay(filters);
+            if (data && data.points && data.points.length > 0) {
+                displayHeatmapData(data);
+            } else {
+                console.log('No heatmap data points available');
+                // Clear existing data and show empty state
+                clearHeatmapLayers();
+                updateHeatmapStats({ totalPoints: 0 });
+            }
+            
+            // Try to load analytics overlay (but don't fail if it doesn't work)
+            try {
+                await loadAnalyticsOverlay(filters);
+            } catch (overlayError) {
+                console.warn('Could not load analytics overlay:', overlayError);
+            }
         } else {
-            showHeatmapError('Failed to load heatmap data');
+            const errorText = await response.text();
+            console.error('Heatmap API error:', response.status, errorText);
+            showHeatmapError(`Failed to load heatmap data (${response.status}): ${errorText}`);
         }
         
     } catch (error) {
         console.error('Heatmap data load error:', error);
-        showHeatmapError('Error loading heatmap data');
+        showHeatmapError('Error loading heatmap data: ' + error.message);
     } finally {
         showHeatmapLoading(false);
     }
@@ -3957,16 +4032,28 @@ function reverseTransformY(leafletY) {
 // Update heatmap statistics panel
 function updateHeatmapStats(data) {
     const legend = document.getElementById('heatmapLegend');
-    if (!legend || !data.stats) return;
+    if (!legend) return;
     
-    legend.innerHTML = `
-        <small class="text-muted">
-            <strong>${data.stats.totalPoints || 0}</strong> data points<br>
-            <i class="fas fa-circle text-danger"></i> High Activity
-            <i class="fas fa-circle text-warning ms-2"></i> Medium
-            <i class="fas fa-circle text-success ms-2"></i> Low
-        </small>
-    `;
+    const totalPoints = (data && data.stats && data.stats.totalPoints) ? data.stats.totalPoints : 
+                       (data && data.totalPoints) ? data.totalPoints : 0;
+    
+    if (totalPoints === 0) {
+        legend.innerHTML = `
+            <small class="text-muted">
+                <strong>No data available</strong><br>
+                Select different filters to see heatmap data
+            </small>
+        `;
+    } else {
+        legend.innerHTML = `
+            <small class="text-muted">
+                <strong>${totalPoints}</strong> data points<br>
+                <i class="fas fa-circle text-danger"></i> High Activity
+                <i class="fas fa-circle text-warning ms-2"></i> Medium
+                <i class="fas fa-circle text-success ms-2"></i> Low
+            </small>
+        `;
+    }
 }
 
 // Heatmap control functions
