@@ -863,7 +863,7 @@
 
                         <!-- Interactive Map Container -->
                         <div id="interactiveHeatmapResults">
-                            <div class="heatmap-container" style="height: 600px; position: relative; border: 2px solid var(--border-color); border-radius: 8px;">
+                            <div class="heatmap-container" style="height: 70vh; min-height: 600px; position: relative; border: 2px solid var(--border-color); border-radius: 8px; margin-bottom: 20px;">
                                 <div id="heatmapMap" style="height: 100%; width: 100%; border-radius: 6px;"></div>
                                 
                                 <!-- Map Loading Overlay -->
@@ -3435,50 +3435,60 @@ let isHeatmapAnimating = false;
 let heatmapAnimation = null;
 
 // Map configurations for CS2 maps (coordinate transformations)
+// Using Leaflet CRS.Simple coordinate system where [0,0] is top-left of 1024x1024 image
 const mapConfigs = {
     'de_dust2': { 
         name: 'Dust2', 
-        bounds: [[-2476, -3239], [1024, 3239]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-2476, -3239], [1024, 3239]],
         image: '/maps/de_dust2.png'
     },
     'de_mirage': { 
         name: 'Mirage', 
-        bounds: [[-3230, -1713], [1024, 1713]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-3230, -1713], [1024, 1713]],
         image: '/maps/de_mirage.png'
     },
     'de_inferno': { 
         name: 'Inferno', 
-        bounds: [[-2087, -3870], [1024, 3870]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-2087, -3870], [1024, 3870]],
         image: '/maps/de_inferno.png'
     },
     'de_ancient': { 
         name: 'Ancient', 
-        bounds: [[-2953, -2164], [1024, 2164]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-2953, -2164], [1024, 2164]],
         image: '/maps/de_ancient.png'
     },
     'de_anubis': { 
         name: 'Anubis', 
-        bounds: [[-2796, -3328], [1024, 3328]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-2796, -3328], [1024, 3328]],
         image: '/maps/de_anubis.png'
     },
     'de_nuke': { 
         name: 'Nuke', 
-        bounds: [[-3453, -2887], [1024, 2887]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-3453, -2887], [1024, 2887]],
         image: '/maps/de_nuke.png'
     },
     'de_vertigo': { 
         name: 'Vertigo', 
-        bounds: [[-3168, -2304], [1152, 2304]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-3168, -2304], [1152, 2304]],
         image: '/maps/de_vertigo.png'
     },
     'de_overpass': { 
         name: 'Overpass', 
-        bounds: [[-4831, -3699], [1024, 3699]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-4831, -3699], [1024, 3699]],
         image: '/maps/de_overpass.png'
     },
     'de_train': { 
         name: 'Train', 
-        bounds: [[-2477, -2208], [1024, 2208]],
+        bounds: [[0, 0], [1024, 1024]],
+        gameBounds: [[-2477, -2208], [1024, 2208]],
         image: '/maps/de_train.png'
     }
 };
@@ -3795,15 +3805,19 @@ function addFirstKillOverlay(firstKillData) {
     // Implementation would depend on available position data
 }
 
-// Transform coordinate systems
+// Transform coordinate systems from CS2 game coordinates to Leaflet pixel coordinates
 function transformX(gameX) {
     const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    return (gameX - config.bounds[0][0]) / (config.bounds[1][0] - config.bounds[0][0]) * 1024 - 512;
+    const gameBounds = config.gameBounds;
+    // Normalize to 0-1, then scale to 1024 pixels
+    return ((gameX - gameBounds[0][0]) / (gameBounds[1][0] - gameBounds[0][0])) * 1024;
 }
 
 function transformY(gameY) {
     const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    return (gameY - config.bounds[0][1]) / (config.bounds[1][1] - config.bounds[0][1]) * 1024 - 512;
+    const gameBounds = config.gameBounds;
+    // Normalize to 0-1, then scale to 1024 pixels (flip Y axis for Leaflet)
+    return 1024 - ((gameY - gameBounds[0][1]) / (gameBounds[1][1] - gameBounds[0][1])) * 1024;
 }
 
 // Get color gradient for heatmap type
@@ -4037,15 +4051,20 @@ async function loadPositionAnalytics(x, y) {
     }
 }
 
-// Reverse coordinate transforms
+// Reverse coordinate transforms from Leaflet pixel coordinates to CS2 game coordinates
 function reverseTransformX(leafletX) {
     const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    return ((leafletX + 512) / 1024) * (config.bounds[1][0] - config.bounds[0][0]) + config.bounds[0][0];
+    const gameBounds = config.gameBounds;
+    // Scale back from 1024 pixels to 0-1, then to game coordinates
+    return (leafletX / 1024) * (gameBounds[1][0] - gameBounds[0][0]) + gameBounds[0][0];
 }
 
 function reverseTransformY(leafletY) {
     const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    return ((leafletY + 512) / 1024) * (config.bounds[1][1] - config.bounds[0][1]) + config.bounds[0][1];
+    const gameBounds = config.gameBounds;
+    // Flip Y axis back, scale from 1024 pixels to 0-1, then to game coordinates
+    const normalizedY = (1024 - leafletY) / 1024;
+    return normalizedY * (gameBounds[1][1] - gameBounds[0][1]) + gameBounds[0][1];
 }
 
 // Update heatmap statistics panel
@@ -4229,12 +4248,13 @@ function displayDemoHeatmapData(mapName) {
     // Clear existing layers
     clearHeatmapLayers();
     
-    // Generate sample data points within map bounds
+    // Generate sample data points within game coordinate bounds
     const sampleData = [];
     for (let i = 0; i < 50; i++) {
-        const gameX = config.bounds[0][0] + Math.random() * (config.bounds[1][0] - config.bounds[0][0]);
-        const gameY = config.bounds[0][1] + Math.random() * (config.bounds[1][1] - config.bounds[0][1]);
+        const gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+        const gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
         
+        // Transform to Leaflet coordinates [lat, lng]
         sampleData.push([
             transformY(gameY),
             transformX(gameX),
