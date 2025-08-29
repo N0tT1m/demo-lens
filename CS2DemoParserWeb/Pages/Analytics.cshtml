@@ -3584,7 +3584,7 @@ function getHeatmapEndpoint(type) {
         'kills': 'deaths', // Backend uses 'deaths' for kill locations
         'deaths': 'deaths',
         'utility': 'utility',
-        'bomb_events': 'bomb-events',
+        'bomb_events': 'player-positions', // Fallback to player-positions until bomb-events endpoint is deployed
         'clutch': 'player-positions', // Use position data filtered by clutch situations
         'first-kills': 'deaths' // Use death/kill data filtered by first kills
     };
@@ -3773,33 +3773,33 @@ function getBombEventMarkerStyle(point) {
     // Define bomb event styles (mapping actual event types from API)
     const bombEventStyles = {
         'begin_plant': {
-            radius: 5,
-            fillColor: '#FF4500', // Red-orange for begin plant (lighter)
-            color: '#CC3300',
+            radius: 6,
+            fillColor: '#ff4444', // Red for bomb plants
+            color: '#cc0000',
             weight: 2,
             opacity: 1,
             fillOpacity: 0.8
         },
         'planted': {
             radius: 6,
-            fillColor: '#DC143C', // Dark crimson for completed plant
-            color: '#AA0000',
+            fillColor: '#ff4444', // Red for bomb plants
+            color: '#cc0000',
             weight: 2,
             opacity: 1,
             fillOpacity: 0.8
         },
         'begin_defuse': {
             radius: 5,
-            fillColor: '#7CFC00', // Light green for begin defuse
-            color: '#55AA00',
+            fillColor: '#44ff44', // Green for defuses
+            color: '#00cc00',
             weight: 2,
             opacity: 1,
             fillOpacity: 0.8
         },
         'defused': {
-            radius: 6,
-            fillColor: '#32CD32', // Dark lime green for completed defuse
-            color: '#228B22',
+            radius: 5,
+            fillColor: '#44ff44', // Green for defuses
+            color: '#00cc00',
             weight: 2,
             opacity: 1,
             fillOpacity: 0.8
@@ -3831,7 +3831,6 @@ function getBombEventMarkerStyle(point) {
     };
     
     const eventType = point.eventType?.toLowerCase();
-    console.log('Bomb event point:', point, 'eventType:', eventType, 'currentHeatmapType:', currentHeatmapType);
     return bombEventStyles[eventType] || defaultStyle;
 }
 
