@@ -3646,10 +3646,11 @@ async function refreshHeatmapData() {
             if (data && data.points && data.points.length > 0) {
                 displayHeatmapData(data);
             } else {
-                console.log('No heatmap data points available');
-                // Clear existing data and show empty state
-                clearHeatmapLayers();
-                updateHeatmapStats({ totalPoints: 0 });
+                console.log('No heatmap data points available - showing demo data');
+                // Show demo data when no real data is available
+                displayDemoHeatmapData(selectedMap);
+                updateHeatmapStats({ totalPoints: 50 });
+                showHeatmapInfo('Demo Mode: No database data available, showing sample data');
             }
             
             // Try to load analytics overlay (but don't fail if it doesn't work)
@@ -4248,19 +4249,10 @@ function displayDemoHeatmapData(mapName) {
     // Clear existing layers
     clearHeatmapLayers();
     
-    // Generate sample data points within game coordinate bounds
-    const sampleData = [];
-    for (let i = 0; i < 50; i++) {
-        const gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
-        const gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
-        
-        // Transform to Leaflet coordinates [lat, lng]
-        sampleData.push([
-            transformY(gameY),
-            transformX(gameX),
-            Math.random()
-        ]);
-    }
+    // Generate sample data points based on heatmap type
+    const sampleData = generateDemoDataForType(currentHeatmapType, config);
+    
+    console.log(`Generating demo data for type: ${currentHeatmapType}`);
     
     // Create heatmap layer
     const heatLayer = L.heatLayer(sampleData, {
@@ -4273,7 +4265,122 @@ function displayDemoHeatmapData(mapName) {
     
     heatmapLayers.heat = heatLayer;
     
-    console.log('Demo heatmap data displayed with', sampleData.length, 'points');
+    console.log('Demo heatmap data displayed with', sampleData.length, 'points for type:', currentHeatmapType);
+}
+
+function generateDemoDataForType(heatmapType, config) {
+    const sampleData = [];
+    let numPoints = 50;
+    
+    // Generate different patterns based on heatmap type
+    switch(heatmapType) {
+        case 'kills':
+        case 'deaths':
+            // Cluster around common engagement areas (center and corners)
+            numPoints = 60;
+            for (let i = 0; i < numPoints; i++) {
+                let gameX, gameY;
+                if (Math.random() < 0.6) {
+                    // Center area
+                    gameX = config.gameBounds[0][0] + (config.gameBounds[1][0] - config.gameBounds[0][0]) * (0.4 + Math.random() * 0.2);
+                    gameY = config.gameBounds[0][1] + (config.gameBounds[1][1] - config.gameBounds[0][1]) * (0.4 + Math.random() * 0.2);
+                } else {
+                    // Random positions
+                    gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+                    gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
+                }
+                
+                sampleData.push([
+                    transformY(gameY),
+                    transformX(gameX),
+                    0.3 + Math.random() * 0.7
+                ]);
+            }
+            break;
+            
+        case 'utility':
+            // Cluster around choke points and corners
+            numPoints = 40;
+            for (let i = 0; i < numPoints; i++) {
+                let gameX, gameY;
+                if (Math.random() < 0.7) {
+                    // Edge areas (utility usage)
+                    const edge = Math.floor(Math.random() * 4);
+                    switch(edge) {
+                        case 0: // Top
+                            gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+                            gameY = config.gameBounds[0][1] + (config.gameBounds[1][1] - config.gameBounds[0][1]) * Math.random() * 0.3;
+                            break;
+                        case 1: // Bottom
+                            gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+                            gameY = config.gameBounds[0][1] + (config.gameBounds[1][1] - config.gameBounds[0][1]) * (0.7 + Math.random() * 0.3);
+                            break;
+                        case 2: // Left
+                            gameX = config.gameBounds[0][0] + (config.gameBounds[1][0] - config.gameBounds[0][0]) * Math.random() * 0.3;
+                            gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
+                            break;
+                        case 3: // Right
+                            gameX = config.gameBounds[0][0] + (config.gameBounds[1][0] - config.gameBounds[0][0]) * (0.7 + Math.random() * 0.3);
+                            gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
+                            break;
+                    }
+                } else {
+                    gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+                    gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
+                }
+                
+                sampleData.push([
+                    transformY(gameY),
+                    transformX(gameX),
+                    0.2 + Math.random() * 0.6
+                ]);
+            }
+            break;
+            
+        case 'bomb_events':
+            // Cluster around bomb sites (corners)
+            numPoints = 30;
+            for (let i = 0; i < numPoints; i++) {
+                let gameX, gameY;
+                if (Math.random() < 0.8) {
+                    // Two bomb sites (corners)
+                    if (Math.random() < 0.5) {
+                        // Site A (top-left area)
+                        gameX = config.gameBounds[0][0] + (config.gameBounds[1][0] - config.gameBounds[0][0]) * (0.1 + Math.random() * 0.3);
+                        gameY = config.gameBounds[0][1] + (config.gameBounds[1][1] - config.gameBounds[0][1]) * (0.1 + Math.random() * 0.3);
+                    } else {
+                        // Site B (bottom-right area)
+                        gameX = config.gameBounds[0][0] + (config.gameBounds[1][0] - config.gameBounds[0][0]) * (0.6 + Math.random() * 0.3);
+                        gameY = config.gameBounds[0][1] + (config.gameBounds[1][1] - config.gameBounds[0][1]) * (0.6 + Math.random() * 0.3);
+                    }
+                } else {
+                    gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+                    gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
+                }
+                
+                sampleData.push([
+                    transformY(gameY),
+                    transformX(gameX),
+                    0.4 + Math.random() * 0.6
+                ]);
+            }
+            break;
+            
+        default: // 'position' and others
+            // Distribute throughout the map
+            for (let i = 0; i < numPoints; i++) {
+                const gameX = config.gameBounds[0][0] + Math.random() * (config.gameBounds[1][0] - config.gameBounds[0][0]);
+                const gameY = config.gameBounds[0][1] + Math.random() * (config.gameBounds[1][1] - config.gameBounds[0][1]);
+                
+                sampleData.push([
+                    transformY(gameY),
+                    transformX(gameX),
+                    0.1 + Math.random() * 0.9
+                ]);
+            }
+    }
+    
+    return sampleData;
 }
 
 function showDemoData() {
