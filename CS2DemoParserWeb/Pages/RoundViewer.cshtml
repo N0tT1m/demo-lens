@@ -364,18 +364,29 @@ async function loadRoundsForDemo() {
     }
 
     try {
+        console.log('Loading rounds for demoId:', demoId);
         const response = await fetch(`/api/round-viewer/rounds?demoId=${demoId}`);
+        console.log('Response status:', response.status);
+
         if (response.ok) {
             const data = await response.json();
+            console.log('Response data:', data);
             const roundSelect = document.getElementById('roundSelect');
 
             roundSelect.innerHTML = '<option value="">Select Round</option>';
-            data.Data.forEach(round => {
-                const option = document.createElement('option');
-                option.value = round.Id;
-                option.textContent = `Round ${round.RoundNumber} - ${round.WinnerTeam || 'Unknown'} (${round.Duration?.toFixed(1)}s)`;
-                roundSelect.appendChild(option);
-            });
+            if (data.Data && Array.isArray(data.Data)) {
+                data.Data.forEach(round => {
+                    const option = document.createElement('option');
+                    option.value = round.Id;
+                    option.textContent = `Round ${round.RoundNumber} - ${round.WinnerTeam || 'Unknown'} (${round.Duration?.toFixed(1)}s)`;
+                    roundSelect.appendChild(option);
+                });
+            } else {
+                console.error('Invalid response structure:', data);
+            }
+        } else {
+            const errorText = await response.text();
+            console.error('API error:', response.status, errorText);
         }
     } catch (error) {
         console.error('Error loading rounds:', error);
