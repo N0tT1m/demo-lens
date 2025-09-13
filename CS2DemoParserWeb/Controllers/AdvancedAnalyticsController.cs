@@ -3743,7 +3743,8 @@ namespace CS2DemoParserWeb.Controllers
                             
                         FROM Players p
                         INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        LEFT JOIN Rounds r ON r.DemoFileId = d.Id
+                        LEFT JOIN Matches m ON d.Id = m.DemoFileId
+                        LEFT JOIN Rounds r ON m.Id = r.MatchId
                         LEFT JOIN PlayerRoundStats prs ON p.Id = prs.PlayerId AND r.Id = prs.RoundId
                         LEFT JOIN Kills k ON p.Id = k.KillerId
                         LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
