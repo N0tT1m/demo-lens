@@ -336,16 +336,16 @@ function resizeCanvas() {
 
 async function loadDemoList() {
     try {
-        const response = await fetch('/api/demo/demos');
+        const response = await fetch('/api/round-viewer/demo-files');
         if (response.ok) {
-            const demos = await response.json();
+            const data = await response.json();
             const demoSelect = document.getElementById('demoSelect');
 
             demoSelect.innerHTML = '<option value="">Select Demo</option>';
-            demos.forEach(demo => {
+            data.Data.forEach(demo => {
                 const option = document.createElement('option');
-                option.value = demo.id;
-                option.textContent = `${demo.fileName} (${demo.mapName})`;
+                option.value = demo.Id;
+                option.textContent = `${demo.FileName} (${demo.MapName})`;
                 demoSelect.appendChild(option);
             });
 

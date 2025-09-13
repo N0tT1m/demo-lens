@@ -20,6 +20,52 @@ namespace CS2DemoParserWeb.Controllers
             _logger = logger;
         }
 
+        [HttpGet("demo-files")]
+        public async Task<IActionResult> GetDemoFiles()
+        {
+            try
+            {
+                var sql = @"
+                    SELECT
+                        Id,
+                        FileName,
+                        MapName,
+                        ParsedAt
+                    FROM DemoFiles
+                    ORDER BY ParsedAt DESC";
+
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand(sql, connection);
+                using var reader = await command.ExecuteReaderAsync();
+                var demoFiles = new List<Dictionary<string, object>>();
+
+                while (await reader.ReadAsync())
+                {
+                    var demo = new Dictionary<string, object>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var value = reader.GetValue(i);
+                        demo[reader.GetName(i)] = value == DBNull.Value ? null! : value;
+                    }
+                    demoFiles.Add(demo);
+                }
+
+                return Ok(new
+                {
+                    Title = "Available Demo Files",
+                    Data = demoFiles,
+                    TotalRecords = demoFiles.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting demo files");
+                return StatusCode(500, $"Error getting demo files: {ex.Message}");
+            }
+        }
+
         [HttpGet("rounds")]
         public async Task<IActionResult> GetRounds([FromQuery] int? demoId = null, [FromQuery] string? mapName = null)
         {
