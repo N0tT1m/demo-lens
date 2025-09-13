@@ -25,6 +25,13 @@ namespace CS2DemoParserWeb.Controllers
         {
             try
             {
+                _logger.LogInformation("GetRounds called with demoId: {DemoId}, mapName: {MapName}", demoId, mapName);
+
+                if (demoId == null)
+                {
+                    _logger.LogWarning("GetRounds called with null demoId");
+                    return BadRequest("DemoId is required");
+                }
                 var sql = @"
                     SELECT
                         r.Id,
