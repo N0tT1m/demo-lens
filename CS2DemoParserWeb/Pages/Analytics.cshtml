@@ -3807,18 +3807,43 @@ function addFirstKillOverlay(firstKillData) {
 }
 
 // Transform coordinate systems from CS2 game coordinates to Leaflet pixel coordinates
+// Using the same coordinate transformation as the working HeatmapService
 function transformX(gameX) {
-    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    const gameBounds = config.gameBounds;
-    // Normalize to 0-1, then scale to 1024 pixels
-    return ((gameX - gameBounds[0][0]) / (gameBounds[1][0] - gameBounds[0][0])) * 1024;
+    const mapName = getSelectedMap() || 'de_dust2';
+    const config = getHeatmapConfig(mapName);
+    if (!config) return 0;
+
+    // Convert from game coordinates to radar coordinates (same as HeatmapService.ConvertToImageX)
+    const normalized = (gameX - config.PosX) / config.Scale;
+    // Convert to image coordinates (1024x1024 base)
+    return normalized * 1024 / 1024;
 }
 
 function transformY(gameY) {
-    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    const gameBounds = config.gameBounds;
-    // Normalize to 0-1, then scale to 1024 pixels (flip Y axis for Leaflet)
-    return 1024 - ((gameY - gameBounds[0][1]) / (gameBounds[1][1] - gameBounds[0][1])) * 1024;
+    const mapName = getSelectedMap() || 'de_dust2';
+    const config = getHeatmapConfig(mapName);
+    if (!config) return 0;
+
+    // Convert from game coordinates to radar coordinates, flip Y axis (same as HeatmapService.ConvertToImageY)
+    const normalized = (config.PosY - gameY) / config.Scale;
+    // Convert to image coordinates (1024x1024 base)
+    return normalized * 1024 / 1024;
+}
+
+// Get heatmap config matching HeatmapService MapConfigs
+function getHeatmapConfig(mapName) {
+    const configs = {
+        'de_ancient': { PosX: -2953, PosY: 2164, Scale: 5 },
+        'de_anubis': { PosX: -2796, PosY: 3328, Scale: 5.22 },
+        'de_dust2': { PosX: -2476, PosY: 3239, Scale: 4.4 },
+        'de_inferno': { PosX: -2087, PosY: 3870, Scale: 4.9 },
+        'de_mirage': { PosX: -3230, PosY: 1713, Scale: 5.0 },
+        'de_nuke': { PosX: -3453, PosY: 2887, Scale: 7.0 },
+        'de_overpass': { PosX: -4831, PosY: 1781, Scale: 5.2 },
+        'de_vertigo': { PosX: -3168, PosY: 1762, Scale: 4.0 },
+        'de_train': { PosX: -2477, PosY: 2208, Scale: 4.5 }
+    };
+    return configs[mapName];
 }
 
 // Get color gradient for heatmap type
@@ -4054,18 +4079,23 @@ async function loadPositionAnalytics(x, y) {
 
 // Reverse coordinate transforms from Leaflet pixel coordinates to CS2 game coordinates
 function reverseTransformX(leafletX) {
-    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    const gameBounds = config.gameBounds;
-    // Scale back from 1024 pixels to 0-1, then to game coordinates
-    return (leafletX / 1024) * (gameBounds[1][0] - gameBounds[0][0]) + gameBounds[0][0];
+    const mapName = getSelectedMap() || 'de_dust2';
+    const config = getHeatmapConfig(mapName);
+    if (!config) return 0;
+
+    // Reverse of HeatmapService.ConvertToImageX
+    const normalized = leafletX * 1024 / 1024;
+    return (normalized * config.Scale) + config.PosX;
 }
 
 function reverseTransformY(leafletY) {
-    const config = heatmapData.currentConfig || mapConfigs['de_dust2'];
-    const gameBounds = config.gameBounds;
-    // Flip Y axis back, scale from 1024 pixels to 0-1, then to game coordinates
-    const normalizedY = (1024 - leafletY) / 1024;
-    return normalizedY * (gameBounds[1][1] - gameBounds[0][1]) + gameBounds[0][1];
+    const mapName = getSelectedMap() || 'de_dust2';
+    const config = getHeatmapConfig(mapName);
+    if (!config) return 0;
+
+    // Reverse of HeatmapService.ConvertToImageY
+    const normalized = leafletY * 1024 / 1024;
+    return config.PosY - (normalized * config.Scale);
 }
 
 // Update heatmap statistics panel
