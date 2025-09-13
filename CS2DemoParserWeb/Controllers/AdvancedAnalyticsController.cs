@@ -3748,6 +3748,7 @@ namespace CS2DemoParserWeb.Controllers
                         LEFT JOIN Kills k ON p.Id = k.KillerId
                         LEFT JOIN WeaponFires wf ON p.Id = wf.PlayerId
                         LEFT JOIN Grenades g ON p.Id = g.PlayerId
+                        LEFT JOIN FlashEvents fe ON p.Id = fe.FlashedPlayerId
                         
                         WHERE (@DemoId IS NULL OR d.Id = @DemoId)
                             AND (@MapName IS NULL OR d.MapName = @MapName)
