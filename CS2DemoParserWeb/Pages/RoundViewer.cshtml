@@ -374,8 +374,8 @@ async function loadRoundsForDemo() {
             const roundSelect = document.getElementById('roundSelect');
 
             roundSelect.innerHTML = '<option value="">Select Round</option>';
-            if (data.Data && Array.isArray(data.Data)) {
-                data.Data.forEach(round => {
+            if (data.data && Array.isArray(data.data)) {
+                data.data.forEach(round => {
                     const option = document.createElement('option');
                     option.value = round.Id;
                     option.textContent = `Round ${round.RoundNumber} - ${round.WinnerTeam || 'Unknown'} (${round.Duration?.toFixed(1)}s)`;
