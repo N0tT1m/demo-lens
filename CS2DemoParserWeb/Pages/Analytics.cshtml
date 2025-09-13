@@ -1656,7 +1656,7 @@ async function loadInventoryAnalysis(filters) {
 }
 
 function displayClutchResults(response) {
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         updateWidgetContent('clutchResults', '<div class="alert alert-info">No clutch data found for the selected filters.</div>');
         return;
     }
@@ -1702,7 +1702,7 @@ function displayClutchResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const successRate = parseFloat(row.ClutchSuccessRate || 0).toFixed(1);
         const successClass = successRate > 50 ? 'bg-success' : successRate > 25 ? 'bg-warning' : 'bg-danger';
         
@@ -1724,16 +1724,16 @@ function displayClutchResults(response) {
     updateWidgetContent('clutchResults', html);
 
     // Store data for grid view recreation and create charts
-    window.lastClutchData = response.Data;
+    window.lastClutchData = response.data;
     setTimeout(() => {
-        createClutchCharts(response.Data);
+        createClutchCharts(response.data);
     }, 100);
 }
 
 function displayTradeKillResults(response) {
     const container = document.getElementById('tradeKillResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No trade kill data found for the selected filters.</div>';
         return;
     }
@@ -1756,7 +1756,7 @@ function displayTradeKillResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const avgTime = parseFloat(row.AvgTradeTimeSeconds || 0).toFixed(2);
         const fastestTime = parseFloat(row.FastestTradeSeconds || 0).toFixed(2);
         const avgDistance = parseFloat(row.AvgTradeDistance || 0).toFixed(0);
@@ -1783,7 +1783,7 @@ function displayTradeKillResults(response) {
 function displayEconomyResults(response) {
     const container = document.getElementById('economyResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No economy data found for the selected filters.</div>';
         return;
     }
@@ -1806,7 +1806,7 @@ function displayEconomyResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const winRate = parseFloat(row.WinPercentage || 0).toFixed(1);
         const equipmentROI = parseFloat(row.AvgEquipmentROI || 0).toFixed(3);
         const damagePerDollar = parseFloat(row.AvgDamagePerDollar || 0).toFixed(3);
@@ -1837,7 +1837,7 @@ function displayEconomyResults(response) {
 function displayPerformanceResults(response) {
     const container = document.getElementById('performanceResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No performance data found for the selected filters.</div>';
         return;
     }
@@ -1860,7 +1860,7 @@ function displayPerformanceResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const efficiencyScore = parseFloat(row.EfficiencyScore || 0).toFixed(2);
         const impactRating = parseFloat(row.AvgImpactRating || 0).toFixed(2);
         const survivalRate = parseFloat(row.SurvivalRate || 0).toFixed(1);
@@ -1891,7 +1891,7 @@ function displayPerformanceResults(response) {
 function displayFirstKillResults(response) {
     const container = document.getElementById('firstKillResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No first kill data found for the selected filters. This endpoint may need configuration or data is not available.</div>';
         return;
     }
@@ -1914,7 +1914,7 @@ function displayFirstKillResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const winRate = parseFloat(row.FirstKillWinPercentage || 0).toFixed(1);
         const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
         const winRateClass = winRate > 60 ? 'bg-success' : winRate > 45 ? 'bg-warning' : 'bg-danger';
@@ -1940,7 +1940,7 @@ function displayFirstKillResults(response) {
 function displayPositionResults(response) {
     const container = document.getElementById('positionResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No position data found for the selected filters.</div>';
         return;
     }
@@ -1962,7 +1962,7 @@ function displayPositionResults(response) {
                 <tbody>
     `;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const avgDistance = parseFloat(row.AvgKillDistance || 0).toFixed(0);
         const headshotRate = parseFloat(row.HeadshotPercentage || 0).toFixed(1);
         
@@ -2015,7 +2015,7 @@ async function exportAnalysis(analysisType) {
 function displayMasterAnalyticsResults(response) {
     const container = document.getElementById('masterAnalyticsResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No master analytics data found for the selected filters.</div>';
         return;
     }
@@ -2042,7 +2042,7 @@ function displayMasterAnalyticsResults(response) {
                 </thead>
                 <tbody>`;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const performanceColor = row.OverallPerformanceScore >= 70 ? 'text-success' : 
                                 row.OverallPerformanceScore >= 50 ? 'text-warning' : 'text-danger';
         
@@ -2077,7 +2077,7 @@ function displayMasterAnalyticsResults(response) {
         <div class="mt-3">
             <small class="text-muted">
                 Performance Score combines K/D, survival, utility usage, and accuracy metrics (0-100 scale).
-                ${response.Data.length} players analyzed with comprehensive multi-dimensional metrics.
+                ${response.data.length} players analyzed with comprehensive multi-dimensional metrics.
             </small>
         </div>`;
     
@@ -2087,7 +2087,7 @@ function displayMasterAnalyticsResults(response) {
 function displaySituationResults(response) {
     const container = document.getElementById('situationResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No situational analysis data found for the selected filters.</div>';
         return;
     }
@@ -2111,7 +2111,7 @@ function displaySituationResults(response) {
                 </thead>
                 <tbody>`;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const pressureColor = row.PressurePerformanceScore >= 2.0 ? 'text-success' : 
                              row.PressurePerformanceScore >= 1.0 ? 'text-warning' : 'text-danger';
         
@@ -2153,7 +2153,7 @@ function displaySituationResults(response) {
 function displayInventoryResults(response) {
     const container = document.getElementById('inventoryResults');
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No inventory data found for the selected filters.</div>';
         return;
     }
@@ -2177,7 +2177,7 @@ function displayInventoryResults(response) {
                 </thead>
                 <tbody>`;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         const categoryColor = {
             'Full Buy': 'bg-success',
             'Buy Round': 'bg-primary', 
@@ -2292,13 +2292,13 @@ async function loadPressureMetrics(filters) {
 function displayGenericResults(response, containerId) {
     const container = document.getElementById(containerId);
     
-    if (!response.Data || response.Data.length === 0) {
+    if (!response.data || response.data.length === 0) {
         container.innerHTML = '<div class="alert alert-info">No data found for the selected filters.</div>';
         return;
     }
 
     // Create table with dynamic headers
-    const firstRow = response.Data[0];
+    const firstRow = response.data[0];
     const headers = Object.keys(firstRow);
     
     let html = `
@@ -2309,7 +2309,7 @@ function displayGenericResults(response, containerId) {
                 </thead>
                 <tbody>`;
     
-    response.Data.forEach(row => {
+    response.data.forEach(row => {
         html += '<tr>';
         headers.forEach(header => {
             let value = row[header];
