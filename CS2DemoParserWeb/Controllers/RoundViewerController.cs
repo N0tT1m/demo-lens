@@ -179,7 +179,7 @@ namespace CS2DemoParserWeb.Controllers
 
                 return Ok(new
                 {
-                    Title = $"Round Data - Tick {tick ?? "All"}",
+                    Title = $"Round Data - Tick {tick?.ToString() ?? "All"}",
                     RoundId = roundId,
                     RequestedTick = tick,
                     Data = data,

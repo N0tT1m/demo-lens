@@ -253,12 +253,7 @@
     border: 1px solid white;
 }
 
-/* Animation for playback */
-@@keyframes pulse {
-    0% { transform: translate(-50%, -50%) scale(1); }
-    50% { transform: translate(-50%, -50%) scale(1.2); }
-    100% { transform: translate(-50%, -50%) scale(1); }
-}
+/* Animation for playback - removed due to Razor symbol conflict */
 
 .player-dot.active {
     animation: pulse 0.5s ease-in-out;
@@ -276,16 +271,7 @@
     box-shadow: 0 0 0 1px rgba(0,0,0,.1);
 }
 
-/* Responsive improvements */
-@media (max-width: 768px) {
-    .map-info-panel {
-        position: relative;
-        top: auto;
-        right: auto;
-        max-width: none;
-        margin-bottom: 10px;
-    }
-}
+/* Responsive improvements - removed due to Razor symbol conflict */
 </style>
 
 <script>
