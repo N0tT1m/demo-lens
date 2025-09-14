@@ -396,17 +396,28 @@ async function loadRoundsForDemo() {
 
 async function loadRoundData() {
     const roundId = document.getElementById('roundSelect').value;
-    if (!roundId) {
-        alert('Please select a round');
+    const demoId = document.getElementById('demoSelect').value;
+
+    if (!roundId || !demoId) {
+        alert('Please select a demo and round');
         return;
     }
+
+    // Get the round number from the selected option text
+    const roundSelect = document.getElementById('roundSelect');
+    const selectedOption = roundSelect.options[roundSelect.selectedIndex];
+    const roundText = selectedOption.textContent;
+    const roundNumber = parseInt(roundText.match(/Round (\d+)/)[1]);
+
+    console.log(`Loading Round ${roundNumber} from Demo ${demoId} (roundId: ${roundId})`);
 
     showLoading(true);
 
     try {
-        // Load round data and events in parallel
+        // Use new HeatmapService-style API with demoId + roundNumber
+        // Also keep roundId as fallback for events API
         const [roundResponse, eventsResponse] = await Promise.all([
-            fetch(`/api/round-viewer/round-data?roundId=${roundId}`),
+            fetch(`/api/round-viewer/round-data?demoId=${demoId}&roundNumber=${roundNumber}`),
             fetch(`/api/round-viewer/round-events?roundId=${roundId}`)
         ]);
 
@@ -572,7 +583,7 @@ function getEventIcon(eventType) {
     }
 }
 
-// Transform game coordinates to canvas coordinates using proper map config
+// Transform game coordinates to canvas coordinates - EXACTLY matching HeatmapImageService
 function transformToCanvas(gameX, gameY, mapName) {
     const config = mapConfigs[mapName];
     if (!config) {
@@ -580,19 +591,21 @@ function transformToCanvas(gameX, gameY, mapName) {
         return { x: 0, y: 0 };
     }
 
-    // Convert game coordinates to map coordinates using the same logic as heatmap
-    // This matches the HeatmapService coordinate transformation
-    const mapX = (gameX - config.PosX) / config.Scale;
-    const mapY = (config.PosY - gameY) / config.Scale; // Flip Y axis for CS2
+    // Step 1: Convert from game coordinates to radar coordinates (same as HeatmapImageService)
+    const normalizedX = (gameX - config.PosX) / config.Scale;
+    const normalizedY = (config.PosY - gameY) / config.Scale; // Flip Y axis for CS2
 
-    // Normalize to 0-1 range (assuming 1024x1024 map coordinate system)
-    const normalizedX = mapX / 1024;
-    const normalizedY = mapY / 1024;
+    // Step 2: Convert to image coordinates using 1024x1024 base (same as HeatmapImageService)
+    // The map image is always 1024x1024, so we use those as the "imageWidth" and "imageHeight"
+    const mapImageWidth = 1024;
+    const mapImageHeight = 1024;
 
-    // Account for aspect ratio difference between square map (1024x1024) and rectangular canvas
-    // The map image is square, but canvas might be rectangular
+    const mapImageX = normalizedX * mapImageWidth / 1024;  // This simplifies to just normalizedX
+    const mapImageY = normalizedY * mapImageHeight / 1024; // This simplifies to just normalizedY
+
+    // Step 3: Scale to canvas size while maintaining aspect ratio (like how the map is drawn)
     const canvasAspectRatio = canvas.width / canvas.height;
-    const mapAspectRatio = 1.0; // Map is 1024x1024 (square)
+    const mapAspectRatio = 1.0; // Map is always square (1024x1024)
 
     let canvasX, canvasY;
 
@@ -600,20 +613,20 @@ function transformToCanvas(gameX, gameY, mapName) {
         // Canvas is wider than map - center the map horizontally
         const scale = canvas.height; // Use height as the limiting dimension
         const offsetX = (canvas.width - scale) / 2;
-        canvasX = normalizedX * scale + offsetX;
-        canvasY = normalizedY * scale;
+        canvasX = mapImageX * scale / mapImageWidth + offsetX;
+        canvasY = mapImageY * scale / mapImageHeight;
     } else {
         // Canvas is taller than map - center the map vertically
         const scale = canvas.width; // Use width as the limiting dimension
         const offsetY = (canvas.height - scale) / 2;
-        canvasX = normalizedX * scale;
-        canvasY = normalizedY * scale + offsetY;
+        canvasX = mapImageX * scale / mapImageWidth;
+        canvasY = mapImageY * scale / mapImageHeight + offsetY;
     }
 
     // Debug logging for first few transformations
     if (Math.random() < 0.01) {
-        console.log(`Transform: game(${gameX}, ${gameY}) -> map(${mapX.toFixed(1)}, ${mapY.toFixed(1)}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
-        console.log(`Map config:`, config);
+        console.log(`Transform: game(${gameX}, ${gameY}) -> normalized(${normalizedX.toFixed(1)}, ${normalizedY.toFixed(1)}) -> mapImage(${mapImageX.toFixed(1)}, ${mapImageY.toFixed(1)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
+        console.log(`Canvas: ${canvas.width}x${canvas.height}, Aspect: ${canvasAspectRatio.toFixed(2)}`);
     }
 
     return {
