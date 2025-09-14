@@ -559,8 +559,23 @@ function processRoundData() {
     console.log('StartTick value:', roundInfo.StartTick, 'type:', typeof roundInfo.StartTick);
     console.log('EndTick value:', roundInfo.EndTick, 'type:', typeof roundInfo.EndTick);
 
-    minTick = roundInfo.StartTick;
-    maxTick = roundInfo.EndTick || roundInfo.StartTick + 32000; // Fallback if EndTick is null
+    // Handle case where StartTick might be null/undefined
+    let actualStartTick = roundInfo.StartTick;
+    let actualEndTick = roundInfo.EndTick;
+
+    // If StartTick is null/undefined, calculate from the data
+    if (actualStartTick == null || isNaN(actualStartTick)) {
+        console.log('StartTick is null/undefined, calculating from data');
+        const allTicks = currentRoundData.map(d => d.Tick).filter(t => t != null && !isNaN(t));
+        if (allTicks.length > 0) {
+            actualStartTick = Math.min(...allTicks) + 1000; // Add offset to get back to round start
+            actualEndTick = Math.max(...allTicks);
+            console.log('Calculated StartTick:', actualStartTick, 'EndTick:', actualEndTick);
+        }
+    }
+
+    minTick = actualStartTick || 0;
+    maxTick = actualEndTick || (actualStartTick + 32000);
 
     console.log('minTick set to:', minTick, 'maxTick set to:', maxTick);
 
@@ -1076,17 +1091,12 @@ function jumpToTick(tick) {
 
 function updateTickDisplay(tick) {
     const displayTick = tick || currentTick;
-    // Calculate relative tick based on the round's actual start tick
-    const roundStartTick = currentRoundData && currentRoundData.length > 0 ? currentRoundData[0].StartTick : minTick;
 
-    // Handle null/undefined StartTick
-    const actualStartTick = roundStartTick != null && !isNaN(roundStartTick) ? roundStartTick : minTick;
-    const relativeTick = displayTick - actualStartTick;
+    // Use minTick (which is the corrected round start tick) for calculation
+    const relativeTick = displayTick - minTick;
 
     // Debug logging
-    console.log(`updateTickDisplay: displayTick=${displayTick}, roundStartTick=${roundStartTick}, relativeTick=${relativeTick}`);
-    console.log('currentRoundData exists?', !!currentRoundData, 'length:', currentRoundData?.length);
-    console.log('currentRoundData[0].StartTick:', currentRoundData?.[0]?.StartTick);
+    console.log(`updateTickDisplay: displayTick=${displayTick}, minTick=${minTick}, relativeTick=${relativeTick}`);
 
     document.getElementById('currentTick').textContent = relativeTick;
     document.getElementById('tickSlider').value = displayTick;
@@ -1174,13 +1184,9 @@ function showMapInfo(x, y) {
             const gameX = (normalizedX * 1024 * config.Scale) + config.PosX;
             const gameY = config.PosY - (normalizedY * 1024 * config.Scale);
 
-            const roundStartTick = currentRoundData && currentRoundData.length > 0 ? currentRoundData[0].StartTick : minTick;
-            console.log(`Tooltip calc: currentTick=${currentTick}, StartTick=${currentRoundData[0]?.StartTick}, minTick=${minTick}, roundStartTick=${roundStartTick}`);
-            console.log('Full currentRoundData[0] in tooltip:', currentRoundData[0]);
-
-            // Handle null/undefined StartTick
-            const actualStartTick = roundStartTick != null && !isNaN(roundStartTick) ? roundStartTick : minTick;
-            const relativeTick = currentTick - actualStartTick;
+            // Use minTick (which is the corrected round start tick) for calculation
+            const relativeTick = currentTick - minTick;
+            console.log(`Tooltip calc: currentTick=${currentTick}, minTick=${minTick}, relativeTick=${relativeTick}`);
             content.innerHTML = `
                 <strong>Position:</strong><br>
                 Game: (${gameX.toFixed(0)}, ${gameY.toFixed(0)})<br>
