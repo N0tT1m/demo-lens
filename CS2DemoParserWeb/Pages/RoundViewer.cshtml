@@ -417,11 +417,13 @@ async function loadRoundData() {
             currentRoundEvents = eventsData.data;
 
             if (currentRoundData.length > 0) {
+                console.log('Round data loaded successfully, count:', currentRoundData.length);
                 processRoundData();
                 showRoundInfo(currentRoundData[0]);
                 loadMapImage(currentRoundData[0].MapName);
                 setupTimeline();
                 showControls(true);
+                console.log('All setup functions called');
             } else {
                 alert('No data found for this round');
             }
@@ -965,9 +967,23 @@ function showLoading(show) {
 }
 
 function showControls(show) {
-    document.getElementById('timelineControls').style.display = show ? 'block' : 'none';
-    document.getElementById('roundCanvas').style.display = show ? 'block' : 'none';
-    document.querySelector('.map-placeholder').style.display = show ? 'none' : 'flex';
+    console.log('showControls called with:', show);
+
+    const timelineControls = document.getElementById('timelineControls');
+    const roundCanvas = document.getElementById('roundCanvas');
+    const mapPlaceholder = document.querySelector('.map-placeholder');
+
+    console.log('Elements found:', {
+        timelineControls: !!timelineControls,
+        roundCanvas: !!roundCanvas,
+        mapPlaceholder: !!mapPlaceholder
+    });
+
+    if (timelineControls) timelineControls.style.display = show ? 'block' : 'none';
+    if (roundCanvas) roundCanvas.style.display = show ? 'block' : 'none';
+    if (mapPlaceholder) mapPlaceholder.style.display = show ? 'none' : 'flex';
+
+    console.log('Canvas display after change:', roundCanvas ? roundCanvas.style.display : 'null');
 }
 
 function resetViewer() {
