@@ -266,8 +266,8 @@ public class CorrectedDemoParserService
         demo.Source1GameEvents.InfernoExtinguish += OnInfernoExtinguish;
         demo.Source1GameEvents.MolotovDetonate += OnMolotovDetonate;
 
-        // CRITICAL: Hook into tick processing for continuous player position tracking
-        demo.TickEnd += OnTickEnd;
+        // Note: TickEnd event doesn't exist in this demo parser library
+        // Position tracking is handled via other frequent events
         
         // Smoke events
         demo.Source1GameEvents.SmokegrenadeExpired += OnSmokegrenadeExpired;

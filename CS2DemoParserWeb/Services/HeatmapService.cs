@@ -146,8 +146,8 @@ namespace CS2DemoParserWeb.Services
                 INNER JOIN Players p ON pp.PlayerId = p.Id
                 INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
                 LEFT JOIN Matches m ON d.Id = m.DemoFileId
-                LEFT JOIN Rounds r ON m.Id = r.MatchId 
-                    AND pp.Tick >= r.StartTick 
+                LEFT JOIN Rounds r ON m.Id = r.MatchId
+                    AND pp.Tick >= r.StartTick
                     AND (r.EndTick IS NULL OR pp.Tick <= r.EndTick)
                 WHERE 1=1
                     AND (@DemoName IS NULL OR d.FileName = @DemoName)

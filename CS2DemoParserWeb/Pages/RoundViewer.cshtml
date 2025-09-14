@@ -484,21 +484,21 @@ async function loadRoundData() {
         const selectedDemo = demos.find(d => d.id == demoId);
         const mapName = selectedDemo?.mapName || 'de_mirage';
 
-        // Use heatmap API for accurate position data, but modify it for round viewer needs
-        const [heatmapResponse, eventsResponse] = await Promise.all([
-            fetch(`/api/heatmap/player-positions?demoId=${demoId}&mapName=${mapName}&roundNumber=${roundNumber}`),
+        // Use round-viewer API for position data that includes spawn positions (pre-round data)
+        const [roundDataResponse, eventsResponse] = await Promise.all([
+            fetch(`/api/round-viewer/get-round-data?demoId=${demoId}&roundNumber=${roundNumber}`),
             fetch(`/api/round-viewer/round-events?roundId=${roundId}`)
         ]);
 
-        if (heatmapResponse.ok && eventsResponse.ok) {
-            const heatmapData = await heatmapResponse.json();
+        if (roundDataResponse.ok && eventsResponse.ok) {
+            const roundDataResult = await roundDataResponse.json();
             const eventsData = await eventsResponse.json();
 
-            console.log('Heatmap data received:', heatmapData.points.length, 'points');
-            console.log('Sample heatmap point:', heatmapData.points[0]);
+            console.log('Round data received:', roundDataResult.Data.length, 'records');
+            console.log('Sample position record:', roundDataResult.Data[0]);
 
-            // Convert heatmap data format to round viewer format
-            const convertedData = convertHeatmapToRoundViewerFormat(heatmapData.points, mapName, roundNumber);
+            // Use round-viewer data directly (already includes spawn positions)
+            const convertedData = roundDataResult.Data;
             console.log('Converted data:', convertedData.length, 'records');
             console.log('Sample converted record:', convertedData[0]);
 
@@ -527,18 +527,18 @@ async function loadRoundData() {
             }
         } else {
             console.error('Failed to load data:', {
-                heatmapStatus: heatmapResponse.status,
+                roundDataStatus: roundDataResponse.status,
                 eventsStatus: eventsResponse.status,
-                heatmapOk: heatmapResponse.ok,
+                roundDataOk: roundDataResponse.ok,
                 eventsOk: eventsResponse.ok
             });
 
-            const heatmapError = await heatmapResponse.text();
+            const roundDataError = await roundDataResponse.text();
             const eventsError = await eventsResponse.text();
-            console.error('Heatmap error:', heatmapError);
+            console.error('Round data error:', roundDataError);
             console.error('Events error:', eventsError);
 
-            throw new Error(`Failed to load round data - Heatmap: ${heatmapResponse.status}, Events: ${eventsResponse.status}`);
+            throw new Error(`Failed to load round data - RoundData: ${roundDataResponse.status}, Events: ${eventsResponse.status}`);
         }
     } catch (error) {
         console.error('Error loading round data:', error);
