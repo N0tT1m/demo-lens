@@ -443,15 +443,19 @@ async function loadRoundData() {
 function processRoundData() {
     if (!currentRoundData || currentRoundData.length === 0) return;
 
-    // Get tick range from actual data (not the round's reported range)
+    // Use the round's actual start and end ticks for proper timeline
+    const roundInfo = currentRoundData[0];
+    minTick = roundInfo.StartTick;
+    maxTick = roundInfo.EndTick || roundInfo.StartTick + 32000; // Fallback if EndTick is null
+    currentTick = minTick; // Start at the actual beginning of the round
+
+    // Get available data tick range for comparison
     const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null);
-    minTick = Math.min(...ticks);
-    maxTick = Math.max(...ticks);
-    currentTick = minTick;
+    const dataMinTick = Math.min(...ticks);
+    const dataMaxTick = Math.max(...ticks);
 
-    console.log(`Using actual data tick range: ${minTick} to ${maxTick} (round reported: ${currentRoundData[0]?.StartTick} to ${currentRoundData[0]?.EndTick})`);
-
-    // Using proper map configurations instead of dynamic bounds
+    console.log(`Using round tick range: ${minTick} to ${maxTick}`);
+    console.log(`Available data tick range: ${dataMinTick} to ${dataMaxTick}`);
     console.log('Processing round data with proper map configurations');
 
     // Group data by tick for efficient lookup
