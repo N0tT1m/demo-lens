@@ -562,9 +562,11 @@ function getEventIcon(eventType) {
 
 // Transform game coordinates to canvas coordinates using proper map config
 function transformToCanvas(gameX, gameY, mapName) {
+    console.log('Looking up config for mapName:', mapName, 'Available configs:', Object.keys(mapConfigs));
     const config = mapConfigs[mapName];
     if (!config) {
         console.warn('No map config found for:', mapName);
+        console.log('Available map configs:', mapConfigs);
         return { x: 0, y: 0 };
     }
 
