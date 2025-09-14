@@ -432,15 +432,14 @@ namespace CS2DemoParserWeb.Controllers
                             pp.InSmoke,
                             pp.IsBlind
 
-                        FROM PlayerPositions pp
-                        INNER JOIN Players p ON pp.PlayerId = p.Id
-                        INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
-                        LEFT JOIN Matches m ON d.Id = m.DemoFileId
-                        LEFT JOIN Rounds r ON m.Id = r.MatchId
+                        FROM DemoFiles d
+                        INNER JOIN Matches m ON d.Id = m.DemoFileId
+                        INNER JOIN Rounds r ON m.Id = r.MatchId AND r.RoundNumber = @RoundNumber
+                        INNER JOIN Players p ON d.Id = p.DemoFileId
+                        INNER JOIN PlayerPositions pp ON p.Id = pp.PlayerId
+                            AND pp.Tick >= (r.StartTick - 1000)  -- Include 1000 ticks before round start for spawn positions
+                            AND pp.Tick <= ISNULL(r.EndTick, r.StartTick + 32000)  -- Strictly within round boundaries
                         WHERE d.Id = @DemoId
-                            AND r.RoundNumber = @RoundNumber
-                            AND pp.Tick >= (r.StartTick - 2000)  -- Include 1000 ticks before round start for spawn positions
-                            AND (r.EndTick IS NULL OR pp.Tick <= r.EndTick)
                             AND (@Tick IS NULL OR pp.Tick = @Tick)
                         ORDER BY pp.Tick, p.Team, p.PlayerName";
 
