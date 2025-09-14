@@ -287,6 +287,95 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpGet("verify-continuous-tracking")]
+        public async Task<IActionResult> VerifyContinuousTracking([FromQuery] int demoId, [FromQuery] int roundNumber)
+        {
+            try
+            {
+                var demoSource = await GetDemoSourceAsync(demoId);
+                var adjustedRoundNumber = GetDatabaseRoundNumber(roundNumber, demoSource);
+
+                // Check tick intervals to see if positions are captured continuously or just on events
+                var sql = @"
+                    SELECT
+                        pp.Tick,
+                        COUNT(DISTINCT pp.PlayerId) as PlayerCount,
+                        (pp.Tick - LAG(pp.Tick) OVER (ORDER BY pp.Tick)) as TickGap,
+                        STRING_AGG(p.PlayerName, ', ') as Players
+                    FROM PlayerPositions pp
+                    INNER JOIN Players p ON pp.PlayerId = p.Id
+                    INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                    INNER JOIN Matches m ON d.Id = m.DemoFileId
+                    INNER JOIN Rounds r ON m.Id = r.MatchId
+                    WHERE d.Id = @DemoId
+                        AND r.RoundNumber = @RoundNumber
+                        AND pp.Tick BETWEEN (r.StartTick - 500) AND (r.StartTick + 500)
+                    GROUP BY pp.Tick
+                    ORDER BY pp.Tick";
+
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@DemoId", demoId);
+                command.Parameters.AddWithValue("@RoundNumber", adjustedRoundNumber);
+
+                using var reader = await command.ExecuteReaderAsync();
+                var tickData = new List<Dictionary<string, object>>();
+
+                while (await reader.ReadAsync())
+                {
+                    var row = new Dictionary<string, object>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var value = reader.GetValue(i);
+                        row[reader.GetName(i)] = value == DBNull.Value ? null! : value;
+                    }
+                    tickData.Add(row);
+                }
+
+                // Analyze the data to determine tracking pattern
+                var analysis = new
+                {
+                    TotalTicks = tickData.Count,
+                    TickGaps = tickData.Where(t => t["TickGap"] != null).Select(t => Convert.ToInt32(t["TickGap"])).ToList(),
+                    AverageGap = tickData.Where(t => t["TickGap"] != null).Any()
+                        ? tickData.Where(t => t["TickGap"] != null).Select(t => Convert.ToInt32(t["TickGap"])).Average()
+                        : 0,
+                    MaxGap = tickData.Where(t => t["TickGap"] != null).Any()
+                        ? tickData.Where(t => t["TickGap"] != null).Select(t => Convert.ToInt32(t["TickGap"])).Max()
+                        : 0,
+                    IsRegularInterval = false // We'll determine this from gaps
+                };
+
+                // Check if tracking is at regular intervals (good) or sporadic (bad)
+                var gaps = analysis.TickGaps;
+                var isRegular = gaps.Count > 5 && gaps.All(gap => gap >= 8 && gap <= 32); // Should be every 16 ticks roughly
+
+                return Ok(new
+                {
+                    Title = "Continuous Tracking Verification",
+                    DemoId = demoId,
+                    RoundNumber = roundNumber,
+                    Analysis = new
+                    {
+                        TotalTicksWithData = analysis.TotalTicks,
+                        AverageTickGap = analysis.AverageGap,
+                        MaxTickGap = analysis.MaxGap,
+                        IsRegularInterval = isRegular,
+                        TrackingPattern = isRegular ? "CONTINUOUS (Good)" : "EVENT-BASED (Bad)",
+                        Recommendation = isRegular ? "Position tracking is working correctly" : "Position tracking is still event-based - demo needs reparsing"
+                    },
+                    RawData = tickData.Take(20) // First 20 ticks for inspection
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying continuous tracking");
+                return StatusCode(500, $"Error verifying tracking: {ex.Message}");
+            }
+        }
+
         [HttpGet("round-data")]
         public async Task<IActionResult> GetRoundData([FromQuery] int? roundId = null, [FromQuery] int? demoId = null, [FromQuery] int? roundNumber = null, [FromQuery] int? tick = null)
         {
