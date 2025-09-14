@@ -494,11 +494,11 @@ async function loadRoundData() {
             const roundDataResult = await roundDataResponse.json();
             const eventsData = await eventsResponse.json();
 
-            console.log('Round data received:', roundDataResult.Data.length, 'records');
-            console.log('Sample position record:', roundDataResult.Data[0]);
+            console.log('Round data received:', roundDataResult.data.length, 'records');
+            console.log('Sample position record:', roundDataResult.data[0]);
 
             // Use round-viewer data directly (already includes spawn positions)
-            const convertedData = roundDataResult.Data;
+            const convertedData = roundDataResult.data;
             console.log('Converted data:', convertedData.length, 'records');
             console.log('Sample converted record:', convertedData[0]);
 
