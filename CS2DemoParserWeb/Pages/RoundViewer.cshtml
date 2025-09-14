@@ -555,7 +555,10 @@ function processRoundData() {
     const roundInfo = currentRoundData[0];
     minTick = roundInfo.StartTick;
     maxTick = roundInfo.EndTick || roundInfo.StartTick + 32000; // Fallback if EndTick is null
-    currentTick = minTick; // Start at the actual beginning of the round
+
+    // Start earlier to see spawn positions - CS2 spawns happen before round officially starts
+    const spawnOffset = 500; // Start 500 ticks before round start to see spawns
+    currentTick = Math.max(minTick - spawnOffset, 0); // Don't go below tick 0
 
     // Get available data tick range for comparison
     const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null);
@@ -605,7 +608,8 @@ function loadMapImage(mapName) {
 
 function setupTimeline() {
     const slider = document.getElementById('tickSlider');
-    slider.min = minTick;
+    const sliderMinTick = Math.max(minTick - 500, 0); // Include spawn offset
+    slider.min = sliderMinTick;
     slider.max = maxTick;
     slider.value = currentTick;
 
@@ -1046,7 +1050,7 @@ function jumpToTick(tick) {
 
 function updateTickDisplay(tick) {
     const displayTick = tick || currentTick;
-    const relativeTick = displayTick - minTick; // Show tick relative to round start
+    const relativeTick = displayTick - (minTick - 500); // Show tick relative to spawn start (500 ticks before round)
     document.getElementById('currentTick').textContent = relativeTick;
     document.getElementById('tickSlider').value = displayTick;
 }
