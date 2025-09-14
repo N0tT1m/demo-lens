@@ -231,6 +231,30 @@ namespace CS2DemoParserWeb.Controllers
                     command.Parameters.AddWithValue("@DemoId", demoId);
                     command.Parameters.AddWithValue("@RoundNumber", adjustedRoundNumber);
                     command.Parameters.AddWithValue("@Tick", (object?)tick ?? DBNull.Value);
+
+                    using var reader = await command.ExecuteReaderAsync();
+                    var data = new List<Dictionary<string, object>>();
+
+                    while (await reader.ReadAsync())
+                    {
+                        var row = new Dictionary<string, object>();
+                        for (int i = 0; i < reader.FieldCount; i++)
+                        {
+                            var value = reader.GetValue(i);
+                            row[reader.GetName(i)] = value == DBNull.Value ? null! : value;
+                        }
+                        data.Add(row);
+                    }
+
+                    return Ok(new
+                    {
+                        Title = $"Round Data - Tick {tick?.ToString() ?? "All"}",
+                        DemoId = demoId ?? 0,
+                        RoundNumber = roundNumber ?? 0,
+                        RequestedTick = tick,
+                        Data = data,
+                        TotalRecords = data.Count
+                    });
                 }
                 else if (roundId.HasValue)
                 {

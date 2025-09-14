@@ -494,13 +494,20 @@ async function loadRoundData() {
             const heatmapData = await heatmapResponse.json();
             const eventsData = await eventsResponse.json();
 
+            console.log('Heatmap data received:', heatmapData.points.length, 'points');
+            console.log('Sample heatmap point:', heatmapData.points[0]);
+
             // Convert heatmap data format to round viewer format
+            const convertedData = convertHeatmapToRoundViewerFormat(heatmapData.points, mapName, roundNumber);
+            console.log('Converted data:', convertedData.length, 'records');
+            console.log('Sample converted record:', convertedData[0]);
+
             const roundData = {
                 title: `Round Data - Tick All`,
                 roundId: parseInt(roundId),
                 requestedTick: null,
-                data: convertHeatmapToRoundViewerFormat(heatmapData.points, mapName, roundNumber),
-                totalRecords: heatmapData.points.length
+                data: convertedData,
+                totalRecords: convertedData.length
             };
 
             currentRoundData = roundData.data;
@@ -519,7 +526,19 @@ async function loadRoundData() {
                 alert('No data found for this round');
             }
         } else {
-            throw new Error('Failed to load round data');
+            console.error('Failed to load data:', {
+                heatmapStatus: heatmapResponse.status,
+                eventsStatus: eventsResponse.status,
+                heatmapOk: heatmapResponse.ok,
+                eventsOk: eventsResponse.ok
+            });
+
+            const heatmapError = await heatmapResponse.text();
+            const eventsError = await eventsResponse.text();
+            console.error('Heatmap error:', heatmapError);
+            console.error('Events error:', eventsError);
+
+            throw new Error(`Failed to load round data - Heatmap: ${heatmapResponse.status}, Events: ${eventsResponse.status}`);
         }
     } catch (error) {
         console.error('Error loading round data:', error);
@@ -669,42 +688,42 @@ function transformToCanvas(gameX, gameY, mapName) {
         return { x: 0, y: 0 };
     }
 
-    // Step 1: Convert from game coordinates to radar coordinates (same as HeatmapImageService)
+    // EXACT same transformation as HeatmapImageService.ConvertToImageX/Y
     const normalizedX = (gameX - config.PosX) / config.Scale;
     const normalizedY = (config.PosY - gameY) / config.Scale; // Flip Y axis for CS2
 
-    // Step 2: Convert to image coordinates using 1024x1024 base (same as HeatmapImageService)
-    // The map image is always 1024x1024, so we use those as the "imageWidth" and "imageHeight"
-    const mapImageWidth = 1024;
-    const mapImageHeight = 1024;
+    // Convert to image coordinates (1024x1024 base) - EXACT same as HeatmapImageService
+    const imageWidth = 1024;
+    const imageHeight = 1024;
+    const heatmapImageX = normalizedX * imageWidth / 1024; // This is just normalizedX
+    const heatmapImageY = normalizedY * imageHeight / 1024; // This is just normalizedY
 
-    const mapImageX = normalizedX * mapImageWidth / 1024;  // This simplifies to just normalizedX
-    const mapImageY = normalizedY * mapImageHeight / 1024; // This simplifies to just normalizedY
-
-    // Step 3: Scale to canvas size while maintaining aspect ratio (like how the map is drawn)
+    // Now scale to canvas size - match how the map image is actually drawn
     const canvasAspectRatio = canvas.width / canvas.height;
-    const mapAspectRatio = 1.0; // Map is always square (1024x1024)
+    const mapAspectRatio = 1.0; // Map is square
 
     let canvasX, canvasY;
 
     if (canvasAspectRatio > mapAspectRatio) {
-        // Canvas is wider than map - center the map horizontally
-        const scale = canvas.height; // Use height as the limiting dimension
-        const offsetX = (canvas.width - scale) / 2;
-        canvasX = mapImageX * scale / mapImageWidth + offsetX;
-        canvasY = mapImageY * scale / mapImageHeight;
+        // Canvas wider - map uses full height, centered horizontally
+        const mapPixelSize = canvas.height;
+        const offsetX = (canvas.width - mapPixelSize) / 2;
+        canvasX = heatmapImageX * mapPixelSize + offsetX;
+        canvasY = heatmapImageY * mapPixelSize;
     } else {
-        // Canvas is taller than map - center the map vertically
-        const scale = canvas.width; // Use width as the limiting dimension
-        const offsetY = (canvas.height - scale) / 2;
-        canvasX = mapImageX * scale / mapImageWidth;
-        canvasY = mapImageY * scale / mapImageHeight + offsetY;
+        // Canvas taller - map uses full width, centered vertically
+        const mapPixelSize = canvas.width;
+        const offsetY = (canvas.height - mapPixelSize) / 2;
+        canvasX = heatmapImageX * mapPixelSize;
+        canvasY = heatmapImageY * mapPixelSize + offsetY;
     }
 
-    // Debug logging for first few transformations
-    if (Math.random() < 0.01) {
-        console.log(`Transform: game(${gameX}, ${gameY}) -> normalized(${normalizedX.toFixed(1)}, ${normalizedY.toFixed(1)}) -> mapImage(${mapImageX.toFixed(1)}, ${mapImageY.toFixed(1)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
+    // Debug logging - always log first transformation for debugging
+    if (!window.debugLoggedFirst) {
+        console.log(`FIRST TRANSFORM: game(${gameX}, ${gameY}) -> normalized(${normalizedX.toFixed(1)}, ${normalizedY.toFixed(1)}) -> heatmapImage(${heatmapImageX.toFixed(1)}, ${heatmapImageY.toFixed(1)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
         console.log(`Canvas: ${canvas.width}x${canvas.height}, Aspect: ${canvasAspectRatio.toFixed(2)}`);
+        console.log(`Map config for ${mapName}:`, config);
+        window.debugLoggedFirst = true;
     }
 
     return {
@@ -813,10 +832,22 @@ function drawGrid() {
 }
 
 function drawPlayers(tickData, mapName) {
-    tickData.forEach(player => {
+    console.log(`Drawing ${tickData.length} players for map: ${mapName}`);
+
+    tickData.forEach((player, index) => {
         if (player.PositionX == null || player.PositionY == null) return;
 
+        // Log first few players' raw coordinates
+        if (index < 3) {
+            console.log(`Player ${player.PlayerName}: Raw game coords (${player.PositionX}, ${player.PositionY})`);
+        }
+
         const pos = transformToCanvas(player.PositionX, player.PositionY, mapName);
+
+        // Log transformed coordinates for first few players
+        if (index < 3) {
+            console.log(`Player ${player.PlayerName}: Canvas coords (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
+        }
 
         // Determine player color
         const isAlive = player.IsAlive;
