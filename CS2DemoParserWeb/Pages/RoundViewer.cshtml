@@ -441,11 +441,13 @@ async function loadRoundData() {
 function processRoundData() {
     if (!currentRoundData || currentRoundData.length === 0) return;
 
-    // Get tick range
+    // Get tick range from actual data (not the round's reported range)
     const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null);
     minTick = Math.min(...ticks);
     maxTick = Math.max(...ticks);
     currentTick = minTick;
+
+    console.log(`Using actual data tick range: ${minTick} to ${maxTick} (round reported: ${currentRoundData[0]?.StartTick} to ${currentRoundData[0]?.EndTick})`);
 
     // Calculate coordinate bounds
     const positions = currentRoundData.filter(d => d.PositionX != null && d.PositionY != null);
@@ -622,8 +624,23 @@ function drawCurrentFrame() {
 
     if (!currentRoundData || !currentRoundData.tickData) return;
 
-    const tickData = currentRoundData.tickData.get(currentTick);
-    if (!tickData) return;
+    // Find the nearest available tick data
+    let tickData = currentRoundData.tickData.get(currentTick);
+    if (!tickData) {
+        // Find the closest tick with data
+        const availableTicks = Array.from(currentRoundData.tickData.keys()).sort((a, b) => a - b);
+        let nearestTick = availableTicks.reduce((prev, curr) =>
+            Math.abs(curr - currentTick) < Math.abs(prev - currentTick) ? curr : prev
+        );
+        tickData = currentRoundData.tickData.get(nearestTick);
+
+        if (!tickData) return;
+
+        // Log when using nearest tick
+        if (Math.abs(nearestTick - currentTick) > 0) {
+            console.log(`Using nearest tick ${nearestTick} for requested tick ${currentTick}`);
+        }
+    }
 
     const mapName = tickData[0].MapName;
 
