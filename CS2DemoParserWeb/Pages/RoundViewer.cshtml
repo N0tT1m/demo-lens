@@ -598,10 +598,10 @@ function transformToCanvas(gameX, gameY, mapName) {
         canvasY = normalizedY * scale + offsetY;
     }
 
-    // Debug logging for first few transformations
-    if (Math.random() < 0.01) {
+    // Debug logging for transformations
+    if (Math.random() < 0.05) { // More frequent logging
         console.log(`Transform: game(${gameX}, ${gameY}) -> map(${mapX.toFixed(1)}, ${mapY.toFixed(1)}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
-        console.log(`Map config:`, config);
+        console.log(`Canvas: ${canvas.width}x${canvas.height}, AspectRatio: ${canvasAspectRatio.toFixed(2)}, Map config:`, config);
     }
 
     return {
