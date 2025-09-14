@@ -445,6 +445,20 @@ function processRoundData() {
     maxTick = Math.max(...ticks);
     currentTick = minTick;
 
+    // Calculate coordinate bounds
+    const positions = currentRoundData.filter(d => d.PositionX != null && d.PositionY != null);
+    const xCoords = positions.map(d => d.PositionX);
+    const yCoords = positions.map(d => d.PositionY);
+
+    currentRoundData.bounds = {
+        minX: Math.min(...xCoords),
+        maxX: Math.max(...xCoords),
+        minY: Math.min(...yCoords),
+        maxY: Math.max(...yCoords)
+    };
+
+    console.log('Calculated bounds:', currentRoundData.bounds);
+
     // Group data by tick for efficient lookup
     const tickData = new Map();
     currentRoundData.forEach(row => {
@@ -555,12 +569,15 @@ function getEventIcon(eventType) {
 
 // Transform game coordinates to canvas coordinates
 function transformToCanvas(gameX, gameY, mapName) {
-    const config = mapConfigs[mapName];
-    if (!config) return { x: 0, y: 0 };
+    if (!currentRoundData || !currentRoundData.bounds) {
+        return { x: 0, y: 0 };
+    }
+
+    const bounds = currentRoundData.bounds;
 
     // Convert game coordinates to normalized coordinates (0-1)
-    const normalizedX = (gameX - config.PosX) / config.Scale / 1024;
-    const normalizedY = (config.PosY - gameY) / config.Scale / 1024;
+    const normalizedX = (gameX - bounds.minX) / (bounds.maxX - bounds.minX);
+    const normalizedY = 1 - (gameY - bounds.minY) / (bounds.maxY - bounds.minY); // Flip Y axis
 
     // Convert to canvas coordinates
     const canvasX = normalizedX * canvas.width;
@@ -569,6 +586,7 @@ function transformToCanvas(gameX, gameY, mapName) {
     // Debug logging for first few transformations
     if (Math.random() < 0.01) {
         console.log(`Transform: game(${gameX}, ${gameY}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
+        console.log(`Bounds: X(${bounds.minX} to ${bounds.maxX}), Y(${bounds.minY} to ${bounds.maxY})`);
     }
 
     return {
