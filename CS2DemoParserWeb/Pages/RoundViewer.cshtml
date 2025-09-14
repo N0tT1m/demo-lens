@@ -461,19 +461,23 @@ function processRoundData() {
 }
 
 function loadMapImage(mapName) {
+    console.log('Loading map image for:', mapName);
     const config = mapConfigs[mapName];
     if (!config) {
         console.warn('No map config found for:', mapName);
+        console.log('Available map configs:', Object.keys(mapConfigs));
         return;
     }
 
+    console.log('Map config:', config);
     mapImage = new Image();
     mapImage.onload = function() {
+        console.log('Map image loaded successfully');
         drawCurrentFrame();
     };
     mapImage.onerror = function() {
-        console.warn('Failed to load map image:', config.image);
-        drawCurrentFrame();
+        console.error('Failed to load map image:', config.image);
+        drawCurrentFrame(); // Still draw without map background
     };
     mapImage.src = config.image;
 }
