@@ -413,8 +413,8 @@ async function loadRoundData() {
             const roundData = await roundResponse.json();
             const eventsData = await eventsResponse.json();
 
-            currentRoundData = roundData.Data;
-            currentRoundEvents = eventsData.Data;
+            currentRoundData = roundData.data;
+            currentRoundEvents = eventsData.data;
 
             if (currentRoundData.length > 0) {
                 processRoundData();
