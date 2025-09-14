@@ -577,9 +577,26 @@ function transformToCanvas(gameX, gameY, mapName) {
     const normalizedX = mapX / 1024;
     const normalizedY = mapY / 1024;
 
-    // Convert to canvas coordinates
-    const canvasX = normalizedX * canvas.width;
-    const canvasY = normalizedY * canvas.height;
+    // Account for aspect ratio difference between square map (1024x1024) and rectangular canvas
+    // The map image is square, but canvas might be rectangular
+    const canvasAspectRatio = canvas.width / canvas.height;
+    const mapAspectRatio = 1.0; // Map is 1024x1024 (square)
+
+    let canvasX, canvasY;
+
+    if (canvasAspectRatio > mapAspectRatio) {
+        // Canvas is wider than map - center the map horizontally
+        const scale = canvas.height; // Use height as the limiting dimension
+        const offsetX = (canvas.width - scale) / 2;
+        canvasX = normalizedX * scale + offsetX;
+        canvasY = normalizedY * scale;
+    } else {
+        // Canvas is taller than map - center the map vertically
+        const scale = canvas.width; // Use width as the limiting dimension
+        const offsetY = (canvas.height - scale) / 2;
+        canvasX = normalizedX * scale;
+        canvasY = normalizedY * scale + offsetY;
+    }
 
     // Debug logging for first few transformations
     if (Math.random() < 0.01) {
@@ -604,9 +621,23 @@ function drawCurrentFrame() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw map image if available
+    // Draw map image if available, respecting aspect ratio
     if (mapImage && mapImage.complete) {
-        ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+        // Calculate the same aspect ratio scaling as the coordinate transformation
+        const canvasAspectRatio = canvas.width / canvas.height;
+        const mapAspectRatio = 1.0; // Map is square
+
+        if (canvasAspectRatio > mapAspectRatio) {
+            // Canvas is wider - center map horizontally
+            const scale = canvas.height;
+            const offsetX = (canvas.width - scale) / 2;
+            ctx.drawImage(mapImage, offsetX, 0, scale, scale);
+        } else {
+            // Canvas is taller - center map vertically
+            const scale = canvas.width;
+            const offsetY = (canvas.height - scale) / 2;
+            ctx.drawImage(mapImage, 0, offsetY, scale, scale);
+        }
     } else {
         // Draw background
         ctx.fillStyle = '#2c3e50';
