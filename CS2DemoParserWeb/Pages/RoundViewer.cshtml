@@ -571,6 +571,10 @@ function processRoundData() {
 
     console.log(`Using round tick range: ${minTick} to ${maxTick}`);
     console.log(`Available data tick range: ${dataMinTick} to ${dataMaxTick}`);
+
+    // Use the actual first available tick instead of arbitrary offset
+    currentTick = dataMinTick;
+    console.log(`Starting at first available tick: ${currentTick}`);
     console.log('Processing round data with proper map configurations');
 
     // Group data by tick for efficient lookup
@@ -612,9 +616,13 @@ function loadMapImage(mapName) {
 
 function setupTimeline() {
     const slider = document.getElementById('tickSlider');
-    const sliderMinTick = Math.max(minTick - 1000, 0); // Include spawn offset
-    slider.min = sliderMinTick;
-    slider.max = maxTick;
+    // Use actual available data range instead of theoretical range
+    const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null);
+    const dataMinTick = Math.min(...ticks);
+    const dataMaxTick = Math.max(...ticks);
+
+    slider.min = dataMinTick;
+    slider.max = dataMaxTick;
     slider.value = currentTick;
 
     updateTickDisplay(currentTick);
@@ -1055,7 +1063,9 @@ function jumpToTick(tick) {
 
 function updateTickDisplay(tick) {
     const displayTick = tick || currentTick;
-    const relativeTick = displayTick - (minTick - 1000); // Show tick relative to spawn start (1000 ticks before round)
+    // Calculate relative tick based on the actual first available tick
+    const firstAvailableTick = currentRoundData ? Math.min(...currentRoundData.map(d => d.Tick).filter(t => t != null)) : minTick;
+    const relativeTick = displayTick - firstAvailableTick;
     document.getElementById('currentTick').textContent = relativeTick;
     document.getElementById('tickSlider').value = displayTick;
 }
