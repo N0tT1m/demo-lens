@@ -156,6 +156,137 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpGet("debug-round-info")]
+        public async Task<IActionResult> GetDebugRoundInfo([FromQuery] int demoId, [FromQuery] int roundNumber)
+        {
+            try
+            {
+                var demoSource = await GetDemoSourceAsync(demoId);
+                var adjustedRoundNumber = GetDatabaseRoundNumber(roundNumber, demoSource);
+
+                var sql = @"
+                    SELECT
+                        r.StartTick,
+                        r.EndTick,
+                        r.Duration,
+                        COUNT(DISTINCT pp.Tick) as AvailableTickCount,
+                        MIN(pp.Tick) as MinDataTick,
+                        MAX(pp.Tick) as MaxDataTick,
+                        COUNT(DISTINCT pp.PlayerId) as PlayerCount
+                    FROM Rounds r
+                    INNER JOIN Matches m ON r.MatchId = m.Id
+                    INNER JOIN DemoFiles d ON m.DemoFileId = d.Id
+                    INNER JOIN Players p ON p.DemoFileId = d.Id
+                    INNER JOIN PlayerPositions pp ON pp.PlayerId = p.Id
+                    WHERE d.Id = @DemoId
+                        AND r.RoundNumber = @RoundNumber
+                        AND pp.Tick >= (r.StartTick - 2000)  -- Look 2000 ticks back
+                        AND (r.EndTick IS NULL OR pp.Tick <= r.EndTick)
+                    GROUP BY r.StartTick, r.EndTick, r.Duration";
+
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@DemoId", demoId);
+                command.Parameters.AddWithValue("@RoundNumber", adjustedRoundNumber);
+
+                using var reader = await command.ExecuteReaderAsync();
+                var debugInfo = new Dictionary<string, object>();
+
+                if (await reader.ReadAsync())
+                {
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var value = reader.GetValue(i);
+                        debugInfo[reader.GetName(i)] = value == DBNull.Value ? null! : value;
+                    }
+                }
+
+                return Ok(new
+                {
+                    Title = "Debug Round Info",
+                    DemoId = demoId,
+                    RoundNumber = roundNumber,
+                    AdjustedRoundNumber = adjustedRoundNumber,
+                    DemoSource = demoSource,
+                    DebugInfo = debugInfo
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting debug round info");
+                return StatusCode(500, $"Error getting debug info: {ex.Message}");
+            }
+        }
+
+        [HttpGet("check-spawn-data")]
+        public async Task<IActionResult> CheckSpawnData([FromQuery] int demoId, [FromQuery] int roundNumber)
+        {
+            try
+            {
+                var demoSource = await GetDemoSourceAsync(demoId);
+                var adjustedRoundNumber = GetDatabaseRoundNumber(roundNumber, demoSource);
+
+                // Check if we have ANY position data before the round starts
+                var sql = @"
+                    SELECT TOP 50
+                        pp.Tick,
+                        p.PlayerName,
+                        p.Team,
+                        pp.PositionX,
+                        pp.PositionY,
+                        pp.PositionZ,
+                        r.StartTick,
+                        (pp.Tick - r.StartTick) as TicksFromRoundStart
+                    FROM PlayerPositions pp
+                    INNER JOIN Players p ON pp.PlayerId = p.Id
+                    INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
+                    INNER JOIN Matches m ON d.Id = m.DemoFileId
+                    INNER JOIN Rounds r ON m.Id = r.MatchId
+                    WHERE d.Id = @DemoId
+                        AND r.RoundNumber = @RoundNumber
+                        AND pp.Tick BETWEEN (r.StartTick - 2000) AND (r.StartTick + 100)
+                    ORDER BY pp.Tick, p.PlayerName";
+
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@DemoId", demoId);
+                command.Parameters.AddWithValue("@RoundNumber", adjustedRoundNumber);
+
+                using var reader = await command.ExecuteReaderAsync();
+                var spawnData = new List<Dictionary<string, object>>();
+
+                while (await reader.ReadAsync())
+                {
+                    var row = new Dictionary<string, object>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var value = reader.GetValue(i);
+                        row[reader.GetName(i)] = value == DBNull.Value ? null! : value;
+                    }
+                    spawnData.Add(row);
+                }
+
+                return Ok(new
+                {
+                    Title = "Spawn Data Check",
+                    DemoId = demoId,
+                    RoundNumber = roundNumber,
+                    AdjustedRoundNumber = adjustedRoundNumber,
+                    SpawnData = spawnData,
+                    TotalRecords = spawnData.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking spawn data");
+                return StatusCode(500, $"Error checking spawn data: {ex.Message}");
+            }
+        }
+
         [HttpGet("round-data")]
         public async Task<IActionResult> GetRoundData([FromQuery] int? roundId = null, [FromQuery] int? demoId = null, [FromQuery] int? roundNumber = null, [FromQuery] int? tick = null)
         {

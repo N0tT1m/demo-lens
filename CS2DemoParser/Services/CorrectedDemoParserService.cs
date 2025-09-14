@@ -265,6 +265,9 @@ public class CorrectedDemoParserService
         demo.Source1GameEvents.InfernoExpire += OnInfernoExpire;
         demo.Source1GameEvents.InfernoExtinguish += OnInfernoExtinguish;
         demo.Source1GameEvents.MolotovDetonate += OnMolotovDetonate;
+
+        // CRITICAL: Hook into tick processing for continuous player position tracking
+        demo.TickEnd += OnTickEnd;
         
         // Smoke events
         demo.Source1GameEvents.SmokegrenadeExpired += OnSmokegrenadeExpired;
@@ -616,6 +619,9 @@ public class CorrectedDemoParserService
         }
 
         LogGameEvent(_demo, "round_start", "Round started", true);
+
+        // CRITICAL: Track player positions at round start to capture pre-round/spawn positions
+        TrackPlayerPositions();
     }
 
     private void OnRoundEnd(Source1RoundEndEvent e)
@@ -839,6 +845,9 @@ public class CorrectedDemoParserService
         }
 
         LogGameEvent(_demo, "player_hurt", $"{e.Player.PlayerName} hurt by {e.Attacker?.PlayerName} for {e.DmgHealth} damage");
+
+        // Track player positions during damage events for continuous tracking
+        TrackPlayerPositions();
     }
 
     private void OnWeaponFire(Source1WeaponFireEvent e)
@@ -1262,9 +1271,6 @@ public class CorrectedDemoParserService
     public void TrackPlayerPositions()
     {
         if (_demo == null || _currentDemoFile == null) return;
-        
-        // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
 
         var parsePositions = _configuration.GetValue<bool>("ParserSettings:ParsePlayerPositions", true);
         var positionInterval = _configuration.GetValue<int>("ParserSettings:PlayerPositionInterval", 16);
@@ -2055,12 +2061,18 @@ public class CorrectedDemoParserService
     private void OnPlayerFootstep(Source1PlayerFootstepEvent e)
     {
         ProcessPlayerBehaviorEvent("footstep", e.Player);
+
+        // Track player positions on footstep for continuous tracking
+        TrackPlayerPositions();
     }
     
     private void OnPlayerSpawn(Source1PlayerSpawnEvent e)
     {
         ProcessPlayerBehaviorEvent("spawn", e.Player);
         LogGameEvent(_demo, "player_spawn", $"{e.Player?.PlayerName} spawned", true);
+
+        // CRITICAL: Track player positions immediately on spawn to capture spawn locations
+        TrackPlayerPositions();
     }
     
     private void OnPlayerFallDamage(Source1PlayerFalldamageEvent e)
@@ -3357,6 +3369,14 @@ public class CorrectedDemoParserService
         }
         
         return null;
+    }
+
+    // CRITICAL: Tick-based event handler for continuous player position tracking
+    private void OnTickEnd(object? sender, EventArgs e)
+    {
+        // Call our position tracking method on every tick
+        // This ensures we capture positions continuously, including spawns
+        TrackPlayerPositions();
     }
 }
 
