@@ -488,7 +488,7 @@ function loadMapImage(mapName) {
     console.log('Map config:', config);
     mapImage = new Image();
     mapImage.onload = function() {
-        console.log('Map image loaded successfully');
+        console.log('Map image loaded successfully, dimensions:', mapImage.width, 'x', mapImage.height);
         drawCurrentFrame();
     };
     mapImage.onerror = function() {
@@ -598,8 +598,13 @@ function transformToCanvas(gameX, gameY, mapName) {
 }
 
 function drawCurrentFrame() {
-    if (!ctx) return;
+    console.log('drawCurrentFrame called');
+    if (!ctx) {
+        console.log('No canvas context available');
+        return;
+    }
 
+    console.log('Canvas size:', canvas.width, 'x', canvas.height);
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
