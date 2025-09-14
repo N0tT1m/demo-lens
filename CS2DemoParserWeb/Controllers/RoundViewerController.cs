@@ -217,10 +217,10 @@ namespace CS2DemoParserWeb.Controllers
                         INNER JOIN DemoFiles d ON p.DemoFileId = d.Id
                         LEFT JOIN Matches m ON d.Id = m.DemoFileId
                         LEFT JOIN Rounds r ON m.Id = r.MatchId
-                            AND pp.Tick >= r.StartTick
-                            AND (r.EndTick IS NULL OR pp.Tick <= r.EndTick)
                         WHERE d.Id = @DemoId
                             AND r.RoundNumber = @RoundNumber
+                            AND pp.Tick >= (r.StartTick - 1000)  -- Include 1000 ticks before round start for spawn positions
+                            AND (r.EndTick IS NULL OR pp.Tick <= r.EndTick)
                             AND (@Tick IS NULL OR pp.Tick = @Tick)
                         ORDER BY pp.Tick, p.Team, p.PlayerName";
 

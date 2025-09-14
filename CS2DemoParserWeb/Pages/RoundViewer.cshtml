@@ -556,9 +556,13 @@ function processRoundData() {
     minTick = roundInfo.StartTick;
     maxTick = roundInfo.EndTick || roundInfo.StartTick + 32000; // Fallback if EndTick is null
 
+    console.log(`Round boundaries: StartTick=${minTick}, EndTick=${maxTick}`);
+
     // Start earlier to see spawn positions - CS2 spawns happen before round officially starts
-    const spawnOffset = 500; // Start 500 ticks before round start to see spawns
+    const spawnOffset = 1000; // Start 1000 ticks before round start to see spawns (matches server query)
     currentTick = Math.max(minTick - spawnOffset, 0); // Don't go below tick 0
+
+    console.log(`Current tick set to: ${currentTick} (${spawnOffset} ticks before round start)`);
 
     // Get available data tick range for comparison
     const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null);
@@ -608,7 +612,7 @@ function loadMapImage(mapName) {
 
 function setupTimeline() {
     const slider = document.getElementById('tickSlider');
-    const sliderMinTick = Math.max(minTick - 500, 0); // Include spawn offset
+    const sliderMinTick = Math.max(minTick - 1000, 0); // Include spawn offset
     slider.min = sliderMinTick;
     slider.max = maxTick;
     slider.value = currentTick;
@@ -1041,6 +1045,7 @@ function nextTick() {
 
 function jumpToTick(tick) {
     currentTick = parseInt(tick);
+    console.log(`Jumping to tick: ${currentTick}, available ticks:`, Array.from(currentRoundData.tickData.keys()).slice(0, 10));
     updateDisplay();
 
     if (isPlaying) {
@@ -1050,7 +1055,7 @@ function jumpToTick(tick) {
 
 function updateTickDisplay(tick) {
     const displayTick = tick || currentTick;
-    const relativeTick = displayTick - (minTick - 500); // Show tick relative to spawn start (500 ticks before round)
+    const relativeTick = displayTick - (minTick - 1000); // Show tick relative to spawn start (1000 ticks before round)
     document.getElementById('currentTick').textContent = relativeTick;
     document.getElementById('tickSlider').value = displayTick;
 }
