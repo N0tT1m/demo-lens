@@ -292,7 +292,7 @@ let showTrails = false;
 let showEvents = true;
 let playerTrails = new Map();
 
-// Map configurations (using the same as heatmap/analytics)
+// Map configurations (exactly matching HeatmapService)
 const mapConfigs = {
     'de_ancient': { PosX: -2953, PosY: 2164, Scale: 5, image: '/maps/de_ancient.png' },
     'de_anubis': { PosX: -2796, PosY: 3328, Scale: 5.22, image: '/maps/de_anubis.png' },
@@ -302,7 +302,8 @@ const mapConfigs = {
     'de_nuke': { PosX: -3453, PosY: 2887, Scale: 7.0, image: '/maps/de_nuke.png' },
     'de_overpass': { PosX: -4831, PosY: 1781, Scale: 5.2, image: '/maps/de_overpass.png' },
     'de_vertigo': { PosX: -3168, PosY: 1762, Scale: 4.0, image: '/maps/de_vertigo.png' },
-    'de_train': { PosX: -2477, PosY: 2208, Scale: 4.5, image: '/maps/de_train.png' }
+    'de_train': { PosX: -2308, PosY: 2078, Scale: 4.082077, image: '/maps/de_train.png' },
+    'de_cache': { PosX: -2000, PosY: 3250, Scale: 5.5, image: '/maps/de_cache.png' }
 };
 
 // Initialize page
@@ -420,6 +421,7 @@ async function loadRoundData() {
                 console.log('Round data loaded successfully, count:', currentRoundData.length);
                 processRoundData();
                 showRoundInfo(currentRoundData[0]);
+                console.log('Loading map for:', currentRoundData[0].MapName, 'from round data:', currentRoundData[0]);
                 loadMapImage(currentRoundData[0].MapName);
                 setupTimeline();
                 showControls(true);
@@ -497,6 +499,12 @@ function setupTimeline() {
 
     updateTickDisplay(currentTick);
 
+    // Update the timeline label to show this is relative to round start
+    const tickLabel = document.querySelector('label[for="tickSlider"]');
+    if (tickLabel) {
+        tickLabel.textContent = 'Tick (relative):';
+    }
+
     // Show timeline events
     displayTimelineEvents();
 }
@@ -562,11 +570,9 @@ function getEventIcon(eventType) {
 
 // Transform game coordinates to canvas coordinates using proper map config
 function transformToCanvas(gameX, gameY, mapName) {
-    console.log('Looking up config for mapName:', mapName, 'Available configs:', Object.keys(mapConfigs));
     const config = mapConfigs[mapName];
     if (!config) {
         console.warn('No map config found for:', mapName);
-        console.log('Available map configs:', mapConfigs);
         return { x: 0, y: 0 };
     }
 
@@ -600,10 +606,10 @@ function transformToCanvas(gameX, gameY, mapName) {
         canvasY = normalizedY * scale + offsetY;
     }
 
-    // Debug logging for transformations
-    if (Math.random() < 0.05) { // More frequent logging
+    // Debug logging for first few transformations
+    if (Math.random() < 0.01) {
         console.log(`Transform: game(${gameX}, ${gameY}) -> map(${mapX.toFixed(1)}, ${mapY.toFixed(1)}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
-        console.log(`Canvas: ${canvas.width}x${canvas.height}, AspectRatio: ${canvasAspectRatio.toFixed(2)}, Map config:`, config);
+        console.log(`Map config:`, config);
     }
 
     return {
@@ -911,8 +917,10 @@ function jumpToTick(tick) {
 }
 
 function updateTickDisplay(tick) {
-    document.getElementById('currentTick').textContent = tick || currentTick;
-    document.getElementById('tickSlider').value = tick || currentTick;
+    const displayTick = tick || currentTick;
+    const relativeTick = displayTick - minTick; // Show tick relative to round start
+    document.getElementById('currentTick').textContent = relativeTick;
+    document.getElementById('tickSlider').value = displayTick;
 }
 
 function updatePlaybackSpeed() {
@@ -997,11 +1005,12 @@ function showMapInfo(x, y) {
             const gameX = (normalizedX * 1024 * config.Scale) + config.PosX;
             const gameY = config.PosY - (normalizedY * 1024 * config.Scale);
 
+            const relativeTick = currentTick - minTick;
             content.innerHTML = `
                 <strong>Position:</strong><br>
                 Game: (${gameX.toFixed(0)}, ${gameY.toFixed(0)})<br>
                 Canvas: (${x.toFixed(0)}, ${y.toFixed(0)})<br>
-                <strong>Tick:</strong> ${currentTick}
+                <strong>Tick:</strong> ${relativeTick} (abs: ${currentTick})
             `;
 
             panel.classList.remove('d-none');
