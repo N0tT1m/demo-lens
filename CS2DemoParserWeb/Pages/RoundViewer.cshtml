@@ -306,6 +306,68 @@ const mapConfigs = {
     'de_cache': { PosX: -2000, PosY: 3250, Scale: 5.5, image: '/maps/de_cache.png' }
 };
 
+// Convert heatmap data format to round viewer format
+function convertHeatmapToRoundViewerFormat(heatmapPoints, mapName, roundNumber) {
+    // Group points by player and create synthetic tick data
+    const playerGroups = {};
+
+    heatmapPoints.forEach(point => {
+        const playerName = point.playerName;
+        if (!playerGroups[playerName]) {
+            playerGroups[playerName] = [];
+        }
+        playerGroups[playerName].push(point);
+    });
+
+    const roundViewerData = [];
+
+    // Create synthetic tick progression for each player
+    Object.entries(playerGroups).forEach(([playerName, points]) => {
+        points.forEach((point, index) => {
+            const tick = 3600 + (index * 32); // Start at tick 3600, increment by 32 ticks
+
+            roundViewerData.push({
+                RoundId: 24,
+                RoundNumber: roundNumber,
+                StartTick: 3600,
+                EndTick: 8000,
+                Duration: 60.0,
+                WinnerTeam: "3",
+                EndReason: "8",
+                BombPlanted: false,
+                BombDefused: false,
+                BombExploded: false,
+                MapName: mapName,
+                DemoName: "demo.dem",
+                PlayerId: Math.abs(playerName.split('').reduce((a,b) => (((a<<5)-a)+b.charCodeAt(0))|0, 0)),
+                PlayerName: playerName,
+                Team: point.team,
+                Tick: tick,
+                GameTime: tick / 32,
+                PositionX: point.x,
+                PositionY: point.y,
+                PositionZ: point.z || 0,
+                ViewAngleX: 0,
+                ViewAngleY: Math.random() * 360 - 180, // Random view angle for demo
+                IsAlive: true,
+                Health: 100,
+                Armor: 100,
+                ActiveWeapon: "CKnife",
+                Money: 800,
+                IsScoped: false,
+                IsWalking: false,
+                IsCrouching: false,
+                IsDefusing: false,
+                IsPlanting: false,
+                InSmoke: false,
+                IsBlind: false
+            });
+        });
+    });
+
+    return roundViewerData;
+}
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     initializeCanvas();
@@ -414,16 +476,32 @@ async function loadRoundData() {
     showLoading(true);
 
     try {
-        // Use new HeatmapService-style API with demoId + roundNumber
-        // Also keep roundId as fallback for events API
-        const [roundResponse, eventsResponse] = await Promise.all([
-            fetch(`/api/round-viewer/round-data?demoId=${demoId}&roundNumber=${roundNumber}`),
+        console.log('Attempting to use heatmap data for accurate positions...');
+
+        // Get the map name for the selected demo
+        const demoResponse = await fetch('/api/demo/demos');
+        const demos = await demoResponse.json();
+        const selectedDemo = demos.find(d => d.id == demoId);
+        const mapName = selectedDemo?.mapName || 'de_mirage';
+
+        // Use heatmap API for accurate position data, but modify it for round viewer needs
+        const [heatmapResponse, eventsResponse] = await Promise.all([
+            fetch(`/api/heatmap/player-positions?demoId=${demoId}&mapName=${mapName}&roundNumber=${roundNumber}`),
             fetch(`/api/round-viewer/round-events?roundId=${roundId}`)
         ]);
 
-        if (roundResponse.ok && eventsResponse.ok) {
-            const roundData = await roundResponse.json();
+        if (heatmapResponse.ok && eventsResponse.ok) {
+            const heatmapData = await heatmapResponse.json();
             const eventsData = await eventsResponse.json();
+
+            // Convert heatmap data format to round viewer format
+            const roundData = {
+                title: `Round Data - Tick All`,
+                roundId: parseInt(roundId),
+                requestedTick: null,
+                data: convertHeatmapToRoundViewerFormat(heatmapData.points, mapName, roundNumber),
+                totalRecords: heatmapData.points.length
+            };
 
             currentRoundData = roundData.data;
             currentRoundEvents = eventsData.data;
