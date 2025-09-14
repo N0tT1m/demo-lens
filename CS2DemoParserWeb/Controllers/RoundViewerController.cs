@@ -376,7 +376,7 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
-        [HttpGet("round-data")]
+        [HttpGet("get-round-data")]
         public async Task<IActionResult> GetRoundData([FromQuery] int? roundId = null, [FromQuery] int? demoId = null, [FromQuery] int? roundNumber = null, [FromQuery] int? tick = null)
         {
             try
