@@ -439,7 +439,7 @@ namespace CS2DemoParserWeb.Controllers
                         LEFT JOIN Rounds r ON m.Id = r.MatchId
                         WHERE d.Id = @DemoId
                             AND r.RoundNumber = @RoundNumber
-                            AND pp.Tick >= (r.StartTick - 1000)  -- Include 1000 ticks before round start for spawn positions
+                            AND pp.Tick >= (r.StartTick - 2000)  -- Include 1000 ticks before round start for spawn positions
                             AND (r.EndTick IS NULL OR pp.Tick <= r.EndTick)
                             AND (@Tick IS NULL OR pp.Tick = @Tick)
                         ORDER BY pp.Tick, p.Team, p.PlayerName";
