@@ -563,9 +563,17 @@ function transformToCanvas(gameX, gameY, mapName) {
     const normalizedY = (config.PosY - gameY) / config.Scale / 1024;
 
     // Convert to canvas coordinates
+    const canvasX = normalizedX * canvas.width;
+    const canvasY = normalizedY * canvas.height;
+
+    // Debug logging for first few transformations
+    if (Math.random() < 0.01) {
+        console.log(`Transform: game(${gameX}, ${gameY}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
+    }
+
     return {
-        x: normalizedX * canvas.width,
-        y: normalizedY * canvas.height
+        x: canvasX,
+        y: canvasY
     };
 }
 
