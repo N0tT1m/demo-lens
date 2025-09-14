@@ -105,7 +105,7 @@
                 </div>
 
                 <!-- 2D Map Canvas -->
-                <canvas id="roundCanvas" style="display: none; width: 100%; height: 100%; border: 1px solid #ddd;"></canvas>
+                <canvas id="roundCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 1px solid #ddd;"></canvas>
 
                 <!-- Map Info Panel -->
                 <div class="map-info-panel d-none" id="mapInfoPanel">
@@ -984,11 +984,26 @@ function showControls(show) {
         mapPlaceholder: !!mapPlaceholder
     });
 
-    if (timelineControls) timelineControls.style.display = show ? 'block' : 'none';
-    if (roundCanvas) roundCanvas.style.display = show ? 'block' : 'none';
-    if (mapPlaceholder) mapPlaceholder.style.display = show ? 'none' : 'flex';
+    try {
+        if (timelineControls) {
+            timelineControls.style.display = show ? 'block' : 'none';
+            console.log('Timeline controls display set to:', timelineControls.style.display);
+        }
 
-    console.log('Canvas display after change:', roundCanvas ? roundCanvas.style.display : 'null');
+        if (roundCanvas) {
+            roundCanvas.style.display = show ? 'block' : 'none';
+            console.log('Canvas display set to:', roundCanvas.style.display);
+        }
+
+        if (mapPlaceholder) {
+            mapPlaceholder.style.display = show ? 'none' : 'flex';
+            console.log('Placeholder display set to:', mapPlaceholder.style.display);
+        }
+
+        console.log('Canvas display after change:', roundCanvas ? roundCanvas.style.display : 'null');
+    } catch (error) {
+        console.error('Error in showControls:', error);
+    }
 }
 
 function resetViewer() {
