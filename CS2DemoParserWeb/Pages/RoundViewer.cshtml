@@ -576,6 +576,11 @@ function processRoundData() {
     console.log('StartTick value:', roundInfo.StartTick, 'type:', typeof roundInfo.StartTick);
     console.log('EndTick value:', roundInfo.EndTick, 'type:', typeof roundInfo.EndTick);
 
+    // Get available data tick range first
+    const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null && !isNaN(t));
+    const dataMinTick = Math.min(...ticks);
+    const dataMaxTick = Math.max(...ticks);
+
     // Handle case where StartTick might be null/undefined
     let actualStartTick = roundInfo.StartTick;
     let actualEndTick = roundInfo.EndTick;
@@ -583,44 +588,38 @@ function processRoundData() {
     // If StartTick is null/undefined, calculate from the data
     if (actualStartTick == null || isNaN(actualStartTick)) {
         console.log('StartTick is null/undefined, calculating from data');
-        const allTicks = currentRoundData.map(d => d.Tick).filter(t => t != null && !isNaN(t));
-        if (allTicks.length > 0) {
-            actualStartTick = Math.min(...allTicks) + 1000; // Add offset to get back to round start
-            actualEndTick = Math.max(...allTicks);
+        if (ticks.length > 0) {
+            actualStartTick = dataMinTick + 1000; // Estimate round start from data
+            actualEndTick = dataMaxTick;
             console.log('Calculated StartTick:', actualStartTick, 'EndTick:', actualEndTick);
         }
     }
 
-    minTick = actualStartTick || 0;
-    maxTick = actualEndTick || (actualStartTick + 32000);
+    // FIXED: Use dataMinTick as the baseline for relative tick calculations
+    // This ensures that we start from the first available data (spawn positions)
+    minTick = dataMinTick;
+    maxTick = dataMaxTick;
 
-    console.log('minTick set to:', minTick, 'maxTick set to:', maxTick);
+    // Store the actual round boundaries for reference
+    window.roundStartTick = actualStartTick;
+    window.roundEndTick = actualEndTick;
 
-    // Get available data tick range for comparison
-    const ticks = currentRoundData.map(d => d.Tick).filter(t => t != null);
-    const dataMinTick = Math.min(...ticks);
-    const dataMaxTick = Math.max(...ticks);
+    console.log(`Data tick range: ${dataMinTick} to ${dataMaxTick}`);
+    console.log(`Round boundaries: StartTick=${actualStartTick}, EndTick=${actualEndTick}`);
+    console.log(`Timeline will use data range as baseline (minTick=${minTick})`);
 
-    console.log(`Round boundaries: StartTick=${minTick}, EndTick=${maxTick}`);
-    console.log(`Available data tick range: ${dataMinTick} to ${dataMaxTick}`);
-
-    // Start at the first available data tick (which should include spawn positions)
+    // Start at the first available data tick (spawn positions)
     currentTick = dataMinTick;
 
     console.log(`Current tick set to: ${currentTick} (first available data)`);
 
-    // Update maxTick to match actual data range if it's larger
-    maxTick = Math.max(maxTick, dataMaxTick);
-
-    // Setup slider to use actual tick range
+    // Setup slider to use actual data range
     const slider = document.getElementById('tickSlider');
     slider.min = dataMinTick;
     slider.max = dataMaxTick;
     slider.value = currentTick;
 
-    console.log(`Starting at first available tick: ${currentTick}`);
     console.log(`Slider range: ${dataMinTick} to ${dataMaxTick}`);
-    console.log('Processing round data with proper map configurations');
 
     // Group data by tick for efficient lookup
     const tickData = new Map();
@@ -672,10 +671,10 @@ function setupTimeline() {
 
     updateTickDisplay(currentTick);
 
-    // Update the timeline label to show this is relative to round start
+    // Update the timeline label to show this includes pre-round data
     const tickLabel = document.querySelector('label[for="tickSlider"]');
     if (tickLabel) {
-        tickLabel.textContent = 'Tick (relative):';
+        tickLabel.textContent = 'Timeline:';
     }
 
     // Show timeline events
@@ -1117,13 +1116,32 @@ function jumpToTick(tick) {
 function updateTickDisplay(tick) {
     const displayTick = tick || currentTick;
 
-    // Use minTick (which is the corrected round start tick) for calculation
+    // Calculate relative tick from the start of available data
     const relativeTick = displayTick - minTick;
+
+    // Also calculate relative to actual round start if available
+    let roundRelativeTick = null;
+    if (window.roundStartTick) {
+        roundRelativeTick = displayTick - window.roundStartTick;
+    }
 
     // Debug logging
     console.log(`updateTickDisplay: displayTick=${displayTick}, minTick=${minTick}, relativeTick=${relativeTick}`);
+    if (roundRelativeTick !== null) {
+        console.log(`Round relative tick: ${roundRelativeTick}`);
+    }
 
-    document.getElementById('currentTick').textContent = relativeTick;
+    // Show both relative tick and round status
+    let displayText = relativeTick.toString();
+    if (roundRelativeTick !== null) {
+        if (roundRelativeTick < 0) {
+            displayText += ` (${Math.abs(roundRelativeTick)} before round)`;
+        } else {
+            displayText += ` (round +${roundRelativeTick})`;
+        }
+    }
+
+    document.getElementById('currentTick').textContent = displayText;
     document.getElementById('tickSlider').value = displayTick;
 }
 
@@ -1209,14 +1227,30 @@ function showMapInfo(x, y) {
             const gameX = (normalizedX * 1024 * config.Scale) + config.PosX;
             const gameY = config.PosY - (normalizedY * 1024 * config.Scale);
 
-            // Use minTick (which is the corrected round start tick) for calculation
+            // Calculate relative tick from data start and round start
             const relativeTick = currentTick - minTick;
+            let roundRelativeTick = null;
+            if (window.roundStartTick) {
+                roundRelativeTick = currentTick - window.roundStartTick;
+            }
+
             console.log(`Tooltip calc: currentTick=${currentTick}, minTick=${minTick}, relativeTick=${relativeTick}`);
+
+            let tickInfo = `Timeline: ${relativeTick}`;
+            if (roundRelativeTick !== null) {
+                if (roundRelativeTick < 0) {
+                    tickInfo += ` (${Math.abs(roundRelativeTick)} before round)`;
+                } else {
+                    tickInfo += ` (round +${roundRelativeTick})`;
+                }
+            }
+
             content.innerHTML = `
                 <strong>Position:</strong><br>
                 Game: (${gameX.toFixed(0)}, ${gameY.toFixed(0)})<br>
                 Canvas: (${x.toFixed(0)}, ${y.toFixed(0)})<br>
-                <strong>Tick:</strong> ${relativeTick} (abs: ${currentTick})
+                <strong>${tickInfo}</strong><br>
+                <small>Absolute: ${currentTick}</small>
             `;
 
             panel.classList.remove('d-none');
