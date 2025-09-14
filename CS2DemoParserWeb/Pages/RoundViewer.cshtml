@@ -553,6 +553,9 @@ function processRoundData() {
 
     // Use the round's actual start and end ticks for proper timeline
     const roundInfo = currentRoundData[0];
+    console.log('Round info object:', roundInfo);
+    console.log('Available properties:', Object.keys(roundInfo));
+
     minTick = roundInfo.StartTick;
     maxTick = roundInfo.EndTick || roundInfo.StartTick + 32000; // Fallback if EndTick is null
 
@@ -1071,6 +1074,10 @@ function updateTickDisplay(tick) {
     // Calculate relative tick based on the round's actual start tick
     const roundStartTick = currentRoundData && currentRoundData.length > 0 ? currentRoundData[0].StartTick : minTick;
     const relativeTick = displayTick - roundStartTick;
+
+    // Debug logging
+    console.log(`updateTickDisplay: displayTick=${displayTick}, roundStartTick=${roundStartTick}, relativeTick=${relativeTick}`);
+
     document.getElementById('currentTick').textContent = relativeTick;
     document.getElementById('tickSlider').value = displayTick;
 }
@@ -1158,6 +1165,7 @@ function showMapInfo(x, y) {
             const gameY = config.PosY - (normalizedY * 1024 * config.Scale);
 
             const roundStartTick = currentRoundData && currentRoundData.length > 0 ? currentRoundData[0].StartTick : minTick;
+            console.log(`Tooltip calc: currentTick=${currentTick}, StartTick=${currentRoundData[0]?.StartTick}, minTick=${minTick}, roundStartTick=${roundStartTick}`);
             const relativeTick = currentTick - roundStartTick;
             content.innerHTML = `
                 <strong>Position:</strong><br>
