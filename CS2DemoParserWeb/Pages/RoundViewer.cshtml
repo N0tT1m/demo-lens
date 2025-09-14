@@ -449,19 +449,8 @@ function processRoundData() {
 
     console.log(`Using actual data tick range: ${minTick} to ${maxTick} (round reported: ${currentRoundData[0]?.StartTick} to ${currentRoundData[0]?.EndTick})`);
 
-    // Calculate coordinate bounds
-    const positions = currentRoundData.filter(d => d.PositionX != null && d.PositionY != null);
-    const xCoords = positions.map(d => d.PositionX);
-    const yCoords = positions.map(d => d.PositionY);
-
-    currentRoundData.bounds = {
-        minX: Math.min(...xCoords),
-        maxX: Math.max(...xCoords),
-        minY: Math.min(...yCoords),
-        maxY: Math.max(...yCoords)
-    };
-
-    console.log('Calculated bounds:', currentRoundData.bounds);
+    // Using proper map configurations instead of dynamic bounds
+    console.log('Processing round data with proper map configurations');
 
     // Group data by tick for efficient lookup
     const tickData = new Map();
@@ -571,17 +560,22 @@ function getEventIcon(eventType) {
     }
 }
 
-// Transform game coordinates to canvas coordinates
+// Transform game coordinates to canvas coordinates using proper map config
 function transformToCanvas(gameX, gameY, mapName) {
-    if (!currentRoundData || !currentRoundData.bounds) {
+    const config = mapConfigs[mapName];
+    if (!config) {
+        console.warn('No map config found for:', mapName);
         return { x: 0, y: 0 };
     }
 
-    const bounds = currentRoundData.bounds;
+    // Convert game coordinates to map coordinates using the same logic as heatmap
+    // This matches the HeatmapService coordinate transformation
+    const mapX = (gameX - config.PosX) / config.Scale;
+    const mapY = (config.PosY - gameY) / config.Scale; // Flip Y axis for CS2
 
-    // Convert game coordinates to normalized coordinates (0-1)
-    const normalizedX = (gameX - bounds.minX) / (bounds.maxX - bounds.minX);
-    const normalizedY = 1 - (gameY - bounds.minY) / (bounds.maxY - bounds.minY); // Flip Y axis
+    // Normalize to 0-1 range (assuming 1024x1024 map coordinate system)
+    const normalizedX = mapX / 1024;
+    const normalizedY = mapY / 1024;
 
     // Convert to canvas coordinates
     const canvasX = normalizedX * canvas.width;
@@ -589,8 +583,8 @@ function transformToCanvas(gameX, gameY, mapName) {
 
     // Debug logging for first few transformations
     if (Math.random() < 0.01) {
-        console.log(`Transform: game(${gameX}, ${gameY}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
-        console.log(`Bounds: X(${bounds.minX} to ${bounds.maxX}), Y(${bounds.minY} to ${bounds.maxY})`);
+        console.log(`Transform: game(${gameX}, ${gameY}) -> map(${mapX.toFixed(1)}, ${mapY.toFixed(1)}) -> normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)})`);
+        console.log(`Map config:`, config);
     }
 
     return {
