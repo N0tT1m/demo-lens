@@ -438,15 +438,24 @@ async function loadRoundsForDemo() {
 
             roundSelect.innerHTML = '<option value="">Select Round</option>';
             if (data.data && Array.isArray(data.data)) {
+                // Find the first round's StartTick to use as baseline
+                const firstRoundStartTick = data.data.length > 0 ? data.data[0].StartTick : 0;
+
                 data.data.forEach(round => {
                     const option = document.createElement('option');
                     option.value = round.Id;
-                    // Calculate proper duration from tick data if available
+                    // Calculate proper round duration from tick data if available
                     let duration = round.Duration;
                     if (round.StartTick != null && round.EndTick != null) {
+                        // Calculate actual round duration (not cumulative)
                         const tickDuration = round.EndTick - round.StartTick;
                         const tickRate = 128; // CS2 standard tick rate
                         duration = tickDuration / tickRate;
+
+                        // Debug logging for the first few rounds
+                        if (round.RoundNumber <= 3) {
+                            console.log(`Round ${round.RoundNumber}: StartTick=${round.StartTick}, EndTick=${round.EndTick}, TickDuration=${tickDuration}, Duration=${duration.toFixed(1)}s`);
+                        }
                     }
 
                     option.textContent = `Round ${round.RoundNumber} - ${round.WinnerTeam || 'Unknown'} (${duration?.toFixed(1)}s)`;
