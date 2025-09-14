@@ -693,10 +693,10 @@ function transformToCanvas(gameX, gameY, mapName) {
     const normalizedY = (config.PosY - gameY) / config.Scale; // Flip Y axis for CS2
 
     // Convert to image coordinates (1024x1024 base) - EXACT same as HeatmapImageService
-    const imageWidth = 1024;
-    const imageHeight = 1024;
-    const heatmapImageX = normalizedX * imageWidth / 1024; // This is just normalizedX
-    const heatmapImageY = normalizedY * imageHeight / 1024; // This is just normalizedY
+    // HeatmapImageService: return normalized * imageWidth / 1024f;
+    // Since we're working with 1024x1024, this simplifies to just the normalized values
+    const heatmapImageX = normalizedX; // This is the 0-1024 coordinate from HeatmapImageService
+    const heatmapImageY = normalizedY; // This is the 0-1024 coordinate from HeatmapImageService
 
     // Now scale to canvas size - match how the map image is actually drawn
     const canvasAspectRatio = canvas.width / canvas.height;
@@ -708,14 +708,16 @@ function transformToCanvas(gameX, gameY, mapName) {
         // Canvas wider - map uses full height, centered horizontally
         const mapPixelSize = canvas.height;
         const offsetX = (canvas.width - mapPixelSize) / 2;
-        canvasX = heatmapImageX * mapPixelSize + offsetX;
-        canvasY = heatmapImageY * mapPixelSize;
+        // Scale from 1024 coordinate space to canvas pixel space
+        canvasX = (heatmapImageX / 1024) * mapPixelSize + offsetX;
+        canvasY = (heatmapImageY / 1024) * mapPixelSize;
     } else {
         // Canvas taller - map uses full width, centered vertically
         const mapPixelSize = canvas.width;
         const offsetY = (canvas.height - mapPixelSize) / 2;
-        canvasX = heatmapImageX * mapPixelSize;
-        canvasY = heatmapImageY * mapPixelSize + offsetY;
+        // Scale from 1024 coordinate space to canvas pixel space
+        canvasX = (heatmapImageX / 1024) * mapPixelSize;
+        canvasY = (heatmapImageY / 1024) * mapPixelSize + offsetY;
     }
 
     // Debug logging - always log first transformation for debugging
