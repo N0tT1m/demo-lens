@@ -636,7 +636,10 @@ public class CorrectedDemoParserService
 
         _currentRound.EndTick = _demo.CurrentDemoTick.Value;
         _currentRound.EndTime = DateTime.UtcNow;
-        _currentRound.Duration = (float)(DateTime.UtcNow - _currentRound.StartTime).TotalSeconds;
+
+        // Calculate duration based on game ticks, not real-time parsing duration
+        var tickDuration = _currentRound.EndTick - _currentRound.StartTick;
+        _currentRound.Duration = (float)tickDuration / CsDemoParser.TickRate;
         _currentRound.WinnerTeam = e.Winner.ToString();
         _currentRound.EndReason = e.Reason.ToString();
         _currentRound.CTScore = _demo.TeamCounterTerrorist?.Score ?? 0;

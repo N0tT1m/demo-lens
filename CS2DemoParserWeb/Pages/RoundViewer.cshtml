@@ -441,7 +441,15 @@ async function loadRoundsForDemo() {
                 data.data.forEach(round => {
                     const option = document.createElement('option');
                     option.value = round.Id;
-                    option.textContent = `Round ${round.RoundNumber} - ${round.WinnerTeam || 'Unknown'} (${round.Duration?.toFixed(1)}s)`;
+                    // Calculate proper duration from tick data if available
+                    let duration = round.Duration;
+                    if (round.StartTick != null && round.EndTick != null) {
+                        const tickDuration = round.EndTick - round.StartTick;
+                        const tickRate = 128; // CS2 standard tick rate
+                        duration = tickDuration / tickRate;
+                    }
+
+                    option.textContent = `Round ${round.RoundNumber} - ${round.WinnerTeam || 'Unknown'} (${duration?.toFixed(1)}s)`;
                     roundSelect.appendChild(option);
                 });
             } else {
@@ -669,6 +677,14 @@ function showRoundInfo(roundData) {
     const panel = document.getElementById('roundInfoPanel');
     const content = document.getElementById('roundInfoContent');
 
+    // Calculate proper duration from tick data if available
+    let duration = roundData.Duration;
+    if (roundData.StartTick != null && roundData.EndTick != null) {
+        const tickDuration = roundData.EndTick - roundData.StartTick;
+        const tickRate = 128; // CS2 standard tick rate
+        duration = tickDuration / tickRate;
+    }
+
     content.innerHTML = `
         <div class="col-md-2">
             <strong>Round:</strong> ${roundData.RoundNumber}
@@ -680,7 +696,7 @@ function showRoundInfo(roundData) {
             <strong>Winner:</strong> ${roundData.WinnerTeam || 'Unknown'}
         </div>
         <div class="col-md-2">
-            <strong>Duration:</strong> ${roundData.Duration?.toFixed(1)}s
+            <strong>Duration:</strong> ${duration?.toFixed(1)}s
         </div>
         <div class="col-md-2">
             <strong>End Reason:</strong> ${roundData.EndReason || 'Unknown'}
