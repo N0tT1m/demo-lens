@@ -583,7 +583,8 @@ public class CorrectedDemoParserService
             MatchId = _currentMatch?.Id ?? 0,
             RoundNumber = displayRoundNumber,
             StartTick = _demo.CurrentDemoTick.Value,
-            StartTime = DateTime.UtcNow,
+            // Calculate game time from demo start instead of using parsing time
+            StartTime = DateTime.UnixEpoch.AddSeconds((double)_demo.CurrentDemoTick.Value / CsDemoParser.TickRate),
             CTScore = _demo.TeamCounterTerrorist?.Score ?? 0,
             TScore = _demo.TeamTerrorist?.Score ?? 0
         };
@@ -635,7 +636,8 @@ public class CorrectedDemoParserService
         }
 
         _currentRound.EndTick = _demo.CurrentDemoTick.Value;
-        _currentRound.EndTime = DateTime.UtcNow;
+        // Calculate game time from demo start instead of using parsing time
+        _currentRound.EndTime = DateTime.UnixEpoch.AddSeconds((double)_demo.CurrentDemoTick.Value / CsDemoParser.TickRate);
 
         // Calculate duration based on game ticks, not real-time parsing duration
         var tickDuration = _currentRound.EndTick - _currentRound.StartTick;
