@@ -1,0 +1,1994 @@
+@page
+@model CS2DemoParserWeb.Pages.AnalyticsDocumentationModel
+@{
+    ViewData["Title"] = "Analytics Endpoints Documentation";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Analytics Endpoints Documentation</h1>
+                <a href="/Analytics" class="btn btn-outline-secondary">← Back to Analytics</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Table of Contents -->
+            <div class="card position-sticky" style="top: 20px;">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Quick Navigation</h6>
+                </div>
+                <div class="card-body">
+                    <nav class="nav flex-column">
+                        <a class="nav-link" href="#overview">Overview</a>
+                        <a class="nav-link" href="#common-params">Common Parameters</a>
+                        <a class="nav-link" href="#endpoints">Endpoints</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-1">1. Clutch Analysis</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-2">2. Trade Kill Analysis</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-3">3. First Kill Impact</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-4">4. Economic Intelligence</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-5">5. Position Analysis</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-6">6. Enhanced Trade Kill</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-7">7. Weapon Mastery</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-8">8. Grenade Impact</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-9">9. First Blood Impact</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-10">10. Economic Efficiency</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-11">11. Round Momentum</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-12">12. Positioning Intelligence</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-13">13. Team Coordination</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-14">14. Performance Consistency</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-15">15. Damage Efficiency</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-16">16. Comprehensive Clutch</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-17">17. Positioning (Simple)</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-18">18. Weapon Intelligence</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-19">19. Circumstantial Combat</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-20">20. Team Coordination</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-21">21. Pressure Metrics</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-22">22. Database Diagnostic</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-23">23. Economy Intelligence</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-24">24. Advanced Player Perf.</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-25">25. Player Inventory</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-26">26. Master Analytics</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-27">27. Situation Analysis</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-28">28. Economy Enhanced</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-29">29. Movement & Positioning</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-30">30. Timing & Tempo</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-31">31. Weapon Mastery</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-32">32. Match Flow</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-33">33. Performance Trends</a>
+                        <a class="nav-link ps-3 small" href="#endpoint-34">34. Team Dynamics</a>
+                        <a class="nav-link" href="#response-format">Response Format</a>
+                        <a class="nav-link" href="#database-schema">Database Schema</a>
+                        <a class="nav-link" href="#sql-patterns">SQL Patterns</a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <!-- Overview -->
+            <section id="overview" class="mb-5">
+                <h2>Overview</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <p>The <strong>AdvancedAnalyticsController</strong> provides comprehensive analytics endpoints for Counter-Strike 2 demo analysis. All endpoints support CSV export via the <code>format=csv</code> query parameter.</p>
+                        <p class="mb-0"><strong>Base Route:</strong> <code>/api/advanced-analytics</code></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Common Query Parameters -->
+            <section id="common-params" class="mb-5">
+                <h2>Common Query Parameters</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <p>All endpoints (except <code>database-diagnostic</code>) support the following optional query parameters:</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>DemoId</code></td>
+                                        <td>int</td>
+                                        <td>Filter by specific demo file ID</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>MapName</code></td>
+                                        <td>string</td>
+                                        <td>Filter by map name (e.g., "de_dust2")</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>PlayerName</code></td>
+                                        <td>string</td>
+                                        <td>Filter by specific player name</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Team</code></td>
+                                        <td>string</td>
+                                        <td>Filter by team ("CT" or "TERRORIST")</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>StartDate</code></td>
+                                        <td>DateTime</td>
+                                        <td>Filter demos parsed after this date</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>EndDate</code></td>
+                                        <td>DateTime</td>
+                                        <td>Filter demos parsed before this date</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>RoundNumber</code></td>
+                                        <td>int</td>
+                                        <td>Filter by specific round number</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Format</code></td>
+                                        <td>string</td>
+                                        <td>Output format ("csv" for CSV export)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Endpoints -->
+            <section id="endpoints" class="mb-5">
+                <h2>Endpoint Listings</h2>
+
+                <!-- Endpoint 1: Clutch Analysis -->
+                <div id="endpoint-1" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">1. Clutch Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/clutch-analysis</code></p>
+                        <p><strong>Purpose:</strong> Analyzes 1vX clutch situations and calculates success rates.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Kill events</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>ClutchAttempts</code> - Total clutch situations encountered</li>
+                            <li><code>ClutchWins</code> - Successful clutches</li>
+                            <li><code>ClutchSuccessRate</code> - Win percentage in clutch situations</li>
+                            <li><code>ClutchType</code> - Classification (1v1, 1v2, 1v3, 1v4, 1v5)</li>
+                            <li><code>DemosPlayed</code> - Number of distinct demos</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>LastKillsPerRound CTE:</strong> Identifies last 4 kills per round ordered by game time</li>
+                            <li><strong>PotentialClutches CTE:</strong> Groups consecutive final kills by same player</li>
+                            <li>Categorizes clutch type based on kill count (2+ kills = clutch)</li>
+                            <li>Calculates success rate by comparing killer team with winner team</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Identifies clutch scenarios from final kills
+HAVING COUNT(*) >= 2 -- At least 2 kills in final moments</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 2: Trade Kill Analysis -->
+                <div id="endpoint-2" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">2. Trade Kill Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/trade-kill-analysis</code></p>
+                        <p><strong>Purpose:</strong> Analyzes team's ability to quickly trade frags after losing a teammate.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> (k1, k2) - Self-joined for trade detection</li>
+                            <li><code>Players</code> - Player and team info</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalTrades</code> - Count of successful trade kills</li>
+                            <li><code>AvgTradeTimeSeconds</code> - Average time to revenge kill</li>
+                            <li><code>FastestTradeSeconds</code> / <code>SlowestTradeSeconds</code> - Time bounds</li>
+                            <li><code>AvgTradeDistance</code> - Distance between kills</li>
+                            <li><code>FastTrades</code> - Trades within 2 seconds</li>
+                            <li><code>FastTradePercentage</code> - Percentage of fast trades</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Self-join <code>Kills</code> table with 5-second window constraint</li>
+                            <li>Match kills where:
+                                <ul>
+                                    <li>Second kill targets the initial killer</li>
+                                    <li>Teams are opposite</li>
+                                    <li>Victim's team matches trade killer's team</li>
+                                </ul>
+                            </li>
+                            <li>Calculate distance using Pythagorean theorem on positions</li>
+                            <li>Aggregate trade timing statistics</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>AND k2.GameTime > k1.GameTime
+AND k2.GameTime <= k1.GameTime + 5.0 -- Trades within 5 seconds
+AND trade_victim.Id = initial_killer.Id -- Revenge kill</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 3: First Kill Impact -->
+                <div id="endpoint-3" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">3. First Kill Impact</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/first-kill-impact</code></p>
+                        <p><strong>Purpose:</strong> Correlates first blood kills with round win probability.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Kill events</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round winners</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalFirstKills</code> - Count of first kills</li>
+                            <li><code>RoundsWonAfterFirstKill</code> - Wins after getting first kill</li>
+                            <li><code>FirstKillWinPercentage</code> - Correlation with round victory</li>
+                            <li><code>HeadshotFirstKills</code> / <code>HeadshotPercentage</code> - Precision metrics</li>
+                            <li><code>FirstKillType</code> - Categorization (Headshot, AWP Pick, Long Range, Standard)</li>
+                            <li><code>AvgFirstKillTime</code> - Timing of first bloods</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>RoundFirstKills CTE:</strong> Identifies all kills with ordering</li>
+                            <li><strong>FirstKills CTE:</strong> Filters to KillOrder = 1 (first kill per round)</li>
+                            <li>Categorizes first kill types based on weapon and conditions</li>
+                            <li>Correlates with round outcomes</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>ROW_NUMBER() OVER (PARTITION BY k.RoundId ORDER BY k.GameTime ASC) as KillOrder
+WHERE KillOrder = 1 -- First kill only</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 4: Economic Intelligence -->
+                <div id="endpoint-4" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">4. Economic Intelligence</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/economic-intelligence</code></p>
+                        <p><strong>Purpose:</strong> Analyzes player performance across different economic states (eco, force buy, full buy).</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player data</li>
+                            <li><code>PlayerRoundStats</code> - Round-level stats</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Kills</code> - Kill events</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>EconomyType</code> - Weapon category (High_Value_Rifle, Sniper_Investment, Pistol_Economy, SMG_Force)</li>
+                            <li><code>RoundType</code> - Phase classification (Pistol_Round, Anti_Eco_Round, Buy_Round, Late_Round)</li>
+                            <li><code>KillRateWithEconomyType</code> - Kill success rate per economy state</li>
+                            <li><code>WinRateWithEconomyType</code> - Win rate correlation</li>
+                            <li><code>EconomicIntelligenceScore</code> - 0-100 score based on performance</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Joins player stats with kills to analyze weapon usage</li>
+                            <li>Categorizes economy based on weapon types from kills</li>
+                            <li>Classifies round types based on round numbers</li>
+                            <li>Scores economic intelligence using tiered thresholds</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>CASE
+    WHEN EconomyType = 'High_Value_Rifle' AND WinRate >= 70 THEN 95
+    WHEN EconomyType = 'Pistol_Economy' AND KillRate >= 40 THEN 85
+    ...
+END as EconomicIntelligenceScore</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 5: Position Analysis -->
+                <div id="endpoint-5" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">5. Position Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/position-analysis</code></p>
+                        <p><strong>Purpose:</strong> Identifies death hotspots and dangerous areas by map location.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Kill positions</li>
+                            <li><code>Players</code> - Victim information</li>
+                            <li><code>DemoFiles</code> - Map context</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalDeaths</code> - Deaths in specific area</li>
+                            <li><code>AvgKillDistance</code> - Average kill range in area</li>
+                            <li><code>HeadshotDeaths</code> / <code>HeadshotPercentage</code> - Precision in area</li>
+                            <li><code>MapArea</code> - Classified zone (A Site, B Site, Mid, etc.)</li>
+                            <li><code>CommonWeapons</code> - Aggregated weapon list</li>
+                            <li><code>DeathSpreadX/Y</code> - Position variance (clustering)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>DeathHotspots CTE:</strong> Maps victim positions to map areas</li>
+                            <li>Uses coordinate-based CASE statements for area classification</li>
+                            <li>Aggregates STRING_AGG for weapon lists</li>
+                            <li>Calculates position spread using STDEV functions</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>CASE
+    WHEN d.MapName = 'de_dust2' THEN
+        CASE
+            WHEN k.VictimPositionY > 1000 THEN 'A Site'
+            WHEN k.VictimPositionY < -1000 THEN 'B Site'
+            ...
+        END
+END as MapArea</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 6: Enhanced Trade Kill Optimization -->
+                <div id="endpoint-6" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">6. Enhanced Trade Kill Optimization</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/enhanced-trade-kill-optimization</code></p>
+                        <p><strong>Purpose:</strong> Advanced trade kill analysis including positioning, timing, chains, and missed opportunities.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> (k1, k2) - Trade detection</li>
+                            <li><code>Players</code> - Player/team data</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Map/demo info</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>EffectiveTradePercentage</code> - Instant + Fast trades percentage</li>
+                            <li><code>AvgTradeChainLength</code> - Length of trade sequences</li>
+                            <li><code>TradeChains</code> - Multi-kill trade sequences</li>
+                            <li><code>CloseRangeTrades</code> / <code>LongRangeTrades</code> - Distance breakdown</li>
+                            <li><code>StaticTrades</code> / <code>MobileTrades</code> - Movement analysis</li>
+                            <li><code>TradeQuality</code> - Classification (Instant, Fast, Slow, Too Late)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>TradeKillAnalysis CTE:</strong> Basic trade detection with 8-second window</li>
+                            <li><strong>TradeChainAnalysis CTE:</strong> Self-joins to detect sequential trades</li>
+                            <li><strong>FailedTradeOpportunities CTE:</strong> NOT EXISTS query for missed trades</li>
+                            <li>Calculates trader movement distance between positions</li>
+                            <li>Maps positions to areas for spatial analysis</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Trade quality categorization
+CASE
+    WHEN (k2.GameTime - k1.GameTime) <= 1.0 THEN 'Instant'
+    WHEN (k2.GameTime - k1.GameTime) <= 3.0 THEN 'Fast'
+    WHEN (k2.GameTime - k1.GameTime) <= 5.0 THEN 'Slow'
+    ELSE 'Too Late'
+END as TradeQuality</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 7: Weapon Mastery Analytics -->
+                <div id="endpoint-7" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">7. Weapon Mastery Analytics</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/weapon-mastery-analytics</code></p>
+                        <p><strong>Purpose:</strong> Detailed weapon-specific performance including accuracy, range effectiveness, and switching patterns.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Kill data with weapons</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>WeaponFires</code> - Shot accuracy data</li>
+                            <li><code>Equipment</code> - Weapon switching patterns</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalKills</code> / <code>HeadshotPercentage</code> - Kill statistics</li>
+                            <li><code>CloseRangeKills</code>, <code>MediumRangeKills</code>, <code>LongRangeKills</code> - Range distribution</li>
+                            <li><code>WallbangKills</code>, <code>NoScopeKills</code> - Special kills</li>
+                            <li><code>EstimatedAccuracyPercentage</code> - Kill-to-shot ratio</li>
+                            <li><code>AvgSwitchSpeed</code> - Weapon switching proficiency</li>
+                            <li><code>DistanceConsistency</code> - STDEV of kill distances</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>WeaponPerformanceData CTE:</strong> Categorizes weapons and ranges</li>
+                            <li><strong>WeaponFireData CTE:</strong> Aggregates shot counts per weapon</li>
+                            <li><strong>WeaponSwitchingPatterns CTE:</strong> Analyzes equipment changes within 1 second</li>
+                            <li>Joins all CTEs to calculate comprehensive weapon stats</li>
+                            <li>Estimates accuracy as kills / average shots</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Accuracy estimation from shot data
+CASE
+    WHEN AVG(TotalShots) > 0
+    THEN COUNT(*) * 100.0 / AVG(TotalShots)
+    ELSE NULL
+END as EstimatedAccuracyPercentage</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 8: Grenade Impact Quantification -->
+                <div id="endpoint-8" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">8. Grenade Impact Quantification</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/grenade-impact-quantification</code></p>
+                        <p><strong>Purpose:</strong> Analyzes utility effectiveness including flash duration, smoke timing, HE damage, and team coordination.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Grenades</code> - Grenade throws</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>FlashEvents</code> - Flash effectiveness</li>
+                            <li><code>Grenades</code> (self-joined) - Utility combos</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalGrenades</code> - Grenade count</li>
+                            <li><code>AvgThrowDistance</code> - Throw range</li>
+                            <li><code>GrenadesInWonRounds</code> / <code>WinRateWithGrenades</code> - Utility impact on wins</li>
+                            <li><code>AvgFlashDuration</code> - Flash effectiveness</li>
+                            <li><code>EnemyFlashes</code> / <code>TeamFlashes</code> - Flash targeting</li>
+                            <li><code>FullBlinds</code> - Full-blind count</li>
+                            <li><code>UtilityCombos</code> - Coordinated utility (within 3 seconds)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>GrenadeEffectivenessData CTE:</strong> Base grenade data with positions</li>
+                            <li><strong>FlashEffectiveness CTE:</strong> Flash duration and blind levels</li>
+                            <li><strong>UtilityComboDetection CTE:</strong> Detects grenades thrown within 3 seconds (384 ticks)</li>
+                            <li>Aggregates utility metrics per player/area</li>
+                            <li>Calculates win correlation with grenade usage</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Detect coordinated utility
+ABS(g1.ThrowTick - g2.ThrowTick) <= 384 -- Within ~3 seconds
+WHERE p1.Team = p2.Team -- Same team coordination</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 9: First Blood Impact Analysis -->
+                <div id="endpoint-9" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">9. First Blood Impact Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/first-blood-impact-analysis</code></p>
+                        <p><strong>Purpose:</strong> Deep analysis of first kill impact including location heatmaps, weapon effectiveness, and timing correlation.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Kill events (filtered by <code>IsFirstKill = 1</code>)</li>
+                            <li><code>Players</code> - Player data</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Map context</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalFirstKills</code> - First kill count</li>
+                            <li><code>FirstKillWinPercentage</code> - Round win correlation</li>
+                            <li><code>RifleFirstKills</code>, <code>SniperFirstKills</code>, <code>PistolFirstKills</code> - Weapon breakdown</li>
+                            <li><code>HeadshotPercentage</code> - Precision metric</li>
+                            <li><code>WallbangFirstKills</code>, <code>SmokeFirstKills</code> - Special first kills</li>
+                            <li><code>FirstKillArea</code> / <code>FirstKillTiming</code> - Spatial and temporal classification</li>
+                            <li><code>ViewAngleMagnitude</code> - Crosshair placement analysis</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Uses <code>IsFirstKill = 1</code> flag to filter first bloods</li>
+                            <li>Maps positions to areas per map</li>
+                            <li>Categorizes timing (Early 0-15s, Mid 15-45s, Late 45-75s, Very Late 75s+)</li>
+                            <li>Calculates view angle magnitude for crosshair analysis</li>
+                            <li>Aggregates positioning statistics (avg positions, consistency)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>WHERE k.IsFirstKill = 1
+-- Timing categorization
+CASE
+    WHEN k.GameTime <= 15.0 THEN 'Early (0-15s)'
+    WHEN k.GameTime <= 45.0 THEN 'Mid (15-45s)'
+    ...
+END as FirstKillTiming</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 10: Economic Efficiency Analysis -->
+                <div id="endpoint-10" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">10. Economic Efficiency Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/economic-efficiency-analysis</code></p>
+                        <p><strong>Purpose:</strong> Deep analysis of equipment ROI, force buy patterns, save optimization, and economic momentum.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>PlayerRoundStats</code> - Performance and equipment value</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>EquipmentROI</code> - Return on investment ((Kills*1000 + Assists*300 + Damage) / EquipmentValue)</li>
+                            <li><code>EconomicState</code> - Classification (Full Buy, Half Buy, Force Buy, Eco)</li>
+                            <li><code>BuyStrategy</code> - Context-aware strategy (Anti-Eco Force, Momentum Force)</li>
+                            <li><code>AvgEquipmentROI</code> / <code>MaxEquipmentROI</code> - ROI statistics</li>
+                            <li><code>KillsPerEquippedRound</code>, <code>DamagePerDollar</code> - Efficiency metrics</li>
+                            <li><code>AntiEcoForceWinRate</code>, <code>EcoRoundWinRate</code> - Strategy success rates</li>
+                            <li><code>WinRateAfterWin</code>, <code>WinRateAfterLoss</code> - Momentum tracking</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>EconomicRoundData CTE:</strong> Gathers equipment value and performance</li>
+                            <li>Uses LAG() to track previous round outcomes for momentum</li>
+                            <li><strong>EconomicEfficiency CTE:</strong> Calculates ROI and strategy classification</li>
+                            <li>Aggregates efficiency metrics per player/state/strategy</li>
+                            <li>Analyzes post-win and post-loss performance</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- ROI Calculation
+CASE
+    WHEN EquipmentValue > 0 THEN
+        (Kills * 1000 + Assists * 300 + Damage) / EquipmentValue
+    ELSE 0
+END as EquipmentROI
+
+-- Momentum tracking with LAG
+LAG(CASE WHEN Team = WinnerTeam THEN 1 ELSE 0 END) OVER
+    (PARTITION BY PlayerId ORDER BY RoundNumber) as PreviousRoundWon</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 11: Round Momentum Tracking -->
+                <div id="endpoint-11" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">11. Round Momentum Tracking</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/round-momentum-tracking</code></p>
+                        <p><strong>Purpose:</strong> Analyzes streak patterns, comeback potential, momentum shifts, and force reset identification.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Rounds</code> - Round sequences and outcomes</li>
+                            <li><code>DemoFiles</code> - Demo context</li>
+                            <li><code>Kills</code> (subquery) - First kill timing</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>AvgStreakLength</code> / <code>MaxStreak</code> - Winning streaks</li>
+                            <li><code>TotalMomentumShifts</code> / <code>MomentumShiftPercentage</code> - Momentum changes</li>
+                            <li><code>ComebackRounds</code> / <code>ComebackPercentage</code> - Reversals after first blood loss</li>
+                            <li><code>FirstKillAdvantagePercentage</code> - First blood win correlation</li>
+                            <li><code>ForceResetRounds</code> - Breaking losing streaks</li>
+                            <li><code>MomentumBuildRounds</code> - Consecutive wins</li>
+                            <li><code>WinnerKillDominance</code> - Kill share of winning team</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>RoundSequenceData CTE:</strong> Uses LAG() for previous 3 round winners</li>
+                            <li>Subqueries identify first kill team per round</li>
+                            <li><strong>MomentumStreaks CTE:</strong> Classifies momentum patterns</li>
+                            <li>Calculates streak lengths with ROW_NUMBER()</li>
+                            <li>Identifies force resets (no wins in last 3 rounds) and momentum builds</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Momentum shift detection
+CASE WHEN LAG(WinnerTeam) OVER (...) != WinnerTeam THEN 1 ELSE 0 END as MomentumShift
+
+-- Force reset identification
+CASE
+    WHEN PreviousWinner != WinnerTeam AND
+         TwoRoundsAgoWinner != WinnerTeam AND
+         ThreeRoundsAgoWinner != WinnerTeam THEN 'Force Reset'
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 12: Positioning Intelligence -->
+                <div id="endpoint-12" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">12. Positioning Intelligence</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/positioning-intelligence</code></p>
+                        <p><strong>Purpose:</strong> Death probability heatmaps, movement patterns, angle holding effectiveness, and site control.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Death positions</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Map data</li>
+                            <li><code>EnhancedPlayerPositions</code> - Movement data</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalDeaths</code> / <code>DeathProbabilityPercentage</code> - Death risk by area</li>
+                            <li><code>AvgDeathDistance</code> / <code>DeathDistanceVariation</code> - Kill distance stats</li>
+                            <li><code>AK47Deaths</code>, <code>M4Deaths</code>, <code>AWPDeaths</code> - Weapon breakdown</li>
+                            <li><code>AvgMovementSpeedAtDeath</code> - Movement correlation</li>
+                            <li><code>StationaryPercentage</code> - Static vs mobile deaths</li>
+                            <li><code>LongAngleDeathPercentage</code> - Angle holding risks</li>
+                            <li><code>TerroristDeathPercentage</code> - Site control indicators</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>DeathPositionAnalysis CTE:</strong> Maps death positions to areas and analyzes angles</li>
+                            <li><strong>MovementPatternAnalysis CTE:</strong> Calculates speed and coverage from position data</li>
+                            <li>Joins movement patterns with death locations</li>
+                            <li>Calculates death probability as percentage of total deaths on map</li>
+                            <li>Analyzes weapon effectiveness per position</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Death probability calculation
+CAST(COUNT(*) AS FLOAT) /
+    (SELECT COUNT(*) FROM DeathPositionAnalysis sub WHERE sub.MapName = dpa.MapName) * 100
+    as DeathProbabilityPercentage
+
+-- Movement analysis
+AVG(SQRT(POWER(VelocityX, 2) + POWER(VelocityY, 2))) as AvgSpeed</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 13: Team Coordination Metrics -->
+                <div id="endpoint-13" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">13. Team Coordination Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/team-coordination-metrics</code></p>
+                        <p><strong>Purpose:</strong> Analyzes rotation timing, stack effectiveness, spread formation, and synchronized utility usage.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>EnhancedPlayerPositions</code> - Position/velocity data</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Grenades</code> - Utility timing</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalRotations</code> / <code>EarlyRotationPercentage</code> - Rotation timing</li>
+                            <li><code>AvgStackSize</code>, <code>FullStackCount</code>, <code>TripleStackCount</code> - Stack analysis</li>
+                            <li><code>AvgStackSpread</code> - Stack tightness (distance)</li>
+                            <li><code>AStackPercentage</code>, <code>BStackPercentage</code>, <code>MidStackPercentage</code> - Stack distribution</li>
+                            <li><code>TightStackPercentage</code> - Close formations</li>
+                            <li><code>SynchronizedUtilityCount</code> - Coordinated grenades</li>
+                            <li><code>FlashCombos</code>, <code>SmokeCombos</code>, <code>HECombos</code> - Utility coordination</li>
+                            <li><code>CoordinationScore</code> - Weighted score (0-100)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>RotationAnalysis CTE:</strong> Tracks area changes using LAG()</li>
+                            <li><strong>StackFormationAnalysis CTE:</strong> Identifies player groupings in areas</li>
+                            <li>Calculates stack spread using position min/max</li>
+                            <li><strong>UtilityCoordinationAnalysis CTE:</strong> Detects grenades within 3-second windows</li>
+                            <li>Weighted coordination score: Tight Stacks (30%) + Early Rotations (25%) + Sync Utility (45%)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Area rotation detection
+LAG(CurrentArea, 10) OVER (PARTITION BY PlayerId, RoundId ORDER BY Tick) as PreviousArea
+WHERE CurrentArea != PreviousArea
+
+-- Stack spread calculation
+SQRT(POWER(MAX(PositionX) - MIN(PositionX), 2) +
+     POWER(MAX(PositionY) - MIN(PositionY), 2)) as StackSpread</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 14: Performance Consistency Profiling -->
+                <div id="endpoint-14" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">14. Performance Consistency Profiling</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/performance-consistency-profiling</code></p>
+                        <p><strong>Purpose:</strong> Tilt detection, variance tracking, and adaptation analysis for performance consistency.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>PlayerRoundStats</code> - Round-level performance</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>AverageKills</code>, <code>AverageDeaths</code>, <code>AverageAssists</code>, <code>AverageDamage</code> - Mean stats</li>
+                            <li><code>AverageRating</code> - Overall performance rating</li>
+                            <li><code>KillVariance</code>, <code>DamageVariance</code> - STDEV consistency measures</li>
+                            <li><code>BestKillRound</code>, <code>WorstKillRound</code> - Performance bounds</li>
+                            <li><code>FullBuyKills</code>, <code>EcoKills</code> - Economic context performance</li>
+                            <li><code>ConsistencyLevel</code> - Classification (Very Consistent to Very Inconsistent)</li>
+                            <li><code>ConsistencyScore</code> - 0-100 score based on variance</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Aggregates player statistics across rounds</li>
+                            <li>Calculates STDEV for kills and damage</li>
+                            <li>Separate averages for full buy vs eco rounds</li>
+                            <li>Scores consistency based on kill variance thresholds</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>STDEV(CAST(Kills AS FLOAT)) as KillVariance
+
+-- Consistency scoring
+CASE
+    WHEN KillVariance <= 0.8 THEN 'Very Consistent' -- Score: 90
+    WHEN KillVariance <= 1.2 THEN 'Consistent' -- Score: 75
+    WHEN KillVariance <= 1.8 THEN 'Moderate' -- Score: 60
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 15: Damage Efficiency Analytics -->
+                <div id="endpoint-15" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">15. Damage Efficiency Analytics</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/damage-efficiency-analytics</code></p>
+                        <p><strong>Purpose:</strong> Comprehensive damage waste, armor penetration, finishing ability, and multi-target tracking.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Damage events</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>DamageWastePercentage</code> - Overkill damage percentage</li>
+                            <li><code>FinishingPercentage</code> - Kill success rate</li>
+                            <li><code>DamagePerKill</code> - Damage required per kill</li>
+                            <li><code>ArmorPenDamage</code> vs <code>UnarmoredDamage</code> - Armor effectiveness</li>
+                            <li><code>HeadshotPercentage</code> - Precision metric</li>
+                            <li><code>MultiTargetRounds</code> / <code>AvgTargetsPerMultiKill</code> - Multi-kill capability</li>
+                            <li><code>DamageEfficiencyScore</code>, <code>OverallEfficiencyScore</code> - Composite scores</li>
+                            <li><code>PerformanceCategory</code> - Classification (Elite Sniper, Excellent Rifle Control, etc.)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>DamageBreakdownAnalysis CTE:</strong> Calculates effective vs wasted damage</li>
+                            <li>Applies armor penetration modifiers (AK 77%, M4 70%, AWP 100%)</li>
+                            <li><strong>MultiTargetAnalysis CTE:</strong> Detects multi-kill windows (5 seconds)</li>
+                            <li><strong>WasteIdentificationAnalysis CTE:</strong> Aggregates waste metrics</li>
+                            <li>Overall score: Finishing (40%) + Efficiency (30%) + Headshot (20%) + Multi-target bonus (10%)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Effective damage calculation
+CASE WHEN VictimHealth <= Damage THEN VictimHealth ELSE Damage END as EffectiveDamage
+-- Wasted damage
+CASE WHEN VictimHealth <= Damage THEN 0 ELSE Damage - VictimHealth END as WastedDamage
+
+-- Armor penetration
+CASE
+    WHEN VictimArmor > 0 AND Weapon LIKE '%ak47%' THEN Damage * 0.77
+    WHEN VictimArmor > 0 AND Weapon LIKE '%m4%' THEN Damage * 0.70
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 16: Comprehensive Clutch Analysis -->
+                <div id="endpoint-16" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">16. Comprehensive Clutch Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/comprehensive-clutch-analysis</code></p>
+                        <p><strong>Purpose:</strong> Deep clutch analysis including positioning, health/armor states, economic context, and multi-clutch performance.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Clutch kill events</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>PlayerRoundStats</code> - Equipment and stats</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TotalClutchAttempts</code> / <code>TotalClutchWins</code> - Overall clutch performance</li>
+                            <li><code>Clutch1v2</code>, <code>Clutch1v3</code>, <code>Clutch1v4Plus</code> - Success rates by clutch size</li>
+                            <li><code>HealthyClutchSuccessRate</code> vs <code>LowHealthClutchSuccessRate</code> - Health impact</li>
+                            <li><code>FullBuyClutchSuccessRate</code> vs <code>EcoClutchSuccessRate</code> - Economic correlation</li>
+                            <li><code>RifleClutches</code>, <code>AwpClutches</code>, <code>PistolClutches</code> - Weapon preferences</li>
+                            <li><code>AvgClutchEquipmentValue</code> - Investment analysis</li>
+                            <li><code>AvgClutchKillDistance</code> - Engagement range</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>ClutchSetupAnalysis CTE:</strong> Uses multi-kill rounds as proxy for clutches</li>
+                            <li>Categorizes health conditions (Healthy, Moderate, Low, Critical)</li>
+                            <li>Classifies equipment levels (Full Buy, Partial, Light, Eco)</li>
+                            <li><strong>MultiClutchPlayers CTE:</strong> Aggregates clutch performance</li>
+                            <li>Analyzes success rates across different variables</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Clutch identification (using kills as proxy)
+WHERE prs2.Kills >= 2 -- Multi-kill scenarios
+
+-- Equipment categorization
+CASE
+    WHEN EquipmentValue >= 4000 THEN 'Full Buy'
+    WHEN EquipmentValue >= 2000 THEN 'Partial Buy'
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 17: Positioning Analysis (Simple) -->
+                <div id="endpoint-17" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">17. Positioning Analysis (Simple)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/positioning-analysis</code></p>
+                        <p><strong>Purpose:</strong> Simplified performance analysis by game phase (first half vs second half).</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>PlayerRoundStats</code> - Round stats</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>RoundsPlayed</code>, <code>RoundsWon</code>, <code>WinPercentage</code> - Win rate by position</li>
+                            <li><code>TotalKills</code>, <code>TotalDeaths</code>, <code>TotalAssists</code>, <code>TotalDamage</code> - Aggregate stats</li>
+                            <li><code>KDRatio</code> - Kill/death ratio</li>
+                            <li><code>AvgDamagePerRound</code> - Consistent damage output</li>
+                            <li><code>RoundsSurvived</code>, <code>SurvivalRate</code> - Survival metrics</li>
+                            <li><code>PositionContext</code> - First_Half vs Second_Half</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Simple round number check for half classification (<=15 = First_Half)</li>
+                            <li>Aggregates performance by player/team/map/half</li>
+                            <li>Calculates ratios and percentages</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>CASE
+    WHEN RoundNumber <= 15 THEN 'First_Half'
+    ELSE 'Second_Half'
+END as PositionContext</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 18: Weapon Intelligence -->
+                <div id="endpoint-18" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">18. Weapon Intelligence</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/weapon-intelligence</code></p>
+                        <p><strong>Purpose:</strong> Weapon-specific performance including headshot rates, distance effectiveness, and proficiency scoring.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>PlayerRoundStats</code> - Round stats</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Kills</code> - Weapon kill data</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>KillsWithWeapon</code> - Kill count per weapon</li>
+                            <li><code>HeadshotRate</code> - Headshot percentage</li>
+                            <li><code>AvgKillDistance</code>, <code>MinKillDistance</code>, <code>MaxKillDistance</code> - Range statistics</li>
+                            <li><code>WinRateWithWeapon</code> - Round win correlation</li>
+                            <li><code>AvgRoundDamage</code> - Overall damage contribution</li>
+                            <li><code>WeaponProficiencyScore</code> - 0-100 score based on performance</li>
+                            <li><code>WeaponClass</code> - Classification (Rifle, Sniper, Pistol, SMG)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Joins kills with player round stats</li>
+                            <li>Categorizes weapons into classes</li>
+                            <li>Aggregates kill statistics per weapon</li>
+                            <li>Scores proficiency using tiered thresholds</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Weapon proficiency scoring
+CASE
+    WHEN HeadshotRate >= 60 AND KillCount >= 10 THEN 95
+    WHEN HeadshotRate >= 40 AND KillCount >= 5 THEN 80
+    WHEN WinRate >= 70 THEN 75
+    ...
+END as WeaponProficiencyScore</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 19: Circumstantial Combat -->
+                <div id="endpoint-19" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">19. Circumstantial Combat</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/circumstantial-combat</code></p>
+                        <p><strong>Purpose:</strong> Performance analysis under special combat conditions (precision, range, weapon-specific).</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>PlayerRoundStats</code> - Round stats</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Kills</code> - Combat conditions</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>EngagementsInCondition</code> - Count of combat scenarios</li>
+                            <li><code>KillsInCondition</code> - Successful kills</li>
+                            <li><code>ConditionKillPercentage</code> - Success rate</li>
+                            <li><code>WeaponsUsedInCondition</code> - Weapon variety</li>
+                            <li><code>HeadshotRateInCondition</code> - Precision metric</li>
+                            <li><code>LongRangeKills</code> / <code>CloseRangeKills</code> - Distance breakdown</li>
+                            <li><code>CircumstantialMasteryScore</code> - Scaled performance score (higher for difficult conditions)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Categorizes combat conditions based on distance, headshot, weapon</li>
+                            <li>Aggregates performance per condition</li>
+                            <li>Applies multipliers for difficult conditions (Precision_LongRange = 2x)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Condition classification
+CASE
+    WHEN IsHeadshot = 1 AND Distance > 800 THEN 'Precision_LongRange'
+    WHEN Distance > 1200 THEN 'Long_Range'
+    ...
+END as CombatCondition
+
+-- Mastery scoring with multipliers
+CASE
+    WHEN CombatCondition = 'Precision_LongRange' THEN KillRate * 2.0
+    WHEN CombatCondition LIKE '%Precision%' THEN KillRate * 1.5
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 20: Team Coordination -->
+                <div id="endpoint-20" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">20. Team Coordination</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/team-coordination</code></p>
+                        <p><strong>Purpose:</strong> Team kill coordination, flash teamwork, utility support, and coordinated execution.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> (p) - Player information</li>
+                            <li><code>PlayerRoundStats</code> (prs) - Player stats</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Players</code> (teammate) - Teammate information</li>
+                            <li><code>Kills</code> - Kill timing for coordination</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TeammatesPlayedWith</code> - Unique teammate count</li>
+                            <li><code>TotalKills</code> - Player kill count</li>
+                            <li><code>CoordinatedKills</code> - Kills within 2 seconds of teammate</li>
+                            <li><code>SupportKills</code> - Kills within 5 seconds</li>
+                            <li><code>AvgKillCoordinationTime</code> - Average time between teammate kills</li>
+                            <li><code>ComplementaryWeaponKills</code> - Different weapons used together</li>
+                            <li><code>CoordinationEffectivenessScore</code> - Combined coordination and win rate</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Left joins with teammates in same round</li>
+                            <li>Left joins kills to detect timing coordination</li>
+                            <li>Calculates time differences between kills (ABS)</li>
+                            <li>Aggregates coordination metrics</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Detect coordinated kills
+LEFT JOIN Kills teammate_k ON teammate.Id = teammate_k.KillerId
+    AND teammate_k.RoundId = r.Id
+    AND k.Id IS NOT NULL
+    AND ABS(k.GameTime - teammate_k.GameTime) <= 5.0
+
+-- Coordination effectiveness
+(CoordinatedKills * 100.0 / TotalKills) * (WinRate) / 100.0</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 21: Pressure Metrics -->
+                <div id="endpoint-21" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">21. Pressure Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/pressure-metrics</code></p>
+                        <p><strong>Purpose:</strong> High-pressure performance, clutch scaling, mental resilience under numerical disadvantage.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>PlayerRoundStats</code> - Performance data</li>
+                            <li><code>Rounds</code> - Round outcomes with live player counts</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>NumericalSituation</code> - Classification (1vX_CT, 1vX_T, 2vX_CT, 2vX_T, Neutral)</li>
+                            <li><code>AvgPressureLevel</code> - Calculated pressure intensity</li>
+                            <li><code>HighPressureSituations</code> - Count of intense scenarios</li>
+                            <li><code>ClutchAttempts</code> / <code>ClutchSuccessRate</code> - 1vX performance</li>
+                            <li><code>SurvivalRate</code> - Survival under pressure</li>
+                            <li><code>PressurePerformanceScore</code> - 0-100 composite score</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Uses round live player counts (CTLivePlayers, TLivePlayers)</li>
+                            <li>Classifies numerical situations</li>
+                            <li>Simplified pressure level based on kills and survival</li>
+                            <li>Filters to non-neutral situations</li>
+                            <li>Scores based on win rate and K/D under pressure</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Numerical situation detection
+CASE
+    WHEN IsAlive = 1 AND Team = 'CT' AND CTLivePlayers = 1 AND TLivePlayers >= 2 THEN '1vX_CT'
+    WHEN IsAlive = 1 AND Team = 'T' AND TLivePlayers = 1 AND CTLivePlayers >= 2 THEN '1vX_T'
+    ...
+END as NumericalSituation
+
+-- Pressure scoring
+CASE
+    WHEN WinRate >= 70 AND KDRatio >= 1.5 THEN 95
+    WHEN WinRate >= 60 AND KDRatio >= 1.2 THEN 80
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 22: Database Diagnostic -->
+                <div id="endpoint-22" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">22. Database Diagnostic</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/database-diagnostic</code></p>
+                        <p><strong>Purpose:</strong> Database health check showing record counts for main tables.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>DemoFiles</code></li>
+                            <li><code>Rounds</code></li>
+                            <li><code>Players</code></li>
+                            <li><code>Kills</code></li>
+                            <li><code>PlayerRoundStats</code></li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>RecordCount</code> - Total records per table</li>
+                            <li><code>MaxId</code> / <code>MinId</code> - ID ranges</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <p>Simple UNION ALL query across main tables.</p>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>SELECT 'TableName', COUNT(*), MAX(Id), MIN(Id) FROM Table
+UNION ALL
+...</code></pre>
+
+                        <div class="alert alert-warning mt-3">
+                            <strong>Note:</strong> This endpoint does NOT accept standard query parameters.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Endpoint 23: Economy Intelligence Dashboard -->
+                <div id="endpoint-23" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">23. Economy Intelligence Dashboard</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/economy-intelligence-dashboard</code></p>
+                        <p><strong>Purpose:</strong> Advanced economy analysis including money efficiency, equipment ROI, and economic state correlation.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>PlayerRoundStats</code> - Overall stats</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>EconomyEvents</code> - Money and equipment events</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>EconomyState</code> - Money classification (Rich $5000+, Full Buy, Force Buy, Eco, Broke)</li>
+                            <li><code>AvgStartMoney</code> / <code>AvgEndMoney</code> / <code>AvgMoneySpent</code> - Money flow</li>
+                            <li><code>AvgItemsEquipped</code> / <code>AvgItemsPickedUp</code> - Equipment stats</li>
+                            <li><code>RifleUsageRate</code>, <code>ArmorUsageRate</code> - Equipment preferences</li>
+                            <li><code>AvgGrenadesPerRound</code> - Utility usage</li>
+                            <li><code>EconomicEfficiency</code> - Wins per $1000 invested</li>
+                            <li><code>MoneyManagementScore</code> - Win rate vs money spent</li>
+                            <li><code>DamagePerDollar</code>, <code>EquipmentROI</code> - Value metrics</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>PlayerOverallStats CTE:</strong> Baseline performance</li>
+                            <li><strong>EconomyPerformance CTE:</strong> Detailed equipment events</li>
+                            <li><strong>RoundEconomyStats CTE:</strong> Aggregates per round</li>
+                            <li>Joins with overall stats for context</li>
+                            <li>Calculates efficiency ratios</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Economic efficiency
+Wins / AvgStartMoney * 1000 as EconomicEfficiency -- Wins per $1000
+
+-- Equipment value estimation
+(RifleCount * 2700 + ArmorCount * 1000 + GrenadeAvg * 300) / RoundCount</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 24: Advanced Player Performance -->
+                <div id="endpoint-24" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">24. Advanced Player Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/advanced-player-performance</code></p>
+                        <p><strong>Purpose:</strong> HLTV-style ratings, consistency scoring, and multi-kill performance analysis.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>PlayerRoundStats</code> - Round-level stats</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>AvgRating</code> - Standard rating</li>
+                            <li><code>AvgImpactRating</code> - Custom HLTV-style calculation</li>
+                            <li><code>QuadKills</code>, <code>TripleKills</code>, <code>DoubleKills</code> - Multi-kill counts</li>
+                            <li><code>RatingConsistency</code> - STDEV of rating</li>
+                            <li><code>WorstRating</code> / <code>BestRating</code> - Performance bounds</li>
+                            <li><code>SurvivalRate</code> - Survival percentage</li>
+                            <li><code>EfficiencyScore</code> - ImpactRating * (1 - STDEV/Avg)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Calculates custom impact rating per round</li>
+                            <li>Aggregates statistics across rounds</li>
+                            <li>Uses STDEV for consistency measurement</li>
+                            <li>Efficiency score penalizes inconsistency</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Custom HLTV-style impact rating
+(Kills * 0.679 + Assists * 0.154 + Damage * 0.0021 +
+ CASE WHEN IsAlive = 1 THEN 0.15 ELSE 0 END) as ImpactRating
+
+-- Efficiency with consistency penalty
+AvgImpactRating * (1 - (STDEV(Rating) / AVG(Rating)))</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 25: Player Inventory -->
+                <div id="endpoint-25" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">25. Player Inventory</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/player-inventory</code></p>
+                        <p><strong>Purpose:</strong> Detailed round-by-round equipment, economy, and loadout analysis.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>EconomyEvents</code> - Equipment events</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>RoundStartMoney</code> / <code>RoundEndMoney</code> - Money flow</li>
+                            <li><code>TotalEquipmentValue</code> - Estimated total value</li>
+                            <li><code>MoneySpentOnEquipment</code> - Actual purchases</li>
+                            <li><code>UniqueItemsCarried</code> - Item variety</li>
+                            <li><code>HasPrimary</code>, <code>HasArmor</code> - Equipment flags</li>
+                            <li><code>GrenadeCount</code> - Utility count</li>
+                            <li><code>WeaponsCarried</code>, <code>GrenadesCarried</code> - Item lists (STRING_AGG)</li>
+                            <li><code>LoadoutCategory</code> - Classification (Full Buy, Buy Round, Force Buy, Eco, Save)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>PlayerInventory CTE:</strong> Categorizes equipment and estimates values</li>
+                            <li><strong>LatestInventory CTE:</strong> Deduplicates to latest per item</li>
+                            <li><strong>RoundInventorySummary CTE:</strong> Aggregates per round</li>
+                            <li>Uses STRING_AGG for item lists</li>
+                            <li>Categorizes loadout based on total value</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Item value estimation
+CASE ItemName
+    WHEN 'ak47' THEN 2700
+    WHEN 'm4a1_silencer' THEN 3100
+    WHEN 'awp' THEN 4750
+    ...
+END as EstimatedValue
+
+-- Loadout categorization
+CASE
+    WHEN TotalEquipmentValue >= 6000 THEN 'Full Buy'
+    WHEN TotalEquipmentValue >= 3000 THEN 'Buy Round'
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 26: Master Analytics Dashboard -->
+                <div id="endpoint-26" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">26. Master Analytics Dashboard</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/master-analytics-dashboard</code></p>
+                        <p><strong>Purpose:</strong> Comprehensive multi-dimensional analysis integrating combat, utility, economy, and intelligence.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Matches</code> - Match data</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>PlayerRoundStats</code> - Round performance</li>
+                            <li><code>Kills</code> - Combat events</li>
+                            <li><code>WeaponFires</code> - Shot accuracy</li>
+                            <li><code>Grenades</code> - Utility usage</li>
+                            <li><code>FlashEvents</code> - Flash effectiveness</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li>Core: <code>TotalKills</code>, <code>TotalDeaths</code>, <code>KDRatio</code>, <code>TotalDamage</code></li>
+                            <li>Combat: <code>Headshots</code>, <code>HeadshotPercentage</code>, <code>WallbangKills</code>, <code>SmokeKills</code></li>
+                            <li>Weapon: <code>ShotsFired</code>, <code>KillsPerShotPercentage</code>, <code>AvgShotAccuracy</code></li>
+                            <li>Utility: <code>GrenadesThrown</code>, <code>GrenadeDamageDealt</code>, <code>UtilityEfficiency</code></li>
+                            <li>Flash: <code>TimesFlashed</code>, <code>AvgFlashDuration</code></li>
+                            <li>Performance: <code>SurvivalRate</code>, <code>KASTPercentage</code>, <code>MVPRounds</code>, <code>ClutchRounds</code></li>
+                            <li><code>OverallPerformanceScore</code> - Composite score (Rating*25 + KD*10 + Survival*0.25 + HS*0.25)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Large multi-table left join from Players</li>
+                            <li>Aggregates all available metrics</li>
+                            <li>Comprehensive scoring formula</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Overall performance score
+(AvgRating * 25 +
+ LEAST(KDRatio * 10, 25) +
+ LEAST(SurvivalRate * 0.25, 25) +
+ LEAST(HeadshotPercentage * 0.25, 25)) as OverallPerformanceScore</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 27: Situation Analysis -->
+                <div id="endpoint-27" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">27. Situation Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/situation-analysis</code></p>
+                        <p><strong>Purpose:</strong> Deep dive into performance across game situations with pressure performance scoring.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>PlayerRoundStats</code> - Round stats</li>
+                            <li><code>Rounds</code> - Round context with live players</li>
+                            <li><code>EconomyEvents</code> - Money state</li>
+                            <li><code>FlashEvents</code> - Utility state</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>SituationType</code> - Classification (1vX_CT, 1vX_T, 2vX_CT, PostPlant_Alive, etc.)</li>
+                            <li><code>EconomyState</code> - Money classification (Rich, Full_Buy, Force, Eco, Save)</li>
+                            <li><code>UtilityState</code> - Flash condition (Flashed, Clear)</li>
+                            <li><code>TimesInSituation</code> - Frequency count</li>
+                            <li><code>WinPercentageInSituation</code> - Success rate</li>
+                            <li><code>KDRatioInSituation</code> - Combat effectiveness</li>
+                            <li><code>DifficultyScore</code> - 0-10 score based on situation</li>
+                            <li><code>PressurePerformanceScore</code> - Rating with difficulty multipliers</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>SituationalPerformance CTE:</strong> Classifies all situations</li>
+                            <li>Aggregates performance per situation combination</li>
+                            <li>Assigns difficulty scores to situations</li>
+                            <li>Applies multipliers to ratings (1vX = 3x, 2vX = 2x, Eco = 1.5x)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Difficulty assignment
+CASE
+    WHEN SituationType LIKE '1vX_%' THEN 9.0
+    WHEN SituationType LIKE '2vX_%' THEN 7.0
+    WHEN EconomyState = 'Save' THEN 8.0
+    ...
+END as DifficultyScore
+
+-- Pressure performance with multipliers
+CASE
+    WHEN SituationType LIKE '1vX_%' THEN Rating * 3.0
+    WHEN SituationType LIKE '2vX_%' THEN Rating * 2.0
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 28: Economy Intelligence Enhanced -->
+                <div id="endpoint-28" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">28. Economy Intelligence Enhanced</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/economy-intelligence-enhanced</code></p>
+                        <p><strong>Purpose:</strong> Advanced economic analysis with ROI, money management, and purchase effectiveness.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>EconomyEvents</code> - Money and purchase events</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Rounds</code> - Round outcomes</li>
+                            <li><code>PlayerRoundStats</code> - Performance context</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>EconomyState</code> - Money classification (Full_Buy, Force_Buy, Eco_Buy, Save_Round)</li>
+                            <li><code>ItemCategory</code> - Equipment type (Rifle, Sniper, Pistol, Utility, Armor)</li>
+                            <li><code>PurchaseCount</code> / <code>TotalSpent</code> / <code>AvgItemCost</code> - Spending statistics</li>
+                            <li><code>WinRateWithPurchase</code> - Purchase success correlation</li>
+                            <li><code>KillsPerThousandSpent</code> - Kill efficiency</li>
+                            <li><code>DamagePerDollarSpent</code> - Damage efficiency</li>
+                            <li><code>MoneyManagementScore</code> - Tiered score based on win rate and item category</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>EconomyAnalysis CTE:</strong> Joins economy events with performance</li>
+                            <li>Categorizes items and money states</li>
+                            <li>Calculates ROI metrics (kills/damage per dollar)</li>
+                            <li>Scores money management with category-specific thresholds</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Kill efficiency
+TotalKills * 1.0 / TotalSpent * 1000 as KillsPerThousandSpent
+
+-- Money management scoring
+CASE
+    WHEN WinRate >= 70 AND ItemCategory = 'Rifle' THEN 95
+    WHEN WinRate >= 60 AND EconomyState = 'Force_Buy' THEN 85
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 29: Movement & Positioning -->
+                <div id="endpoint-29" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">29. Movement & Positioning</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/movement-positioning</code></p>
+                        <p><strong>Purpose:</strong> Death zone analysis, positioning advantages, and map control patterns.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Death positions</li>
+                            <li><code>Players</code> - Victim information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Map data</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>MapArea</code> - Zone classification (A_Site, B_Site, Mid, Tunnels, Connector)</li>
+                            <li><code>PositionType</code> - Advantage type (Long_Range_Position, Close_Range_Position, Elevation_Advantage)</li>
+                            <li><code>DeathCount</code> - Deaths in area</li>
+                            <li><code>AvgDeathX/Y/Z</code> - Average death coordinates</li>
+                            <li><code>AvgKillDistance</code> - Kill range in area</li>
+                            <li><code>HeadshotDeathRate</code> - Headshot frequency</li>
+                            <li><code>WeaponsUsed</code> - Weapon variety</li>
+                            <li><code>PositionDangerScore</code> - 0-100 composite danger rating</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>PositionData CTE:</strong> Maps death positions to areas</li>
+                            <li>Classifies position types based on distance and elevation</li>
+                            <li>Aggregates death statistics per area</li>
+                            <li>Scores danger based on death count and headshot rate</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Position type classification
+CASE
+    WHEN Distance > 1000 THEN 'Long_Range_Position'
+    WHEN Distance < 300 THEN 'Close_Range_Position'
+    WHEN ABS(KillerZ - VictimZ) > 100 THEN 'Elevation_Advantage'
+    ...
+END
+
+-- Danger scoring
+CASE
+    WHEN DeathCount >= 20 AND HeadshotRate >= 60 THEN 95
+    WHEN DeathCount >= 15 AND AvgDistance < 500 THEN 85
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 30: Timing & Tempo -->
+                <div id="endpoint-30" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">30. Timing & Tempo</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/timing-tempo</code></p>
+                        <p><strong>Purpose:</strong> Round timing patterns, execution speed, and tempo effectiveness analysis.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Kill timing</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Map data</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>RoundPhase</code> - Time classification (Opening, Mid_Round, Late_Round, Overtime)</li>
+                            <li><code>TempoStyle</code> - Strategy classification (Aggressive_Rush, Standard_Execute, Slow_Default, Late_Round_Play)</li>
+                            <li><code>AvgKillTiming</code> - Average kill time</li>
+                            <li><code>AvgTimeBetweenKills</code> - Kill pace</li>
+                            <li><code>FirstKills</code> / <code>LastKills</code> - Kill sequence position</li>
+                            <li><code>TempoWinRate</code> - Success rate by tempo</li>
+                            <li><code>TempoMasteryScore</code> - 0-100 score with tempo-specific bonuses</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>TimingData CTE:</strong> Uses LAG() to calculate time between kills</li>
+                            <li>ROW_NUMBER() for kill sequence identification</li>
+                            <li>Categorizes phases and tempo styles</li>
+                            <li>Scores mastery with bonuses for specific tempos (Rush+70% WR = 95)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Time between kills
+LAG(GameTime) OVER (PARTITION BY RoundId ORDER BY GameTime) as PrevKillTime
+GameTime - PrevKillTime as TimeBetweenKills
+
+-- Tempo classification
+CASE
+    WHEN GameTime <= 15 THEN 'Aggressive_Rush'
+    WHEN GameTime <= 45 THEN 'Standard_Execute'
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 31: Weapon Mastery -->
+                <div id="endpoint-31" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">31. Weapon Mastery</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/weapon-mastery</code></p>
+                        <p><strong>Purpose:</strong> Detailed weapon performance with accuracy, versatility, and progression tracking.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Kills</code> - Weapon kills</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Map data</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>WeaponClass</code> - Classification (Assault_Rifle, Sniper_Rifle, Pistol, SMG, Knife)</li>
+                            <li><code>EngagementRange</code> - Distance category (Long_Range, Medium_Range, Short_Range, Close_Range)</li>
+                            <li><code>KillsWithWeapon</code> - Usage count</li>
+                            <li><code>AvgKillDistance</code> / <code>MinKillDistance</code> / <code>MaxKillDistance</code> - Range statistics</li>
+                            <li><code>HeadshotPercentage</code> - Precision</li>
+                            <li><code>WinRateWithWeapon</code> - Weapon effectiveness</li>
+                            <li><code>WeaponMasteryScore</code> - 0-100 score with weapon-specific thresholds</li>
+                            <li><code>RangeVersatility</code> - Count of distinct ranges used</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Categorizes weapons and ranges</li>
+                            <li>Aggregates per player/weapon/range</li>
+                            <li>Scores mastery with weapon-specific requirements</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Weapon mastery scoring
+CASE
+    WHEN WeaponClass = 'Sniper_Rifle' AND HeadshotPercentage >= 80 THEN 100
+    WHEN WeaponClass = 'Assault_Rifle' AND HeadshotPercentage >= 60 AND Kills >= 20 THEN 95
+    WHEN WeaponClass = 'Pistol' AND HeadshotPercentage >= 70 THEN 90
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 32: Match Flow -->
+                <div id="endpoint-32" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">32. Match Flow</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/match-flow</code></p>
+                        <p><strong>Purpose:</strong> Momentum patterns, comeback potential, and performance under pressure analysis.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>Rounds</code> - Round sequences</li>
+                            <li><code>DemoFiles</code> - Demo context</li>
+                            <li><code>PlayerRoundStats</code> - Performance data</li>
+                            <li><code>Players</code> - Player information</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>MomentumState</code> - Classification (Hot_Streak, Building_Momentum, Cold_Streak, Losing_Momentum, Comeback_Round)</li>
+                            <li><code>GameState</code> - Score context (Close_Game, Leading, Trailing, Balanced)</li>
+                            <li><code>WinRateInState</code> - Success rate per state</li>
+                            <li><code>AvgKillsInState</code> / <code>AvgDeathsInState</code> - Performance under conditions</li>
+                            <li><code>ClutchRounds</code> - High-impact rounds</li>
+                            <li><code>CloseGameWins</code> - Performance in tight situations</li>
+                            <li><code>MomentumMasteryScore</code> - 0-100 score with momentum-specific bonuses</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li><strong>MatchFlowData CTE:</strong> Uses LAG() for previous 2 round outcomes</li>
+                            <li>Calculates running team score with SUM() OVER</li>
+                            <li><strong>MomentumAnalysis CTE:</strong> Classifies momentum and game states</li>
+                            <li>Scores mastery with bonuses (Comeback+70% = 100, Hot Streak+2.0KD = 95)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Momentum classification
+CASE
+    WHEN RoundWon = 1 AND PrevRoundWon = 1 AND TwoRoundsAgo = 1 THEN 'Hot_Streak'
+    WHEN RoundWon = 1 AND PrevRoundWon = 0 THEN 'Comeback_Round'
+    ...
+END
+
+-- Score context
+CASE
+    WHEN ABS(TeamScore - OpponentScore) <= 1 THEN 'Close_Game'
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 33: Performance Trends -->
+                <div id="endpoint-33" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">33. Performance Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/performance-trends</code></p>
+                        <p><strong>Purpose:</strong> Player improvement over time, consistency metrics, and learning curve analysis.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>PlayerRoundStats</code> - Round-level performance</li>
+                            <li><code>Players</code> - Player information</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Temporal data (ParsedAt)</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>TimeQuintile</code> - Chronological period (1-5, splits career into fifths)</li>
+                            <li><code>AvgKills</code> / <code>AvgDeaths</code> / <code>AvgDamage</code> / <code>AvgKDRatio</code> - Performance over time</li>
+                            <li><code>WinRate</code> - Success rate trend</li>
+                            <li><code>KillsStdDev</code> / <code>DamageStdDev</code> - Consistency metrics</li>
+                            <li><code>MaxMapExperience</code> - Map-specific experience level</li>
+                            <li><code>TrendScore</code> - 0-100 score (higher for recent performance)</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Uses ROW_NUMBER() for chronological ordering</li>
+                            <li>NTILE(5) splits career into 5 periods</li>
+                            <li>Separate map experience tracking</li>
+                            <li>Higher scores for later quintiles (shows improvement)</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Chronological splitting
+ROW_NUMBER() OVER (PARTITION BY PlayerId ORDER BY ParsedAt, RoundNumber) as ChronologicalOrder
+NTILE(5) OVER (PARTITION BY PlayerId ORDER BY ParsedAt, RoundNumber) as TimeQuintile
+
+-- Trend scoring favors recent performance
+CASE
+    WHEN TimeQuintile = 5 THEN [higher scores based on metrics]
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+                <!-- Endpoint 34: Team Dynamics -->
+                <div id="endpoint-34" class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">34. Team Dynamics</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Route:</strong> <code>GET /api/advanced-analytics/team-dynamics</code></p>
+                        <p><strong>Purpose:</strong> Player partnerships, trade kills, support plays, and team chemistry analysis.</p>
+
+                        <h6>Data Sources:</h6>
+                        <ul>
+                            <li><code>PlayerRoundStats</code> (prs1, prs2) - Player and teammate stats</li>
+                            <li><code>Players</code> (p1, p2) - Player and teammate info</li>
+                            <li><code>Rounds</code> - Round context</li>
+                            <li><code>DemoFiles</code> - Demo metadata</li>
+                            <li><code>Kills</code> (k1, k2) - Kill timing for coordination</li>
+                        </ul>
+
+                        <h6>Key Metrics:</h6>
+                        <ul>
+                            <li><code>RoundsPlayedTogether</code> - Partnership frequency</li>
+                            <li><code>TeamWinRate</code> - Combined success rate</li>
+                            <li><code>AvgKillsWithTeammate</code> / <code>AvgDamageWithTeammate</code> - Player performance</li>
+                            <li><code>TeammateAvgKills</code> / <code>TeammateAvgDamage</code> - Teammate performance</li>
+                            <li><code>TradeKillsExecuted</code> / <code>TradeKillRate</code> - Revenge coordination</li>
+                            <li><code>SupportPlays</code> - Assist synergy</li>
+                            <li><code>AvgKillCoordination</code> - Kill timing correlation</li>
+                            <li><code>TeamChemistryScore</code> - 0-100 composite score</li>
+                        </ul>
+
+                        <h6>Calculation Method:</h6>
+                        <ol>
+                            <li>Self-joins PlayerRoundStats to find teammates in same rounds</li>
+                            <li>Left joins Kills for both players to detect timing</li>
+                            <li>Detects trade kills (within 3 seconds)</li>
+                            <li>Identifies support plays (assists + teammate positive KD)</li>
+                            <li>Scores chemistry based on win rate, trades, and coordination</li>
+                        </ol>
+
+                        <h6>SQL Key Logic:</h6>
+                        <pre><code>-- Teammate identification
+INNER JOIN PlayerRoundStats prs2 ON r.Id = prs2.RoundId AND prs2.PlayerId != prs1.PlayerId
+INNER JOIN Players p2 ON prs2.PlayerId = p2.Id AND p2.Team = p1.Team
+
+-- Trade kill detection
+CASE
+    WHEN ABS(k1.GameTime - k2.GameTime) <= 3.0 AND k1/k2 NOT NULL THEN 1
+    ELSE 0
+END as TradeKill
+
+-- Chemistry scoring
+CASE
+    WHEN WinRate >= 70 AND TradeKills >= 5 THEN 100
+    WHEN WinRate >= 60 AND SupportPlays >= 10 THEN 90
+    ...
+END</code></pre>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Response Format -->
+            <section id="response-format" class="mb-5">
+                <h2>Response Format</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <p>All endpoints return JSON in this format:</p>
+                        <pre><code>{
+  "Title": "Endpoint Title",
+  "Description": "Description of analysis",
+  "Data": [
+    {
+      "Column1": "Value1",
+      "Column2": 123,
+      ...
+    }
+  ],
+  "TotalRecords": 42
+}</code></pre>
+
+                        <h5 class="mt-4">CSV Export</h5>
+                        <p>Add <code>?format=csv</code> to any endpoint to receive CSV output:</p>
+                        <ul>
+                            <li>Automatic filename with timestamp</li>
+                            <li>Content-Disposition header for download</li>
+                            <li>Proper CSV escaping for commas and quotes</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Database Schema -->
+            <section id="database-schema" class="mb-5">
+                <h2>Database Schema Reference</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h5>Core Tables Used</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Table</th>
+                                        <th>Purpose</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>DemoFiles</code></td>
+                                        <td>Demo metadata (MapName, ParsedAt, FileName)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Rounds</code></td>
+                                        <td>Round information (RoundNumber, WinnerTeam, BombPlanted, LivePlayers)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Players</code></td>
+                                        <td>Player information (PlayerName, Team, DemoFileId)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Kills</code></td>
+                                        <td>Kill events (Killer, Victim, Weapon, Position, Distance, IsHeadshot, IsFirstKill)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>PlayerRoundStats</code></td>
+                                        <td>Round-level stats (Kills, Deaths, Assists, Damage, EquipmentValue, IsAlive)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Grenades</code></td>
+                                        <td>Grenade events (GrenadeType, ThrowPosition, DetonatePosition, ThrowTick)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>FlashEvents</code></td>
+                                        <td>Flash effectiveness (FlasherPlayerId, FlashedPlayerId, FlashDuration)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>WeaponFires</code></td>
+                                        <td>Shot events (PlayerId, Weapon, GameTime, Accuracy)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Equipment</code></td>
+                                        <td>Equipment changes (PlayerId, ItemName, Action, Tick)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>EconomyEvents</code></td>
+                                        <td>Economy events (PlayerId, EventType, ItemName, MoneyBefore, MoneyAfter)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>EnhancedPlayerPositions</code></td>
+                                        <td>Position tracking (PlayerId, PositionX/Y/Z, VelocityX/Y, Tick)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Matches</code></td>
+                                        <td>Match metadata</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SQL Patterns -->
+            <section id="sql-patterns" class="mb-5">
+                <h2>Common SQL Patterns</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h5>CTEs (Common Table Expressions)</h5>
+                        <p>Most endpoints use multi-stage CTEs for complex calculations:</p>
+                        <ol>
+                            <li><strong>Data Collection CTE:</strong> Gathers base data with joins</li>
+                            <li><strong>Calculation CTE:</strong> Performs aggregations and window functions</li>
+                            <li><strong>Scoring CTE:</strong> Applies business logic for ratings</li>
+                            <li><strong>Final SELECT:</strong> Aggregates and filters results</li>
+                        </ol>
+
+                        <h5 class="mt-4">Window Functions</h5>
+                        <p>Heavily used for:</p>
+                        <ul>
+                            <li><code>ROW_NUMBER()</code> - Sequencing and ranking</li>
+                            <li><code>LAG()</code> / <code>LEAD()</code> - Temporal comparisons</li>
+                            <li><code>SUM() OVER ()</code> - Running totals</li>
+                            <li><code>NTILE()</code> - Percentile bucketing</li>
+                        </ul>
+
+                        <h5 class="mt-4">Spatial Analysis</h5>
+                        <p>Position-based queries use:</p>
+                        <ul>
+                            <li>Pythagorean distance: <code>SQRT(POWER(X2-X1, 2) + POWER(Y2-Y1, 2))</code></li>
+                            <li>Map area classification via CASE statements on coordinates</li>
+                            <li>STDEV for position spread/clustering</li>
+                        </ul>
+
+                        <h5 class="mt-4">Scoring Methodology</h5>
+                        <p>Most endpoints use tiered CASE statements for scoring:</p>
+                        <pre><code>CASE
+    WHEN [excellent criteria] THEN 95-100
+    WHEN [very good criteria] THEN 80-90
+    WHEN [good criteria] THEN 65-75
+    WHEN [acceptable criteria] THEN 50-60
+    ELSE 30-45
+END as Score</code></pre>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    pre {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        font-size: 0.85rem;
+        overflow-x: auto;
+    }
+
+    code {
+        background-color: #f8f9fa;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+
+    .small {
+        font-size: 0.8rem;
+    }
+
+    .card-header h5 {
+        margin: 0;
+        color: #0d6efd;
+    }
+
+    .table-responsive {
+        margin-top: 1rem;
+    }
+</style>

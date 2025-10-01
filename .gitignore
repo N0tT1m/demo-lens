@@ -3,6 +3,7 @@ CS2DemoParserWeb/publish/
 CS2DemoParserWeb/uploads/
 *.exe
 *.dem
+cs2-ml-pipeline/target/
 
 # Build outputs
 bin/
@@ -20,6 +21,7 @@ publish-test/
 appsettings.Development.json
 appsettings.Local.json
 *.secret.json
+*.csv
 
 # Environment files
 .env
