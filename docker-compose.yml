@@ -34,7 +34,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - CONNECTION_STRING=Server=sqlserver,1433;Database=demos;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=true;
-      - ASPNETCORE_URLS=https://+:8080;
+      - ASPNETCORE_URLS=https://demo-lens.duocore.dev:8080;
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/fullchain.pem
       - ASPNETCORE_Kestrel__Certificates__Default__KeyPath=/https/privkey.pem
       - DOTNET_RUNNING_IN_CONTAINER=true
