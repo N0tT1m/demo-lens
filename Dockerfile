@@ -15,7 +15,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
 RUN MKDIR /https
-COPY https/ /https/
+COPY https/fullchain.pem /https/fullchain.pem
+COPY https/privkey.pem /https/privkey.pem
 
 # Install SkiaSharp dependencies for Linux, wget for health checks, and SQL tools
 RUN apt-get update && apt-get install -y \
