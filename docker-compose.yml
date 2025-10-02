@@ -37,7 +37,7 @@ services:
       - CONNECTION_STRING=Server=sqlserver,1433;Database=demos;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=true;
       - ASPNETCORE_URLS=https://demo-lens.duocore.dev;
       - ASPNETCORE_HTTP_PORT=80
-      - ASPNETCORE_HTTP_PORTS=443
+      - ASPNETCORE_HTTPS_PORT=443
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/fullchain.pem
       - ASPNETCORE_Kestrel__Certificates__Default__KeyPath=/https/privkey.pem
       - DOTNET_RUNNING_IN_CONTAINER=true
