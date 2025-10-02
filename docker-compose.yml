@@ -31,7 +31,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
-      - "443:443"
+      - "8080:443"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - CONNECTION_STRING=Server=sqlserver,1433;Database=demos;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=true;
