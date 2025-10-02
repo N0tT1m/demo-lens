@@ -50,10 +50,10 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
 
 # Set environment variables
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=https://demo-lens.duocore.dev:80
+ENV ASPNETCORE_URLS=https://demo-lens.duocore.dev
 
 # Expose port
-EXPOSE 80
+EXPOSE 80, 443
 
 # Use custom entrypoint that applies database optimizations
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
