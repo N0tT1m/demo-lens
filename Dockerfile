@@ -14,7 +14,7 @@ RUN dotnet publish "CS2DemoParserWeb.csproj" -c Release -o /app/publish --verbos
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
-RUN MKDIR /https
+RUN MKDIR -p /https
 COPY https/fullchain.pem /https/fullchain.pem
 COPY https/privkey.pem /https/privkey.pem
 
