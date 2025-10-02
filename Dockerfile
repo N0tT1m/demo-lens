@@ -53,7 +53,8 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=https://demo-lens.duocore.dev
 
 # Expose port
-EXPOSE 80, 443
+EXPOSE 80
+EXPOSE 443
 
 # Use custom entrypoint that applies database optimizations
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
