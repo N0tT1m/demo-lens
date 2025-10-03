@@ -359,12 +359,14 @@ namespace CS2DemoParserWeb.Services
                 GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, b.Team, r.RoundNumber, b.EventType
                 ORDER BY EventCount DESC";
 
-            _logger.LogInformation("Bomb heatmap query - Team filter: {Team}, DemoId: {DemoId}, MapName: {MapName}",
-                query.Team, query.DemoId, query.MapName);
+            _logger.LogInformation("Bomb heatmap query - Team filter: {Team}, DemoId: {DemoId}, MapName: {MapName}, RoundNumber: {RoundNumber}",
+                query.Team, query.DemoId, query.MapName, query.RoundNumber);
 
             var points = await ExecuteHeatmapQuery(sql, query, "bomb_events");
 
-            _logger.LogInformation("Bomb heatmap returned {Count} points", points.Count);
+            _logger.LogInformation("Bomb heatmap returned {Count} points. Sample teams from data: {SampleTeams}",
+                points.Count,
+                string.Join(", ", points.Take(5).Select(p => p.Team ?? "null")));
 
             return new HeatmapData
             {
