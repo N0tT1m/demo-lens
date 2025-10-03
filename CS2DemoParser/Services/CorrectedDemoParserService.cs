@@ -146,6 +146,8 @@ public class CorrectedDemoParserService
             _processedTicks = 0;
             _totalTicks = 0;
 
+            _logger.LogInformation("Starting to parse demo file: {FilePath}. Current _currentRoundNumber BEFORE reset: {RoundNumber}", filePath, _currentRoundNumber);
+
             _logger.LogInformation("Starting to parse demo file: {FilePath}", filePath);
 
             var fileInfo = new FileInfo(filePath);
@@ -600,9 +602,12 @@ public class CorrectedDemoParserService
 
         _currentRoundNumber++;
 
+        _logger.LogInformation("Round start event fired. _currentRoundNumber is now: {RoundNumber}, Display round: {DisplayRound}", _currentRoundNumber, GetDisplayRoundNumber());
+
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
         if (ShouldSkipRound())
         {
+            _logger.LogInformation("Skipping round {RoundNumber} (warmup or knife round)", _currentRoundNumber);
             return;
         }
 
