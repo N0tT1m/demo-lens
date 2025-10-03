@@ -168,8 +168,8 @@ public class CorrectedDemoParserService
             // Use tick-by-tick processing for granular data capture
             await reader.StartReadingAsync(default);
 
-            // Get total ticks for progress calculation
-            _totalTicks = _demo.TotalTicks;
+            // Get total ticks for progress calculation (available after StartReadingAsync)
+            _totalTicks = _demo.TickCount.Value;
             _logger.LogInformation("Total ticks in demo: {TotalTicks}", _totalTicks);
 
             while (await reader.MoveNextAsync(default))
