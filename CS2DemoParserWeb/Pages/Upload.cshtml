@@ -179,22 +179,23 @@ function setupUploadForm() {
                     return;
                 }
 
-                // Show upload complete, then start polling for parse progress
-                if (result.parsed !== false) {
-                    // Show upload complete
-                    progressBar.style.width = '100%';
-                    progressBar.setAttribute('aria-valuenow', 100);
-                    document.getElementById('progressPercent').textContent = '100%';
-                    progressText.textContent = 'Upload complete! Starting parse...';
+                // Show upload complete and start parse progress polling
+                console.log('Upload complete, result.parsing:', result.parsing);
+                progressBar.style.width = '100%';
+                progressBar.setAttribute('aria-valuenow', 100);
+                document.getElementById('progressPercent').textContent = '100%';
+                progressText.textContent = 'Upload complete! Starting parse...';
 
-                    // Wait a moment then reset and start parse progress
+                // If parsing started in background, poll for progress
+                if (result.parsing === true) {
+                    console.log('Parsing started in background, will poll for progress');
                     setTimeout(() => {
                         progressBar.style.width = '0%';
                         progressBar.setAttribute('aria-valuenow', 0);
                         document.getElementById('progressPercent').textContent = '0%';
                         progressText.textContent = 'Parsing demo...';
                         startProgressPolling();
-                    }, 800);
+                    }, 500);
                 }
 
                 let successMessage = `

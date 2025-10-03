@@ -94,89 +94,61 @@ namespace CS2DemoParserWeb.Controllers
 
                 _logger.LogInformation("File uploaded: {FileName} (Size: {Size} bytes, Source: {DemoSource}, Map: {MapName})", fileName, file.Length, demoSource, mapName);
 
-                // Auto-parse the uploaded demo with demo source context
-                _logger.LogInformation("Starting auto-parse for uploaded file: {FileName} with source: {DemoSource} and map: {MapName}", fileName, demoSource, mapName);
-                try 
+                // Start parsing in background task
+                _logger.LogInformation("Starting background parse for uploaded file: {FileName} with source: {DemoSource} and map: {MapName}", fileName, demoSource, mapName);
+                _ = Task.Run(async () =>
                 {
-                    // Pass demoSource and mapName to parser service
-                    var parseResult = await _demoParserService.ParseDemoAsync(filePath, demoSource, mapName);
-                    if (parseResult)
-                    {
-                        _logger.LogInformation("Auto-parse completed successfully for: {FileName}", fileName);
-                        
-                        // Clean up uploaded file after successful parsing
-                        try
-                        {
-                            System.IO.File.Delete(filePath);
-                            _logger.LogInformation("Cleaned up uploaded file after successful parsing: {FileName}", fileName);
-                        }
-                        catch (Exception cleanupEx)
-                        {
-                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file after successful parsing: {FileName}", fileName);
-                        }
-                        
-                        return Ok(new { 
-                            message = "File uploaded and parsed successfully", 
-                            fileName = fileName, 
-                            originalName = file.FileName,
-                            size = file.Length,
-                            demoSource = demoSource,
-                            mapName = mapName,
-                            parsed = true
-                        });
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Auto-parse failed for: {FileName}", fileName);
-                        
-                        // Clean up uploaded file after failed parsing
-                        try
-                        {
-                            System.IO.File.Delete(filePath);
-                            _logger.LogInformation("Cleaned up uploaded file after failed parsing: {FileName}", fileName);
-                        }
-                        catch (Exception cleanupEx)
-                        {
-                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file after failed parsing: {FileName}", fileName);
-                        }
-                        
-                        return Ok(new { 
-                            message = "File uploaded but parsing failed", 
-                            fileName = fileName, 
-                            originalName = file.FileName,
-                            size = file.Length,
-                            demoSource = demoSource,
-                            mapName = mapName,
-                            parsed = false
-                        });
-                    }
-                }
-                catch (Exception parseEx)
-                {
-                    _logger.LogError(parseEx, "Error during auto-parse for: {FileName}", fileName);
-                    
-                    // Clean up uploaded file after parsing error
                     try
                     {
-                        System.IO.File.Delete(filePath);
-                        _logger.LogInformation("Cleaned up uploaded file after parsing error: {FileName}", fileName);
+                        var parseResult = await _demoParserService.ParseDemoAsync(filePath, demoSource, mapName);
+                        if (parseResult)
+                        {
+                            _logger.LogInformation("Background parse completed successfully for: {FileName}", fileName);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Background parse failed for: {FileName}", fileName);
+                        }
+
+                        // Clean up uploaded file after parsing
+                        try
+                        {
+                            System.IO.File.Delete(filePath);
+                            _logger.LogInformation("Cleaned up uploaded file: {FileName}", fileName);
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file: {FileName}", fileName);
+                        }
                     }
-                    catch (Exception cleanupEx)
+                    catch (Exception parseEx)
                     {
-                        _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file after parsing error: {FileName}", fileName);
+                        _logger.LogError(parseEx, "Error during background parse for: {FileName}", fileName);
+
+                        // Clean up uploaded file after parsing error
+                        try
+                        {
+                            System.IO.File.Delete(filePath);
+                            _logger.LogInformation("Cleaned up uploaded file after error: {FileName}", fileName);
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file: {FileName}", fileName);
+                        }
                     }
-                    
-                    return Ok(new { 
-                        message = "File uploaded but parsing encountered an error", 
-                        fileName = fileName, 
-                        originalName = file.FileName,
-                        size = file.Length,
-                        demoSource = demoSource,
-                        mapName = mapName,
-                        parsed = false,
-                        parseError = parseEx.Message
-                    });
-                }
+                });
+
+                // Return immediately - parsing happens in background
+                return Ok(new
+                {
+                    message = "File uploaded, parsing started",
+                    fileName = fileName,
+                    originalName = file.FileName,
+                    size = file.Length,
+                    demoSource = demoSource,
+                    mapName = mapName,
+                    parsing = true // Indicates parsing is in progress
+                });
             }
             catch (Exception ex)
             {
