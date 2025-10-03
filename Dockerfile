@@ -14,6 +14,10 @@ RUN dotnet publish "CS2DemoParserWeb.csproj" -c Release -o /app/publish --verbos
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
+RUN mkdir -p /https
+COPY https/fullchain.pem /https/fullchain.pem
+COPY https/privkey.pem /https/privkey.pem
+
 # Install SkiaSharp dependencies for Linux, wget for health checks, and SQL tools
 RUN apt-get update && apt-get install -y \
     libfontconfig1 \
@@ -46,10 +50,11 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
 
 # Set environment variables
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:80
+ENV ASPNETCORE_URLS=https://demo-lens.duocore.dev
 
 # Expose port
 EXPOSE 80
+EXPOSE 443
 
 # Use custom entrypoint that applies database optimizations
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

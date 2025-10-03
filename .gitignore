@@ -1,4 +1,5 @@
 # Large files and uploads
+cs2-faceit-pipeline/target/
 CS2DemoParserWeb/publish/
 CS2DemoParserWeb/uploads/
 *.exe
