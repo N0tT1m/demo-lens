@@ -590,7 +590,10 @@ namespace CS2DemoParserWeb.Controllers
                         r.StartTick,
                         r.EndTick,
                         r.CTScore,
-                        r.TScore
+                        r.TScore,
+                        r.IsWarmup,
+                        r.IsKnifeRound,
+                        r.GamePhase
                     })
                     .ToListAsync();
 
