@@ -352,7 +352,9 @@ namespace CS2DemoParserWeb.Services
                     AND (@DemoId IS NULL OR d.Id = @DemoId)
                     AND (@MapName IS NULL OR d.MapName = @MapName)
                     AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                    AND (@Team IS NULL OR b.Team = @Team)
+                    AND (@Team IS NULL OR b.Team = @Team OR
+                        (@Team = '2' AND b.Team = 'Terrorist') OR
+                        (@Team = '3' AND b.Team = 'CounterTerrorist'))
                     AND (@RoundNumber IS NULL OR r.RoundNumber = @RoundNumber)
                 GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, b.Team, r.RoundNumber, b.EventType
                 ORDER BY EventCount DESC";
