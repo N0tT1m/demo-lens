@@ -1090,7 +1090,7 @@ public class CorrectedDemoParserService
             GameTime = (float)_demo.CurrentGameTime.Value,
             Player = playerModel,
             Site = site?.ToString(),
-            Team = player.CSTeamNum.ToString(),
+            Team = ((int)player.CSTeamNum).ToString(),
             HasKit = player.PawnHasDefuser
         };
 
