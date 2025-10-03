@@ -96,18 +96,28 @@ public class CorrectedDemoParserService
 
     private bool ShouldSkipRound()
     {
+        var gamePhase = _demo?.GameRules?.CSGamePhase;
+        var warmupPeriod = _demo?.GameRules?.WarmupPeriod;
+
+        _logger.LogInformation("ShouldSkipRound check - Round: {CurrentRound}, GamePhase: {GamePhase}, WarmupPeriod: {WarmupPeriod}, IsInWarmup: {IsInWarmup}, WarmupSkipped: {WarmupSkipped}",
+            _currentRoundNumber, gamePhase, warmupPeriod, _isInWarmup, _warmupRoundsSkipped);
+
         // Skip rounds during warmup phase
-        if (_demo?.GameRules?.WarmupPeriod == true || _demo?.GameRules?.CSGamePhase == CSGamePhase.WarmupRound)
+        if (warmupPeriod == true || gamePhase == CSGamePhase.WarmupRound)
         {
             _isInWarmup = true;
+            _logger.LogInformation("Skipping round {RoundNumber} - Still in warmup (WarmupPeriod={WarmupPeriod}, GamePhase={GamePhase})",
+                _currentRoundNumber, warmupPeriod, gamePhase);
             return true;
         }
 
         // First round after warmup - set the skip count
-        if (_isInWarmup && _demo?.GameRules?.WarmupPeriod == false)
+        if (_isInWarmup && warmupPeriod == false && gamePhase != CSGamePhase.WarmupRound)
         {
             _isInWarmup = false;
             _warmupRoundsSkipped = _currentRoundNumber - 1; // All previous rounds were warmup
+            _logger.LogInformation("Warmup ended! Total warmup rounds skipped: {WarmupRoundsSkipped}. Next round will be round 1.",
+                _warmupRoundsSkipped);
         }
 
         // Also skip knife rounds for FACEIT/ESEA (round 1 after warmup)
@@ -115,6 +125,8 @@ public class CorrectedDemoParserService
             GetDisplayRoundNumber() == 1 &&
             _currentRoundNumber > _warmupRoundsSkipped)
         {
+            _logger.LogInformation("Skipping knife round for {DemoSource} demo (round {CurrentRound})",
+                _demoSource, _currentRoundNumber);
             return true; // Skip knife round
         }
 
@@ -148,7 +160,12 @@ public class CorrectedDemoParserService
 
             _logger.LogInformation("Starting to parse demo file: {FilePath}. Current _currentRoundNumber BEFORE reset: {RoundNumber}", filePath, _currentRoundNumber);
 
-            _logger.LogInformation("Starting to parse demo file: {FilePath}", filePath);
+            // Reset round tracking for new demo
+            _currentRoundNumber = 0;
+            _warmupRoundsSkipped = 0;
+            _isInWarmup = true;
+
+            _logger.LogInformation("Starting to parse demo file: {FilePath}. Reset _currentRoundNumber to 0", filePath);
 
             var fileInfo = new FileInfo(filePath);
             if (!fileInfo.Exists)

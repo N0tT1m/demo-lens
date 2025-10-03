@@ -549,6 +549,24 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpGet("recent-logs")]
+        public IActionResult GetRecentLogs([FromQuery] int count = 50)
+        {
+            // This would require a logging provider that stores logs
+            // For now, return a message about where to find logs
+            return Ok(new
+            {
+                message = "Logs are available in your application hosting environment",
+                suggestions = new[]
+                {
+                    "Check console output if running locally",
+                    "Check docker logs if running in container: docker logs <container-name>",
+                    "Check Application Insights if configured in Azure",
+                    "The logs you're looking for contain: 'ShouldSkipRound check', 'Round start event fired', 'Starting to parse demo file'"
+                }
+            });
+        }
+
         [HttpGet("check-spawn-positions")]
         public async Task<IActionResult> CheckSpawnPositions()
         {
