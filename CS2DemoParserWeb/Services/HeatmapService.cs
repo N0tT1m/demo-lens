@@ -357,7 +357,12 @@ namespace CS2DemoParserWeb.Services
                 GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, b.Team, r.RoundNumber, b.EventType
                 ORDER BY EventCount DESC";
 
+            _logger.LogInformation("Bomb heatmap query - Team filter: {Team}, DemoId: {DemoId}, MapName: {MapName}",
+                query.Team, query.DemoId, query.MapName);
+
             var points = await ExecuteHeatmapQuery(sql, query, "bomb_events");
+
+            _logger.LogInformation("Bomb heatmap returned {Count} points", points.Count);
 
             return new HeatmapData
             {
@@ -715,15 +720,15 @@ namespace CS2DemoParserWeb.Services
         {
             // Adjust round number based on demo source for Faceit/ESEA demos
             var adjustedRoundNumber = GetAdjustedRoundNumber(query.RoundNumber, query.DemoSource);
-            
-            _logger.LogInformation("Adding SQL parameters - DemoId: {DemoId}, MapName: {MapName}, PlayerName: {PlayerName}, Team: {Team}, RoundNumber: {RoundNumber} (Original: {OriginalRound}, Adjusted: {AdjustedRound})", 
+
+            _logger.LogInformation("Adding SQL parameters - DemoId: {DemoId}, MapName: {MapName}, PlayerName: {PlayerName}, Team: {Team}, RoundNumber: {RoundNumber} (Original: {OriginalRound}, Adjusted: {AdjustedRound})",
                 query.DemoId, query.MapName, query.PlayerName, query.Team, adjustedRoundNumber, query.RoundNumber, adjustedRoundNumber);
-                
+
             command.Parameters.AddWithValue("@DemoName", (object?)query.DemoName ?? DBNull.Value);
             command.Parameters.AddWithValue("@DemoId", (object?)query.DemoId ?? DBNull.Value);
             command.Parameters.AddWithValue("@MapName", (object?)query.MapName ?? DBNull.Value);
-            command.Parameters.AddWithValue("@PlayerName", (object?)query.PlayerName ?? DBNull.Value);
-            command.Parameters.AddWithValue("@Team", (object?)query.Team ?? DBNull.Value);
+            command.Parameters.AddWithValue("@PlayerName", string.IsNullOrEmpty(query.PlayerName) ? DBNull.Value : query.PlayerName);
+            command.Parameters.AddWithValue("@Team", string.IsNullOrEmpty(query.Team) ? DBNull.Value : query.Team);
             command.Parameters.AddWithValue("@RoundNumber", (object?)adjustedRoundNumber ?? DBNull.Value);
         }
 
