@@ -548,5 +548,72 @@ namespace CS2DemoParserWeb.Controllers
                 return StatusCode(500, "Error fixing bomb team values");
             }
         }
+
+        [HttpGet("check-spawn-positions")]
+        public async Task<IActionResult> CheckSpawnPositions()
+        {
+            try
+            {
+                var latestDemo = await _context.DemoFiles
+                    .OrderByDescending(d => d.Id)
+                    .FirstOrDefaultAsync();
+
+                if (latestDemo == null)
+                {
+                    return Ok(new { message = "No demos found" });
+                }
+
+                // Get position counts per round
+                var roundPositions = await _context.Rounds
+                    .Where(r => r.DemoFileId == latestDemo.Id)
+                    .Select(r => new
+                    {
+                        RoundNumber = r.RoundNumber,
+                        PositionCount = _context.PlayerPositions.Count(pp => pp.DemoFileId == latestDemo.Id && pp.Tick >= r.StartTick && pp.Tick <= r.EndTick)
+                    })
+                    .ToListAsync();
+
+                // Get sample spawn positions from round 1
+                var round1 = await _context.Rounds
+                    .Where(r => r.DemoFileId == latestDemo.Id && r.RoundNumber == 1)
+                    .FirstOrDefaultAsync();
+
+                var spawnPositions = new List<object>();
+                if (round1 != null)
+                {
+                    var endTick = round1.StartTick + (5 * 64); // First 5 seconds at 64 tick rate
+                    spawnPositions = await _context.PlayerPositions
+                        .Where(pp => pp.DemoFileId == latestDemo.Id
+                            && pp.Tick >= round1.StartTick
+                            && pp.Tick <= endTick)
+                        .OrderBy(pp => pp.Tick)
+                        .Take(20)
+                        .Select(pp => new
+                        {
+                            PlayerName = pp.Player.PlayerName,
+                            Tick = pp.Tick,
+                            X = pp.PositionX,
+                            Y = pp.PositionY,
+                            Z = pp.PositionZ
+                        })
+                        .ToListAsync<object>();
+                }
+
+                return Ok(new
+                {
+                    demoId = latestDemo.Id,
+                    demoName = latestDemo.FileName,
+                    totalRounds = roundPositions.Count,
+                    roundPositions = roundPositions,
+                    round1SpawnSample = spawnPositions,
+                    hasPositions = spawnPositions.Count > 0
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking spawn positions");
+                return StatusCode(500, $"Error checking spawn positions: {ex.Message}");
+            }
+        }
     }
 }
