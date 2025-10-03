@@ -244,6 +244,25 @@ namespace CS2DemoParserWeb.Controllers
             }
         }
 
+        [HttpGet("progress")]
+        public IActionResult GetParseProgress()
+        {
+            try
+            {
+                return Ok(new
+                {
+                    isParsing = _demoParserService.IsParsing,
+                    progress = Math.Round(_demoParserService.ParseProgress, 2),
+                    fileName = _demoParserService.CurrentFileName
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving parse progress");
+                return StatusCode(500, "Error retrieving parse progress");
+            }
+        }
+
         [HttpGet("statistics")]
         public async Task<IActionResult> GetStatistics()
         {

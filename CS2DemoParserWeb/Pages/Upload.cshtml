@@ -64,10 +64,10 @@
                 </form>
                 
                 <div id="uploadProgress" class="mt-3" style="display: none;">
-                    <div class="progress">
-                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    <div class="progress mb-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" id="progressBar" style="width: 0%"></div>
                     </div>
-                    <small class="text-muted">Uploading...</small>
+                    <small class="text-muted" id="progressText">Uploading...</small>
                 </div>
                 
                 <div id="uploadResult" class="mt-3"></div>
@@ -97,32 +97,36 @@ document.addEventListener('DOMContentLoaded', function() {
     loadRecentDemos();
 });
 
+let progressInterval = null;
+
 function setupUploadForm() {
     const form = document.getElementById('uploadForm');
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadProgress = document.getElementById('uploadProgress');
     const uploadResult = document.getElementById('uploadResult');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const fileInput = document.getElementById('demoFile');
         const demoSourceSelect = document.getElementById('demoSource');
         const mapNameSelect = document.getElementById('mapName');
         const file = fileInput.files[0];
         const demoSource = demoSourceSelect.value;
         const mapName = mapNameSelect.value;
-        
+
         if (!file) {
             showAlert('Please select a file', 'danger');
             return;
         }
-        
+
         if (!demoSource) {
             showAlert('Please select a demo source', 'danger');
             return;
         }
-        
+
         if (!mapName) {
             showAlert('Please select a map name', 'danger');
             return;
@@ -136,6 +140,8 @@ function setupUploadForm() {
         uploadBtn.disabled = true;
         uploadProgress.style.display = 'block';
         uploadResult.innerHTML = '';
+        progressBar.style.width = '0%';
+        progressText.textContent = 'Uploading...';
 
         try {
             const response = await fetch('/api/demo/upload', {
@@ -152,13 +158,19 @@ function setupUploadForm() {
             }
 
             if (response.ok) {
+                // Start polling for parse progress
+                if (result.parsed !== false) {
+                    progressText.textContent = 'Parsing demo...';
+                    startProgressPolling();
+                }
+
                 let successMessage = `
                     <div class="alert alert-success">
                         <strong>Upload successful!</strong><br>
                         File: ${result.originalName}<br>
                         Size: ${(result.size / 1024 / 1024).toFixed(2)} MB<br>
                 `;
-                
+
                 if (result.parsed === true) {
                     successMessage += `<span class="text-success">✓ Demo parsed successfully!</span>`;
                     loadRecentDemos();
@@ -171,7 +183,7 @@ function setupUploadForm() {
                 } else {
                     successMessage += `<button class="btn btn-sm btn-primary mt-2" onclick="parseDemo('${result.fileName}')">Parse Demo</button>`;
                 }
-                
+
                 successMessage += `</div>`;
                 uploadResult.innerHTML = successMessage;
                 fileInput.value = '';
@@ -184,11 +196,47 @@ function setupUploadForm() {
                     <strong>Upload failed:</strong> ${error.message}
                 </div>
             `;
-        } finally {
             uploadBtn.disabled = false;
             uploadProgress.style.display = 'none';
         }
     });
+}
+
+function startProgressPolling() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+    }
+
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+
+    progressInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/demo/progress');
+            const data = await response.json();
+
+            if (data.isParsing) {
+                progressBar.style.width = `${data.progress}%`;
+                progressText.textContent = `Parsing demo... ${data.progress.toFixed(1)}%`;
+            } else {
+                // Parsing complete
+                clearInterval(progressInterval);
+                progressInterval = null;
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Parse complete!';
+
+                setTimeout(() => {
+                    uploadProgress.style.display = 'none';
+                    uploadBtn.disabled = false;
+                    loadRecentDemos();
+                }, 1000);
+            }
+        } catch (error) {
+            console.error('Error polling progress:', error);
+        }
+    }, 500); // Poll every 500ms
 }
 
 async function parseDemo(fileName) {

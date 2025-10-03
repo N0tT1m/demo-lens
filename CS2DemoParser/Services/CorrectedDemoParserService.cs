@@ -123,6 +123,13 @@ public class CorrectedDemoParserService
     private readonly Dictionary<int, Models.PlayerRoundStats> _currentRoundStats = new();
     private CsDemoParser? _demo; // Store demo reference
 
+    // Progress tracking
+    private int _totalTicks;
+    private int _processedTicks;
+    public double ParseProgress => _totalTicks > 0 ? (_processedTicks / (double)_totalTicks) * 100.0 : 0.0;
+    public bool IsParsing { get; private set; }
+    public string? CurrentFileName { get; private set; }
+
     public CorrectedDemoParserService(CS2DemoContext context, IConfiguration configuration, ILogger<CorrectedDemoParserService> logger)
     {
         _context = context;
@@ -134,12 +141,18 @@ public class CorrectedDemoParserService
     {
         try
         {
+            IsParsing = true;
+            CurrentFileName = Path.GetFileName(filePath);
+            _processedTicks = 0;
+            _totalTicks = 0;
+
             _logger.LogInformation("Starting to parse demo file: {FilePath}", filePath);
 
             var fileInfo = new FileInfo(filePath);
             if (!fileInfo.Exists)
             {
                 _logger.LogError("Demo file not found: {FilePath}", filePath);
+                IsParsing = false;
                 return false;
             }
 
@@ -154,8 +167,15 @@ public class CorrectedDemoParserService
 
             // Use tick-by-tick processing for granular data capture
             await reader.StartReadingAsync(default);
+
+            // Get total ticks for progress calculation
+            _totalTicks = _demo.TotalTicks;
+            _logger.LogInformation("Total ticks in demo: {TotalTicks}", _totalTicks);
+
             while (await reader.MoveNextAsync(default))
             {
+                _processedTicks = _demo.CurrentDemoTick.Value;
+
                 // Track player positions every 4 ticks (~16x/sec instead of ~64x/sec)
                 // This significantly reduces storage while maintaining good granularity
                 if (_demo.CurrentDemoTick.Value % 4 == 0)
@@ -167,13 +187,15 @@ public class CorrectedDemoParserService
             await SaveDataToDatabase();
 
             _logger.LogInformation("Successfully parsed demo file: {FilePath}", filePath);
+            IsParsing = false;
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error parsing demo file: {FilePath}. File size: {FileSize} bytes. Error type: {ErrorType}", 
-                filePath, 
-                System.IO.File.Exists(filePath) ? new FileInfo(filePath).Length : 0, 
+            IsParsing = false;
+            _logger.LogError(ex, "Error parsing demo file: {FilePath}. File size: {FileSize} bytes. Error type: {ErrorType}",
+                filePath,
+                System.IO.File.Exists(filePath) ? new FileInfo(filePath).Length : 0,
                 ex.GetType().Name);
             
             // Log additional context for Azure debugging
@@ -1037,6 +1059,25 @@ public class CorrectedDemoParserService
     private void ProcessBombEvent(string eventType, CCSPlayerController? player, int? site)
     {
         if (_demo == null || _currentDemoFile == null || _currentRound == null || player == null) return;
+
+        // Validate team-specific bomb events
+        // Only Terrorists can pickup/drop/plant the bomb
+        if ((eventType == "pickup" || eventType == "dropped" || eventType == "planted" || eventType == "begin_plant" || eventType == "abort_plant")
+            && player.CSTeamNum != CSTeamNumber.Terrorist)
+        {
+            _logger?.LogWarning("Skipping bomb event {EventType} for non-Terrorist player {PlayerName} (Team: {Team})",
+                eventType, player.PlayerName, player.CSTeamNum);
+            return;
+        }
+
+        // Only Counter-Terrorists can defuse the bomb
+        if ((eventType == "defused" || eventType == "begin_defuse" || eventType == "abort_defuse")
+            && player.CSTeamNum != CSTeamNumber.CounterTerrorist)
+        {
+            _logger?.LogWarning("Skipping bomb event {EventType} for non-CT player {PlayerName} (Team: {Team})",
+                eventType, player.PlayerName, player.CSTeamNum);
+            return;
+        }
 
         var playerModel = GetOrCreatePlayer(player);
 

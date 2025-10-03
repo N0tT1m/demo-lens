@@ -338,9 +338,9 @@ namespace CS2DemoParserWeb.Services
         public async Task<HeatmapData> GetBombSiteHeatmapAsync(HeatmapQuery query)
         {
             var sql = @"
-                SELECT 
+                SELECT
                     b.PositionX as X, b.PositionY as Y, b.PositionZ as Z,
-                    p.PlayerName, p.Team, r.RoundNumber, b.EventType,
+                    p.PlayerName, b.Team, r.RoundNumber, b.EventType,
                     COUNT(*) as EventCount
                 FROM Bombs b
                 INNER JOIN Players p ON b.PlayerId = p.Id
@@ -352,13 +352,13 @@ namespace CS2DemoParserWeb.Services
                     AND (@DemoId IS NULL OR d.Id = @DemoId)
                     AND (@MapName IS NULL OR d.MapName = @MapName)
                     AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                    AND (@Team IS NULL OR p.Team = @Team)
+                    AND (@Team IS NULL OR b.Team = @Team)
                     AND (@RoundNumber IS NULL OR r.RoundNumber = @RoundNumber)
-                GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, p.Team, r.RoundNumber, b.EventType
+                GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, b.Team, r.RoundNumber, b.EventType
                 ORDER BY EventCount DESC";
 
             var points = await ExecuteHeatmapQuery(sql, query, "bomb_events");
-            
+
             return new HeatmapData
             {
                 MapName = query.MapName ?? "Unknown",
