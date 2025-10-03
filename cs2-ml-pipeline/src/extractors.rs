@@ -16,6 +16,14 @@ pub struct RoundDataExtractor<'a> {
     client: &'a mut Client<Compat<TcpStream>>,
 }
 
+impl<'a> ClutchDataExtractor<'a> {
+    pub fn new(client: &'a mut Client<Compat<TcpStream>>) -> Self { client }
+
+    pub async fn extract(&mut self) -> Result<Vec<>> {
+
+    }
+}
+
 impl<'a> RoundDataExtractor<'a> {
     pub fn new(client: &'a mut Client<Compat<TcpStream>>) -> Self {
         Self { client }
@@ -114,8 +122,6 @@ impl<'a> PlayerDataExtractor<'a> {
                 AVG(CAST(pms.Deaths AS FLOAT)) as avg_deaths,
                 AVG(CAST(pms.HeadshotKills AS FLOAT)) as avg_headshots,
                 AVG(CAST(pms.TotalDamageDealt AS FLOAT)) as avg_damage,
-                SUM(pms.ClutchWins1v1 + pms.ClutchWins1v2 + pms.ClutchWins1v3 + pms.ClutchWins1v4 + pms.ClutchWins1v5) as total_clutches,
-                SUM(pms.ClutchAttempts1v1 + pms.ClutchAttempts1v2 + pms.ClutchAttempts1v3 + pms.ClutchAttempts1v4 + pms.ClutchAttempts1v5) as total_clutch_attempts,
                 AVG(CAST(pms.FirstKills AS FLOAT)) as avg_first_kills,
                 SUM(pms.RoundsPlayed) as total_rounds
             FROM Players p
