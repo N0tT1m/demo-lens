@@ -567,6 +567,60 @@ namespace CS2DemoParserWeb.Controllers
             });
         }
 
+        [HttpGet("check-rounds")]
+        public async Task<IActionResult> CheckRounds([FromQuery] int? demoId = null)
+        {
+            try
+            {
+                var demo = demoId.HasValue
+                    ? await _context.DemoFiles.FindAsync(demoId.Value)
+                    : await _context.DemoFiles.OrderByDescending(d => d.Id).FirstOrDefaultAsync();
+
+                if (demo == null)
+                {
+                    return Ok(new { message = "No demo found" });
+                }
+
+                var rounds = await _context.Rounds
+                    .Where(r => r.DemoFileId == demo.Id)
+                    .OrderBy(r => r.RoundNumber)
+                    .Select(r => new
+                    {
+                        r.RoundNumber,
+                        r.StartTick,
+                        r.EndTick,
+                        r.CTScore,
+                        r.TScore
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    demoId = demo.Id,
+                    demoName = demo.FileName,
+                    demoSource = demo.DemoSource,
+                    totalRounds = rounds.Count,
+                    rounds = rounds,
+                    analysis = new
+                    {
+                        firstRoundNumber = rounds.FirstOrDefault()?.RoundNumber,
+                        lastRoundNumber = rounds.LastOrDefault()?.RoundNumber,
+                        hasSequentialRounds = rounds.Count > 0 && rounds.First().RoundNumber == 1 && rounds.Last().RoundNumber == rounds.Count,
+                        missingRounds = rounds.Count > 1
+                            ? Enumerable.Range(1, rounds.Max(r => r.RoundNumber))
+                                .Except(rounds.Select(r => r.RoundNumber))
+                                .ToList()
+                            : new List<int>()
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking rounds");
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }
+
         [HttpGet("check-spawn-positions")]
         public async Task<IActionResult> CheckSpawnPositions()
         {
