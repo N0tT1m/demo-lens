@@ -88,50 +88,6 @@ public class CorrectedDemoParserService
     private int _warmupRoundsSkipped = 0;
     private bool _isInWarmup = true;
 
-    private int GetDisplayRoundNumber()
-    {
-        // Use actual live round count after warmup
-        return _currentRoundNumber - _warmupRoundsSkipped;
-    }
-
-    private bool ShouldSkipRound()
-    {
-        var gamePhase = _demo?.GameRules?.CSGamePhase;
-        var warmupPeriod = _demo?.GameRules?.WarmupPeriod;
-
-        _logger.LogInformation("ShouldSkipRound check - Round: {CurrentRound}, GamePhase: {GamePhase}, WarmupPeriod: {WarmupPeriod}, IsInWarmup: {IsInWarmup}, WarmupSkipped: {WarmupSkipped}",
-            _currentRoundNumber, gamePhase, warmupPeriod, _isInWarmup, _warmupRoundsSkipped);
-
-        // Skip rounds during warmup phase
-        if (warmupPeriod == true || gamePhase == CSGamePhase.WarmupRound)
-        {
-            _isInWarmup = true;
-            _logger.LogInformation("Skipping round {RoundNumber} - Still in warmup (WarmupPeriod={WarmupPeriod}, GamePhase={GamePhase})",
-                _currentRoundNumber, warmupPeriod, gamePhase);
-            return true;
-        }
-
-        // First round after warmup - set the skip count
-        if (_isInWarmup && warmupPeriod == false && gamePhase != CSGamePhase.WarmupRound)
-        {
-            _isInWarmup = false;
-            _warmupRoundsSkipped = _currentRoundNumber - 1; // All previous rounds were warmup
-            _logger.LogInformation("Warmup ended! Total warmup rounds skipped: {WarmupRoundsSkipped}. Next round will be round 1.",
-                _warmupRoundsSkipped);
-        }
-
-        // Also skip knife rounds for FACEIT/ESEA (round 1 after warmup)
-        if ((_demoSource == "esea" || _demoSource == "faceit") &&
-            GetDisplayRoundNumber() == 1 &&
-            _currentRoundNumber > _warmupRoundsSkipped)
-        {
-            _logger.LogInformation("Skipping knife round for {DemoSource} demo (round {CurrentRound})",
-                _demoSource, _currentRoundNumber);
-            return true; // Skip knife round
-        }
-
-        return false;
-    }
     private readonly Dictionary<int, Models.PlayerRoundStats> _currentRoundStats = new();
     private CsDemoParser? _demo; // Store demo reference
 
@@ -619,14 +575,8 @@ public class CorrectedDemoParserService
 
         _currentRoundNumber++;
 
-        _logger.LogInformation("Round start event fired. _currentRoundNumber is now: {RoundNumber}, Display round: {DisplayRound}", _currentRoundNumber, GetDisplayRoundNumber());
-
-        // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound())
-        {
-            _logger.LogInformation("Skipping round {RoundNumber} (warmup or knife round)", _currentRoundNumber);
-            return;
-        }
+        _logger.LogInformation("Round start event fired. _currentRoundNumber is now: {RoundNumber}, GamePhase: {GamePhase}, WarmupPeriod: {WarmupPeriod}",
+            _currentRoundNumber, _demo.GameRules?.CSGamePhase, _demo.GameRules?.WarmupPeriod);
 
         if (_currentMatch == null)
         {
@@ -642,19 +592,22 @@ public class CorrectedDemoParserService
             _currentDemoFile.TickRate = CsDemoParser.TickRate;
         }
 
-        // Calculate display round number (start from 1 for ESEA/FACEIT after skipping first 2 rounds)
-        var displayRoundNumber = GetDisplayRoundNumber();
+        // Determine round type based on game state
+        var isWarmup = _demo.GameRules?.WarmupPeriod == true || _demo.GameRules?.CSGamePhase == CSGamePhase.WarmupRound;
+        var isKnifeRound = (_demoSource == "esea" || _demoSource == "faceit") && !isWarmup && _currentRoundNumber == 1;
 
         _currentRound = new Models.Round
         {
             DemoFileId = _currentDemoFile.Id,
             MatchId = _currentMatch?.Id ?? 0,
-            RoundNumber = displayRoundNumber,
+            RoundNumber = _currentRoundNumber, // Use actual round number, not display number
             StartTick = _demo.CurrentDemoTick.Value,
-            // Calculate game time from demo start instead of using parsing time
             StartTime = DateTime.UnixEpoch.AddSeconds((double)_demo.CurrentDemoTick.Value / CsDemoParser.TickRate),
             CTScore = _demo.TeamCounterTerrorist?.Score ?? 0,
-            TScore = _demo.TeamTerrorist?.Score ?? 0
+            TScore = _demo.TeamTerrorist?.Score ?? 0,
+            IsWarmup = isWarmup,
+            IsKnifeRound = isKnifeRound,
+            GamePhase = _demo.GameRules?.CSGamePhase.ToString()
         };
 
         _rounds.Add(_currentRound);
@@ -673,7 +626,7 @@ public class CorrectedDemoParserService
                 var roundStats = new Models.PlayerRoundStats
                 {
                     PlayerId = playerId - 1, // Use PlayerSlot (EntityIndex - 1) temporarily
-                    RoundId = displayRoundNumber, // Use display round number
+                    RoundId = _currentRoundNumber,
                     StartMoney = currentMoney,
                     Health = player.PlayerPawn?.Health ?? 0,
                     Armor = player.PlayerPawn?.ArmorValue ?? 0,
@@ -696,12 +649,6 @@ public class CorrectedDemoParserService
     private void OnRoundEnd(Source1RoundEndEvent e)
     {
         if (_demo == null || _currentRound == null) return;
-
-        // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound())
-        {
-            return;
-        }
 
         _currentRound.EndTick = _demo.CurrentDemoTick.Value;
         // Calculate game time from demo start instead of using parsing time
@@ -734,7 +681,6 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
 
         var victim = GetOrCreatePlayer(e.Player);
         var killer = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
@@ -743,7 +689,7 @@ public class CorrectedDemoParserService
         var kill = new Models.Kill
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Killer = killer,
@@ -861,7 +807,6 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
 
         var victim = GetOrCreatePlayer(e.Player);
         var attacker = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
@@ -869,7 +814,7 @@ public class CorrectedDemoParserService
         var damage = new Models.Damage
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Attacker = attacker,
@@ -928,14 +873,13 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
 
         var player = GetOrCreatePlayer(e.Player);
 
         var weaponFire = new Models.WeaponFire
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Player = player,
@@ -964,7 +908,7 @@ public class CorrectedDemoParserService
         var weaponStateChange = new Models.WeaponStateChange
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(),
+            RoundId = _currentRoundNumber,
             Player = player,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -1018,7 +962,7 @@ public class CorrectedDemoParserService
         var grenade = new Models.Grenade
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             Player = playerModel,
             DetonateTick = _demo.CurrentDemoTick.Value,
             DetonateTime = _demo.CurrentGameTime.Value,
@@ -1106,7 +1050,7 @@ public class CorrectedDemoParserService
         var bomb = new Models.Bomb
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             EventType = eventType,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -1179,7 +1123,7 @@ public class CorrectedDemoParserService
             EventType = eventType,
             ZoneType = zoneType,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{player.PlayerName} {eventType.Replace("_", " ")}"
         };
 
@@ -1225,7 +1169,7 @@ public class CorrectedDemoParserService
             AmmoReserve = activeWeapon?.ReserveAmmo?[0] ?? 0,
             IsScoped = player.PlayerPawn?.IsScoped ?? false,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{player.PlayerName} {eventType.Replace("_", " ")} {weaponName}"
         };
 
@@ -1294,7 +1238,7 @@ public class CorrectedDemoParserService
             MoneyAfter = currentMoney,
             MoneyChange = moneyChange,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{player.PlayerName} {eventType} {item} (${previousMoney} -> ${currentMoney})"
         };
 
@@ -1317,7 +1261,7 @@ public class CorrectedDemoParserService
             Action = eventType,
             ItemName = item,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             IsActive = eventType == "equip" || eventType == "pickup"
         };
 
@@ -1458,7 +1402,7 @@ public class CorrectedDemoParserService
             EventName = eventName,
             Description = description,
             IsImportant = isImportant,
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -2092,7 +2036,7 @@ public class CorrectedDemoParserService
             EventType = eventType,
             HostageEntityId = hostageId ?? 0,
             Team = player?.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{(player?.PlayerName ?? "Unknown")} {eventType.Replace("_", " ")} hostage {hostageId}"
         };
         
@@ -2127,7 +2071,7 @@ public class CorrectedDemoParserService
         var flashEvent = new Models.FlashEvent
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             FlashedPlayer = playerModel,
             FlasherPlayer = attackerModel,
             Tick = _demo.CurrentDemoTick.Value,
@@ -2136,7 +2080,7 @@ public class CorrectedDemoParserService
             FlashedPlayerTeam = e.Player.CSTeamNum.ToString(),
             FlasherPlayerTeam = e.Attacker?.CSTeamNum.ToString(),
             IsTeamFlash = e.Attacker?.CSTeamNum == e.Player.CSTeamNum,
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{e.Player.PlayerName} flashed by {e.Attacker?.PlayerName ?? "unknown"} for {e.BlindDuration:F2}s"
         };
         
@@ -2207,7 +2151,7 @@ public class CorrectedDemoParserService
             GameTime = (float)_demo.CurrentGameTime.Value,
             BehaviorType = behaviorType,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{player.PlayerName} {behaviorType.Replace("_", " ")}"
         };
         
@@ -2275,7 +2219,7 @@ public class CorrectedDemoParserService
         var grenadeTrajectory = new Models.GrenadeTrajectory
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             PlayerId = playerModel.Id,
             ThrowTick = _demo.CurrentDemoTick.Value,
             ThrowTime = _demo.CurrentGameTime.Value,
@@ -2345,7 +2289,6 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
         
         ProcessInfernoEvent("start", null, e.Entityid, e.X, e.Y, e.Z);
         LogGameEvent(_demo, "inferno_startburn", "Fire started burning");
@@ -2356,7 +2299,6 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
         
         ProcessInfernoEvent("expire", null, e.Entityid, e.X, e.Y, e.Z);
         LogGameEvent(_demo, "inferno_expire", "Fire expired");
@@ -2367,7 +2309,6 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
         
         ProcessInfernoEvent("extinguish", null, e.Entityid, e.X, e.Y, e.Z);
         LogGameEvent(_demo, "inferno_extinguish", "Fire extinguished");
@@ -2378,7 +2319,6 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
-        if (ShouldSkipRound()) return;
         
         ProcessGrenadeDetonate("molotov", e.X, e.Y, e.Z, e.Player);
         ProcessInfernoEvent("molotov_detonate", e.Player, 0, e.X, e.Y, e.Z, "molotov");
@@ -2390,7 +2330,7 @@ public class CorrectedDemoParserService
         
         var playerModel = player != null ? GetOrCreatePlayer(player) : null;
         
-        var roundNumber = GetDisplayRoundNumber();
+        var roundNumber = _currentRoundNumber;
         
         var infernoEvent = new Models.InfernoEvent
         {
@@ -2438,7 +2378,7 @@ public class CorrectedDemoParserService
             CenterZ = (decimal)e.Z,
             Phase = "expired",
             Team = "Unknown", // Default team value since smoke expired events don't include player info
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"Smoke expired at ({e.X:F2}, {e.Y:F2}, {e.Z:F2})"
         };
         
@@ -2729,7 +2669,7 @@ public class CorrectedDemoParserService
         var bulletImpact = new Models.BulletImpact
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Weapon = e.AttackerPawn?.ActiveWeapon?.EconItem?.Name ?? "unknown"
@@ -2755,7 +2695,7 @@ public class CorrectedDemoParserService
         var bulletImpact = new Models.BulletImpact
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             PlayerId = playerModel.Id,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -2777,7 +2717,7 @@ public class CorrectedDemoParserService
         var weaponFire = new Models.WeaponFire
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = GetDisplayRoundNumber(), // Use display round number
+            RoundId = _currentRoundNumber, // Use display round number
             PlayerId = playerModel.Id,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -2817,7 +2757,7 @@ public class CorrectedDemoParserService
             GameTime = (float)_demo.CurrentGameTime.Value,
             EventType = "ping",
             TargetArea = $"Position ({e.X:F2}, {e.Y:F2}, {e.Z:F2})",
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{e.Player.PlayerName} pinged location ({e.X:F2}, {e.Y:F2}, {e.Z:F2})"
         };
         
@@ -3280,7 +3220,7 @@ public class CorrectedDemoParserService
             MessageType = messageType,
             MessageContent = content,
             Team = targetPlayerModel?.Team ?? "Unknown",
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             Description = $"{messageType}: {content}"
         };
         
@@ -3351,7 +3291,7 @@ public class CorrectedDemoParserService
     //        SteamId = e.Xuid,
     //        Duration = 0, // Duration can be calculated from audio data if needed
     //        Team = player.CSTeamNum.ToString(),
-    //        RoundNumber = GetDisplayRoundNumber()
+    //        RoundNumber = _currentRoundNumber
     //    };
 
     //    _voiceCommunications.Add(voiceComm);
@@ -3376,7 +3316,7 @@ public class CorrectedDemoParserService
             Action = "grenade_inventory_change",
             ItemName = string.Join(", ", newGrenades.Select(g => g.ServerClass?.Name ?? "unknown")),
             Team = pawn.Controller.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             IsActive = newGrenades.Count > 0
         };
 
@@ -3403,7 +3343,7 @@ public class CorrectedDemoParserService
             Action = "weapon_inventory_change",
             ItemName = string.Join(", ", newWeapons.Select(w => w.Value.GetType().Name ?? "unknown")),
             Team = pawn.Controller.CSTeamNum.ToString(),
-            RoundNumber = GetDisplayRoundNumber(),
+            RoundNumber = _currentRoundNumber,
             IsActive = newWeapons.Count > 0
         };
 
