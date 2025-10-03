@@ -500,5 +500,46 @@ namespace CS2DemoParserWeb.Controllers
                 return StatusCode(500, "Error fixing map names");
             }
         }
+
+        [HttpPost("fix-bomb-teams")]
+        public async Task<IActionResult> FixBombTeams()
+        {
+            try
+            {
+                // Update Terrorist to 2
+                var terroristBombs = await _context.Bombs
+                    .Where(b => b.Team == "Terrorist")
+                    .ToListAsync();
+
+                foreach (var bomb in terroristBombs)
+                {
+                    bomb.Team = "2";
+                }
+
+                // Update CounterTerrorist to 3
+                var ctBombs = await _context.Bombs
+                    .Where(b => b.Team == "CounterTerrorist")
+                    .ToListAsync();
+
+                foreach (var bomb in ctBombs)
+                {
+                    bomb.Team = "3";
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new {
+                    message = $"Fixed bomb team values",
+                    terroristCount = terroristBombs.Count,
+                    ctCount = ctBombs.Count,
+                    total = terroristBombs.Count + ctBombs.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fixing bomb team values");
+                return StatusCode(500, "Error fixing bomb team values");
+            }
+        }
     }
 }
