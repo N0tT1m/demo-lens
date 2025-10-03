@@ -13,17 +13,20 @@ namespace CS2DemoParserWeb.Controllers
         private readonly CS2DemoContext _context;
         private readonly ILogger<DemoController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public DemoController(
-            CorrectedDemoParserService demoParserService, 
+            CorrectedDemoParserService demoParserService,
             CS2DemoContext context,
             ILogger<DemoController> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _demoParserService = demoParserService;
             _context = context;
             _logger = logger;
             _configuration = configuration;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         [HttpPost("upload")]
@@ -94,13 +97,17 @@ namespace CS2DemoParserWeb.Controllers
 
                 _logger.LogInformation("File uploaded: {FileName} (Size: {Size} bytes, Source: {DemoSource}, Map: {MapName})", fileName, file.Length, demoSource, mapName);
 
-                // Start parsing in background task
+                // Start parsing in background task with new scope
                 _logger.LogInformation("Starting background parse for uploaded file: {FileName} with source: {DemoSource} and map: {MapName}", fileName, demoSource, mapName);
                 _ = Task.Run(async () =>
                 {
+                    // Create a new scope for the background task
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var scopedParserService = scope.ServiceProvider.GetRequiredService<CorrectedDemoParserService>();
+
                     try
                     {
-                        var parseResult = await _demoParserService.ParseDemoAsync(filePath, demoSource, mapName);
+                        var parseResult = await scopedParserService.ParseDemoAsync(filePath, demoSource, mapName);
                         if (parseResult)
                         {
                             _logger.LogInformation("Background parse completed successfully for: {FileName}", fileName);
