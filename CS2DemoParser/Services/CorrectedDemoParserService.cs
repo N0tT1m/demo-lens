@@ -601,12 +601,18 @@ public class CorrectedDemoParserService
         {
             isKnifeRound = true;
             _isInWarmup = false; // Mark that we've exited warmup
+            _logger.LogInformation("Round {RoundNumber} detected as KNIFE ROUND (demoSource: {DemoSource}, isWarmup: {IsWarmup}, _isInWarmup: {WasInWarmup})",
+                _currentRoundNumber, _demoSource, isWarmup, true);
         }
 
         if (isWarmup)
         {
             _isInWarmup = true;
         }
+
+        _logger.LogInformation("Round {RoundNumber}: isWarmup={IsWarmup}, isKnifeRound={IsKnifeRound}, _isInWarmup={InWarmupState}, WarmupPeriod={WarmupPeriod}, GamePhase={GamePhase}",
+            _currentRoundNumber, isWarmup, isKnifeRound, _isInWarmup,
+            _demo.GameRules?.WarmupPeriod, _demo.GameRules?.CSGamePhase);
 
         _currentRound = new Models.Round
         {
