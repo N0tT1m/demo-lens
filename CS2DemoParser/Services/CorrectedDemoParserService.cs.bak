@@ -88,15 +88,40 @@ public class CorrectedDemoParserService
     private int _warmupRoundsSkipped = 0;
     private bool _isInWarmup = true;
 
+    private int GetDisplayRoundNumber()
+    {
+        // Use actual live round count after warmup
+        return _currentRoundNumber - _warmupRoundsSkipped;
+    }
+
+    private bool ShouldSkipRound()
+    {
+        // Skip rounds during warmup phase
+        if (_demo?.GameRules?.WarmupPeriod == true || _demo?.GameRules?.CSGamePhase == CSGamePhase.WarmUp)
+        {
+            _isInWarmup = true;
+            return true;
+        }
+
+        // First round after warmup - set the skip count
+        if (_isInWarmup && _demo?.GameRules?.WarmupPeriod == false)
+        {
+            _isInWarmup = false;
+            _warmupRoundsSkipped = _currentRoundNumber - 1; // All previous rounds were warmup
+        }
+
+        // Also skip knife rounds for FACEIT/ESEA (round 1 after warmup)
+        if ((_demoSource == "esea" || _demoSource == "faceit") &&
+            GetDisplayRoundNumber() == 1 &&
+            _currentRoundNumber > _warmupRoundsSkipped)
+        {
+            return true; // Skip knife round
+        }
+
+        return false;
+    }
     private readonly Dictionary<int, Models.PlayerRoundStats> _currentRoundStats = new();
     private CsDemoParser? _demo; // Store demo reference
-
-    // Progress tracking
-    private int _totalTicks;
-    private int _processedTicks;
-    public double ParseProgress => _totalTicks > 0 ? (_processedTicks / (double)_totalTicks) * 100.0 : 0.0;
-    public bool IsParsing { get; private set; }
-    public string? CurrentFileName { get; private set; }
 
     public CorrectedDemoParserService(CS2DemoContext context, IConfiguration configuration, ILogger<CorrectedDemoParserService> logger)
     {
@@ -109,25 +134,12 @@ public class CorrectedDemoParserService
     {
         try
         {
-            IsParsing = true;
-            CurrentFileName = Path.GetFileName(filePath);
-            _processedTicks = 0;
-            _totalTicks = 0;
-
-            _logger.LogInformation("Starting to parse demo file: {FilePath}. Current _currentRoundNumber BEFORE reset: {RoundNumber}", filePath, _currentRoundNumber);
-
-            // Reset round tracking for new demo
-            _currentRoundNumber = 0;
-            _warmupRoundsSkipped = 0;
-            _isInWarmup = true;
-
-            _logger.LogInformation("Starting to parse demo file: {FilePath}. Reset _currentRoundNumber to 0", filePath);
+            _logger.LogInformation("Starting to parse demo file: {FilePath}", filePath);
 
             var fileInfo = new FileInfo(filePath);
             if (!fileInfo.Exists)
             {
                 _logger.LogError("Demo file not found: {FilePath}", filePath);
-                IsParsing = false;
                 return false;
             }
 
@@ -142,35 +154,22 @@ public class CorrectedDemoParserService
 
             // Use tick-by-tick processing for granular data capture
             await reader.StartReadingAsync(default);
-
-            // Get total ticks for progress calculation (available after StartReadingAsync)
-            _totalTicks = _demo.TickCount.Value;
-            _logger.LogInformation("Total ticks in demo: {TotalTicks}", _totalTicks);
-
             while (await reader.MoveNextAsync(default))
             {
-                _processedTicks = _demo.CurrentDemoTick.Value;
-
-                // Track player positions every 4 ticks (~16x/sec instead of ~64x/sec)
-                // This significantly reduces storage while maintaining good granularity
-                if (_demo.CurrentDemoTick.Value % 4 == 0)
-                {
-                    TrackPlayerPositions();
-                }
+                // Track player positions and states every tick
+                TrackPlayerPositions();
             }
 
             await SaveDataToDatabase();
 
             _logger.LogInformation("Successfully parsed demo file: {FilePath}", filePath);
-            IsParsing = false;
             return true;
         }
         catch (Exception ex)
         {
-            IsParsing = false;
-            _logger.LogError(ex, "Error parsing demo file: {FilePath}. File size: {FileSize} bytes. Error type: {ErrorType}",
-                filePath,
-                System.IO.File.Exists(filePath) ? new FileInfo(filePath).Length : 0,
+            _logger.LogError(ex, "Error parsing demo file: {FilePath}. File size: {FileSize} bytes. Error type: {ErrorType}", 
+                filePath, 
+                System.IO.File.Exists(filePath) ? new FileInfo(filePath).Length : 0, 
                 ex.GetType().Name);
             
             // Log additional context for Azure debugging
@@ -212,7 +211,7 @@ public class CorrectedDemoParserService
     {
         // Packet events for server info and voice data
         demo.PacketEvents.SvcServerInfo += OnSvcServerInfo;
-        // demo.PacketEvents.SvcVoiceData += OnSvcVoiceData; // Commented out - VoiceCommunication model doesn't have required properties
+        demo.PacketEvents.SvcVoiceData += OnSvcVoiceData;
 
         // Basic game events
         demo.Source1GameEvents.RoundStart += OnRoundStart;
@@ -380,13 +379,13 @@ public class CorrectedDemoParserService
             // Grenade inventory tracking (proven to work in demofile-net examples)
             demo.EntityEvents.CCSPlayerPawn.AddCollectionChangeCallback(
                 pawn => pawn.Grenades,
-                (pawn, oldGrenades, newGrenades) => OnPlayerGrenadeInventoryChanged(pawn, oldGrenades, newGrenades)
+                OnPlayerGrenadeInventoryChanged
             );
 
             // Weapon inventory tracking
             demo.EntityEvents.CCSPlayerPawn.AddCollectionChangeCallback(
                 pawn => pawn.WeaponServices?.MyWeapons,
-                (pawn, oldWeapons, newWeapons) => OnPlayerWeaponInventoryChanged(pawn, oldWeapons, newWeapons)
+                OnPlayerWeaponInventoryChanged
             );
         }
         catch (Exception ex)
@@ -426,77 +425,12 @@ public class CorrectedDemoParserService
         // Map events
         demo.Source1GameEvents.PlayerActivate += OnPlayerActivate;
 
-        // User Message Events - All available events for comprehensive tracking
-        demo.UserMessageEvents.VguiMenu += OnVguiMenuUserMessage;
-        demo.UserMessageEvents.Geiger += OnGeigerUserMessage;
-        demo.UserMessageEvents.Train += OnTrainUserMessage;
-        demo.UserMessageEvents.HudText += OnHudTextUserMessage;
-        demo.UserMessageEvents.HudMsg += OnHudMsgUserMessage;
-        demo.UserMessageEvents.ResetHud += OnResetHudUserMessage;
-        demo.UserMessageEvents.GameTitle += OnGameTitleUserMessage;
-        demo.UserMessageEvents.Shake += OnShakeUserMessage;
-        demo.UserMessageEvents.Fade += OnFadeUserMessage;
-        demo.UserMessageEvents.Rumble += OnRumbleUserMessage;
-        demo.UserMessageEvents.CloseCaption += OnCloseCaptionUserMessage;
-        demo.UserMessageEvents.CloseCaptionDirect += OnCloseCaptionDirectUserMessage;
-        demo.UserMessageEvents.SendAudio += OnSendAudioUserMessage;
-        demo.UserMessageEvents.RawAudio += OnRawAudioUserMessage;
-        demo.UserMessageEvents.VoiceMask += OnVoiceMaskUserMessage;
-        demo.UserMessageEvents.RequestState += OnRequestStateUserMessage;
-        demo.UserMessageEvents.Damage += OnDamageUserMessage;
-        demo.UserMessageEvents.RadioText += OnRadioTextUserMessage;
-        demo.UserMessageEvents.HintText += OnHintTextUserMessage;
-        demo.UserMessageEvents.KeyHintText += OnKeyHintTextUserMessage;
-        demo.UserMessageEvents.ProcessSpottedEntityUpdate += OnProcessSpottedEntityUpdateUserMessage;
-        demo.UserMessageEvents.ReloadEffect += OnReloadEffectUserMessage;
+        // User Message Events (only critical ones for economy and match stats)
         demo.UserMessageEvents.AdjustMoney += OnAdjustMoneyUserMessage;
-        demo.UserMessageEvents.StopSpectatorMode += OnStopSpectatorModeUserMessage;
         demo.UserMessageEvents.KillCam += OnKillCamUserMessage;
-        demo.UserMessageEvents.DesiredTimescale += OnDesiredTimescaleUserMessage;
-        demo.UserMessageEvents.CurrentTimescale += OnCurrentTimescaleUserMessage;
-        demo.UserMessageEvents.AchievementEvent += OnAchievementEventUserMessage;
         demo.UserMessageEvents.MatchEndConditions += OnMatchEndConditionsUserMessage;
-        demo.UserMessageEvents.DisconnectToLobby += OnDisconnectToLobbyUserMessage;
         demo.UserMessageEvents.PlayerStatsUpdate += OnPlayerStatsUpdateUserMessage;
-        demo.UserMessageEvents.WarmupHasEnded += OnWarmupHasEndedUserMessage;
-        demo.UserMessageEvents.ClientInfo += OnClientInfoUserMessage;
-        demo.UserMessageEvents.XRankGet += OnXRankGetUserMessage;
-        demo.UserMessageEvents.XRankUpd += OnXRankUpdUserMessage;
-        demo.UserMessageEvents.CallVoteFailed += OnCallVoteFailedUserMessage;
-        demo.UserMessageEvents.VoteStart += OnVoteStartUserMessage;
-        demo.UserMessageEvents.VotePass += OnVotePassUserMessage;
-        demo.UserMessageEvents.VoteFailed += OnVoteFailedUserMessage;
-        demo.UserMessageEvents.VoteSetup += OnVoteSetupUserMessage;
-        demo.UserMessageEvents.ServerRankRevealAll += OnServerRankRevealAllUserMessage;
-        demo.UserMessageEvents.SendLastKillerDamageToClient += OnSendLastKillerDamageToClientUserMessage;
-        demo.UserMessageEvents.ServerRankUpdate += OnServerRankUpdateUserMessage;
-        demo.UserMessageEvents.ItemPickup += OnItemPickupUserMessage;
-        demo.UserMessageEvents.ShowMenu += OnShowMenuUserMessage;
-        demo.UserMessageEvents.BarTime += OnBarTimeUserMessage;
-        demo.UserMessageEvents.AmmoDenied += OnAmmoDeniedUserMessage;
-        demo.UserMessageEvents.MarkAchievement += OnMarkAchievementUserMessage;
-        demo.UserMessageEvents.MatchStatsUpdate += OnMatchStatsUpdateUserMessage;
-        demo.UserMessageEvents.ItemDrop += OnItemDropUserMessage;
-        demo.UserMessageEvents.GlowPropTurnOff += OnGlowPropTurnOffUserMessage;
-        demo.UserMessageEvents.SendPlayerItemDrops += OnSendPlayerItemDropsUserMessage;
-        demo.UserMessageEvents.RoundBackupFilenames += OnRoundBackupFilenamesUserMessage;
-        demo.UserMessageEvents.SendPlayerItemFound += OnSendPlayerItemFoundUserMessage;
-        demo.UserMessageEvents.ReportHit += OnReportHitUserMessage;
-        demo.UserMessageEvents.XpUpdate += OnXpUpdateUserMessage;
-        demo.UserMessageEvents.QuestProgress += OnQuestProgressUserMessage;
-        demo.UserMessageEvents.ScoreLeaderboardData += OnScoreLeaderboardDataUserMessage;
-        demo.UserMessageEvents.PlayerDecalDigitalSignature += OnPlayerDecalDigitalSignatureUserMessage;
-        demo.UserMessageEvents.WeaponSound += OnWeaponSoundUserMessage;
-        demo.UserMessageEvents.UpdateScreenHealthBar += OnUpdateScreenHealthBarUserMessage;
-        demo.UserMessageEvents.EntityOutlineHighlight += OnEntityOutlineHighlightUserMessage;
-        demo.UserMessageEvents.Ssui += OnSsuiUserMessage;
-        demo.UserMessageEvents.SurvivalStats += OnSurvivalStatsUserMessage;
-        demo.UserMessageEvents.EndOfMatchAllPlayersData += OnEndOfMatchAllPlayersDataUserMessage;
-        demo.UserMessageEvents.PostRoundDamageReport += OnPostRoundDamageReportUserMessage;
         demo.UserMessageEvents.RoundEndReportData += OnRoundEndReportDataUserMessage;
-        demo.UserMessageEvents.CurrentRoundOdds += OnCurrentRoundOddsUserMessage;
-        demo.UserMessageEvents.DeepStats += OnDeepStatsUserMessage;
-        demo.UserMessageEvents.ShootInfo += OnShootInfoUserMessage;
 
         // TODO: ALL REMAINING Source1 Game Events (100+ additional events) - Temporarily commented out until handlers are implemented
         /*
@@ -575,8 +509,11 @@ public class CorrectedDemoParserService
 
         _currentRoundNumber++;
 
-        _logger.LogInformation("Round start event fired. _currentRoundNumber is now: {RoundNumber}, GamePhase: {GamePhase}, WarmupPeriod: {WarmupPeriod}",
-            _currentRoundNumber, _demo.GameRules?.CSGamePhase, _demo.GameRules?.WarmupPeriod);
+        // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound())
+        {
+            return;
+        }
 
         if (_currentMatch == null)
         {
@@ -592,40 +529,23 @@ public class CorrectedDemoParserService
             _currentDemoFile.TickRate = CsDemoParser.TickRate;
         }
 
-        // Determine round type based on game state
-        var isWarmup = _demo.GameRules?.WarmupPeriod == true || _demo.GameRules?.CSGamePhase == CSGamePhase.WarmupRound;
+        // Calculate display round number (start from 1 for ESEA/FACEIT after skipping first 2 rounds)
+        var displayRoundNumber = GetDisplayRoundNumber();
 
-        // Knife round is the first non-warmup round for FACEIT/ESEA
-        var isKnifeRound = false;
-        if ((_demoSource == "esea" || _demoSource == "faceit") && !isWarmup && _isInWarmup)
-        {
-            isKnifeRound = true;
-            _isInWarmup = false; // Mark that we've exited warmup
-            _logger.LogInformation("Round {RoundNumber} detected as KNIFE ROUND (demoSource: {DemoSource}, isWarmup: {IsWarmup}, _isInWarmup: {WasInWarmup})",
-                _currentRoundNumber, _demoSource, isWarmup, true);
-        }
-
-        if (isWarmup)
-        {
-            _isInWarmup = true;
-        }
-
-        _logger.LogInformation("Round {RoundNumber}: isWarmup={IsWarmup}, isKnifeRound={IsKnifeRound}, _isInWarmup={InWarmupState}, WarmupPeriod={WarmupPeriod}, GamePhase={GamePhase}",
-            _currentRoundNumber, isWarmup, isKnifeRound, _isInWarmup,
-            _demo.GameRules?.WarmupPeriod, _demo.GameRules?.CSGamePhase);
+        // Get current game phase from GameRules
+        var gamePhase = _demo.GameRules?.CSGamePhase.ToString() ?? "Unknown";
 
         _currentRound = new Models.Round
         {
             DemoFileId = _currentDemoFile.Id,
             MatchId = _currentMatch?.Id ?? 0,
-            RoundNumber = _currentRoundNumber, // Use actual round number, not display number
+            RoundNumber = displayRoundNumber,
             StartTick = _demo.CurrentDemoTick.Value,
+            // Calculate game time from demo start instead of using parsing time
             StartTime = DateTime.UnixEpoch.AddSeconds((double)_demo.CurrentDemoTick.Value / CsDemoParser.TickRate),
             CTScore = _demo.TeamCounterTerrorist?.Score ?? 0,
             TScore = _demo.TeamTerrorist?.Score ?? 0,
-            IsWarmup = isWarmup,
-            IsKnifeRound = isKnifeRound,
-            GamePhase = _demo.GameRules?.CSGamePhase.ToString()
+            GamePhase = gamePhase
         };
 
         _rounds.Add(_currentRound);
@@ -644,7 +564,7 @@ public class CorrectedDemoParserService
                 var roundStats = new Models.PlayerRoundStats
                 {
                     PlayerId = playerId - 1, // Use PlayerSlot (EntityIndex - 1) temporarily
-                    RoundId = _currentRoundNumber,
+                    RoundId = displayRoundNumber, // Use display round number
                     StartMoney = currentMoney,
                     Health = player.PlayerPawn?.Health ?? 0,
                     Armor = player.PlayerPawn?.ArmorValue ?? 0,
@@ -667,6 +587,12 @@ public class CorrectedDemoParserService
     private void OnRoundEnd(Source1RoundEndEvent e)
     {
         if (_demo == null || _currentRound == null) return;
+
+        // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound())
+        {
+            return;
+        }
 
         _currentRound.EndTick = _demo.CurrentDemoTick.Value;
         // Calculate game time from demo start instead of using parsing time
@@ -699,6 +625,7 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
 
         var victim = GetOrCreatePlayer(e.Player);
         var killer = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
@@ -707,7 +634,7 @@ public class CorrectedDemoParserService
         var kill = new Models.Kill
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Killer = killer,
@@ -825,6 +752,7 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
 
         var victim = GetOrCreatePlayer(e.Player);
         var attacker = e.Attacker != null ? GetOrCreatePlayer(e.Attacker) : null;
@@ -832,7 +760,7 @@ public class CorrectedDemoParserService
         var damage = new Models.Damage
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Attacker = attacker,
@@ -891,13 +819,14 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null || _currentRound == null || e.Player == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
 
         var player = GetOrCreatePlayer(e.Player);
 
         var weaponFire = new Models.WeaponFire
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Player = player,
@@ -926,7 +855,7 @@ public class CorrectedDemoParserService
         var weaponStateChange = new Models.WeaponStateChange
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber,
+            RoundId = GetDisplayRoundNumber(),
             Player = player,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -980,7 +909,7 @@ public class CorrectedDemoParserService
         var grenade = new Models.Grenade
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             Player = playerModel,
             DetonateTick = _demo.CurrentDemoTick.Value,
             DetonateTime = _demo.CurrentGameTime.Value,
@@ -1044,37 +973,18 @@ public class CorrectedDemoParserService
     {
         if (_demo == null || _currentDemoFile == null || _currentRound == null || player == null) return;
 
-        // Validate team-specific bomb events
-        // Only Terrorists can pickup/drop/plant the bomb
-        if ((eventType == "pickup" || eventType == "dropped" || eventType == "planted" || eventType == "begin_plant" || eventType == "abort_plant")
-            && player.CSTeamNum != CSTeamNumber.Terrorist)
-        {
-            _logger?.LogWarning("Skipping bomb event {EventType} for non-Terrorist player {PlayerName} (Team: {Team})",
-                eventType, player.PlayerName, player.CSTeamNum);
-            return;
-        }
-
-        // Only Counter-Terrorists can defuse the bomb
-        if ((eventType == "defused" || eventType == "begin_defuse" || eventType == "abort_defuse")
-            && player.CSTeamNum != CSTeamNumber.CounterTerrorist)
-        {
-            _logger?.LogWarning("Skipping bomb event {EventType} for non-CT player {PlayerName} (Team: {Team})",
-                eventType, player.PlayerName, player.CSTeamNum);
-            return;
-        }
-
         var playerModel = GetOrCreatePlayer(player);
 
         var bomb = new Models.Bomb
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             EventType = eventType,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Player = playerModel,
             Site = site?.ToString(),
-            Team = ((int)player.CSTeamNum).ToString(),
+            Team = player.CSTeamNum.ToString(),
             HasKit = player.PawnHasDefuser
         };
 
@@ -1141,7 +1051,7 @@ public class CorrectedDemoParserService
             EventType = eventType,
             ZoneType = zoneType,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{player.PlayerName} {eventType.Replace("_", " ")}"
         };
 
@@ -1187,7 +1097,7 @@ public class CorrectedDemoParserService
             AmmoReserve = activeWeapon?.ReserveAmmo?[0] ?? 0,
             IsScoped = player.PlayerPawn?.IsScoped ?? false,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{player.PlayerName} {eventType.Replace("_", " ")} {weaponName}"
         };
 
@@ -1256,7 +1166,7 @@ public class CorrectedDemoParserService
             MoneyAfter = currentMoney,
             MoneyChange = moneyChange,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{player.PlayerName} {eventType} {item} (${previousMoney} -> ${currentMoney})"
         };
 
@@ -1279,7 +1189,7 @@ public class CorrectedDemoParserService
             Action = eventType,
             ItemName = item,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             IsActive = eventType == "equip" || eventType == "pickup"
         };
 
@@ -1420,7 +1330,7 @@ public class CorrectedDemoParserService
             EventName = eventName,
             Description = description,
             IsImportant = isImportant,
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -2054,7 +1964,7 @@ public class CorrectedDemoParserService
             EventType = eventType,
             HostageEntityId = hostageId ?? 0,
             Team = player?.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{(player?.PlayerName ?? "Unknown")} {eventType.Replace("_", " ")} hostage {hostageId}"
         };
         
@@ -2089,7 +1999,7 @@ public class CorrectedDemoParserService
         var flashEvent = new Models.FlashEvent
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             FlashedPlayer = playerModel,
             FlasherPlayer = attackerModel,
             Tick = _demo.CurrentDemoTick.Value,
@@ -2098,7 +2008,7 @@ public class CorrectedDemoParserService
             FlashedPlayerTeam = e.Player.CSTeamNum.ToString(),
             FlasherPlayerTeam = e.Attacker?.CSTeamNum.ToString(),
             IsTeamFlash = e.Attacker?.CSTeamNum == e.Player.CSTeamNum,
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{e.Player.PlayerName} flashed by {e.Attacker?.PlayerName ?? "unknown"} for {e.BlindDuration:F2}s"
         };
         
@@ -2169,7 +2079,7 @@ public class CorrectedDemoParserService
             GameTime = (float)_demo.CurrentGameTime.Value,
             BehaviorType = behaviorType,
             Team = player.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{player.PlayerName} {behaviorType.Replace("_", " ")}"
         };
         
@@ -2237,7 +2147,7 @@ public class CorrectedDemoParserService
         var grenadeTrajectory = new Models.GrenadeTrajectory
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             PlayerId = playerModel.Id,
             ThrowTick = _demo.CurrentDemoTick.Value,
             ThrowTime = _demo.CurrentGameTime.Value,
@@ -2307,6 +2217,7 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
         
         ProcessInfernoEvent("start", null, e.Entityid, e.X, e.Y, e.Z);
         LogGameEvent(_demo, "inferno_startburn", "Fire started burning");
@@ -2317,6 +2228,7 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
         
         ProcessInfernoEvent("expire", null, e.Entityid, e.X, e.Y, e.Z);
         LogGameEvent(_demo, "inferno_expire", "Fire expired");
@@ -2327,6 +2239,7 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
         
         ProcessInfernoEvent("extinguish", null, e.Entityid, e.X, e.Y, e.Z);
         LogGameEvent(_demo, "inferno_extinguish", "Fire extinguished");
@@ -2337,6 +2250,7 @@ public class CorrectedDemoParserService
         if (_demo == null || _currentDemoFile == null) return;
         
         // Skip the first two rounds for ESEA/FACEIT demos (warmup and knife round)
+        if (ShouldSkipRound()) return;
         
         ProcessGrenadeDetonate("molotov", e.X, e.Y, e.Z, e.Player);
         ProcessInfernoEvent("molotov_detonate", e.Player, 0, e.X, e.Y, e.Z, "molotov");
@@ -2348,7 +2262,7 @@ public class CorrectedDemoParserService
         
         var playerModel = player != null ? GetOrCreatePlayer(player) : null;
         
-        var roundNumber = _currentRoundNumber;
+        var roundNumber = GetDisplayRoundNumber();
         
         var infernoEvent = new Models.InfernoEvent
         {
@@ -2396,7 +2310,7 @@ public class CorrectedDemoParserService
             CenterZ = (decimal)e.Z,
             Phase = "expired",
             Team = "Unknown", // Default team value since smoke expired events don't include player info
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"Smoke expired at ({e.X:F2}, {e.Y:F2}, {e.Z:F2})"
         };
         
@@ -2687,7 +2601,7 @@ public class CorrectedDemoParserService
         var bulletImpact = new Models.BulletImpact
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Weapon = e.AttackerPawn?.ActiveWeapon?.EconItem?.Name ?? "unknown"
@@ -2713,7 +2627,7 @@ public class CorrectedDemoParserService
         var bulletImpact = new Models.BulletImpact
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             PlayerId = playerModel.Id,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -2735,7 +2649,7 @@ public class CorrectedDemoParserService
         var weaponFire = new Models.WeaponFire
         {
             DemoFileId = _currentDemoFile.Id,
-            RoundId = _currentRoundNumber, // Use display round number
+            RoundId = GetDisplayRoundNumber(), // Use display round number
             PlayerId = playerModel.Id,
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
@@ -2775,7 +2689,7 @@ public class CorrectedDemoParserService
             GameTime = (float)_demo.CurrentGameTime.Value,
             EventType = "ping",
             TargetArea = $"Position ({e.X:F2}, {e.Y:F2}, {e.Z:F2})",
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{e.Player.PlayerName} pinged location ({e.X:F2}, {e.Y:F2}, {e.Z:F2})"
         };
         
@@ -2897,331 +2811,6 @@ public class CorrectedDemoParserService
         ProcessAdvancedUserMessage("round_end_report_data", null, $"Round end data: {e.AllRerEventData.Count} events");
     }
 
-    private void OnVguiMenuUserMessage(CCSUsrMsg_VGUIMenu e)
-    {
-        ProcessAdvancedUserMessage("vgui_menu", null, $"VGUI Menu: {e.Name}");
-    }
-
-    private void OnGeigerUserMessage(CCSUsrMsg_Geiger e)
-    {
-        ProcessAdvancedUserMessage("geiger", null, $"Geiger: {e.Range}");
-    }
-
-    private void OnTrainUserMessage(CCSUsrMsg_Train e)
-    {
-        ProcessAdvancedUserMessage("train", null, $"Train: {e.Train}");
-    }
-
-    private void OnHudTextUserMessage(CCSUsrMsg_HudText e)
-    {
-        ProcessAdvancedUserMessage("hud_text", null, $"HUD Text: {e.Text}");
-    }
-
-    private void OnHudMsgUserMessage(CCSUsrMsg_HudMsg e)
-    {
-        ProcessAdvancedUserMessage("hud_msg", null, $"HUD Message: {e.Channel}");
-    }
-
-    private void OnResetHudUserMessage(CCSUsrMsg_ResetHud e)
-    {
-        ProcessAdvancedUserMessage("reset_hud", null, "Reset HUD");
-    }
-
-    private void OnGameTitleUserMessage(CCSUsrMsg_GameTitle e)
-    {
-        ProcessAdvancedUserMessage("game_title", null, "Game title");
-    }
-
-    private void OnShakeUserMessage(CCSUsrMsg_Shake e)
-    {
-        ProcessAdvancedUserMessage("shake", null, $"Screen shake: {e.LocalAmplitude}");
-    }
-
-    private void OnFadeUserMessage(CCSUsrMsg_Fade e)
-    {
-        ProcessAdvancedUserMessage("fade", null, $"Screen fade: {e.Duration}");
-    }
-
-    private void OnRumbleUserMessage(CCSUsrMsg_Rumble e)
-    {
-        ProcessAdvancedUserMessage("rumble", null, $"Controller rumble: {e.Index}");
-    }
-
-    private void OnCloseCaptionUserMessage(CCSUsrMsg_CloseCaption e)
-    {
-        ProcessAdvancedUserMessage("close_caption", null, $"Caption: {e.Hash}");
-    }
-
-    private void OnCloseCaptionDirectUserMessage(CCSUsrMsg_CloseCaptionDirect e)
-    {
-        ProcessAdvancedUserMessage("close_caption_direct", null, $"Caption direct: {e.Hash}");
-    }
-
-    private void OnSendAudioUserMessage(CCSUsrMsg_SendAudio e)
-    {
-        ProcessAdvancedUserMessage("send_audio", null, "Send audio: Event data");
-    }
-
-    private void OnRawAudioUserMessage(CCSUsrMsg_RawAudio e)
-    {
-        ProcessAdvancedUserMessage("raw_audio", null, $"Raw audio: Pitch {e.Pitch}");
-    }
-
-    private void OnVoiceMaskUserMessage(CCSUsrMsg_VoiceMask e)
-    {
-        ProcessAdvancedUserMessage("voice_mask", null, $"Voice mask: {e.PlayerMasks?.Count ?? 0} players");
-    }
-
-    private void OnRequestStateUserMessage(CCSUsrMsg_RequestState e)
-    {
-        ProcessAdvancedUserMessage("request_state", null, "State request");
-    }
-
-    private void OnDamageUserMessage(CCSUsrMsg_Damage e)
-    {
-        ProcessAdvancedUserMessage("damage", null, $"Damage: {e.Amount} at victim {e.VictimEntindex}");
-    }
-
-    private void OnRadioTextUserMessage(CCSUsrMsg_RadioText e)
-    {
-        ProcessAdvancedUserMessage("radio_text", null, $"Radio: {e.MsgName} from client {e.Client}");
-    }
-
-    private void OnHintTextUserMessage(CCSUsrMsg_HintText e)
-    {
-        ProcessAdvancedUserMessage("hint_text", null, $"Hint: {e.Message}");
-    }
-
-    private void OnKeyHintTextUserMessage(CCSUsrMsg_KeyHintText e)
-    {
-        ProcessAdvancedUserMessage("key_hint_text", null, "Key hint: Event data");
-    }
-
-    private void OnProcessSpottedEntityUpdateUserMessage(CCSUsrMsg_ProcessSpottedEntityUpdate e)
-    {
-        ProcessAdvancedUserMessage("process_spotted_entity_update", null, $"Spotted entity update: {e.NewUpdate}");
-    }
-
-    private void OnReloadEffectUserMessage(CCSUsrMsg_ReloadEffect e)
-    {
-        ProcessAdvancedUserMessage("reload_effect", null, $"Reload effect: Entity {e.Entidx}");
-    }
-
-    private void OnStopSpectatorModeUserMessage(CCSUsrMsg_StopSpectatorMode e)
-    {
-        ProcessAdvancedUserMessage("stop_spectator_mode", null, "Stop spectator mode");
-    }
-
-    private void OnDesiredTimescaleUserMessage(CCSUsrMsg_DesiredTimescale e)
-    {
-        ProcessAdvancedUserMessage("desired_timescale", null, $"Desired timescale: {e.DesiredTimescale}");
-    }
-
-    private void OnCurrentTimescaleUserMessage(CCSUsrMsg_CurrentTimescale e)
-    {
-        ProcessAdvancedUserMessage("current_timescale", null, $"Current timescale: {e.CurTimescale}");
-    }
-
-    private void OnAchievementEventUserMessage(CCSUsrMsg_AchievementEvent e)
-    {
-        ProcessAdvancedUserMessage("achievement_event", null, $"Achievement: {e.Achievement}");
-    }
-
-    private void OnDisconnectToLobbyUserMessage(CCSUsrMsg_DisconnectToLobby e)
-    {
-        ProcessAdvancedUserMessage("disconnect_to_lobby", null, "Disconnect to lobby");
-    }
-
-    private void OnWarmupHasEndedUserMessage(CCSUsrMsg_WarmupHasEnded e)
-    {
-        ProcessAdvancedUserMessage("warmup_has_ended", null, "Warmup ended");
-    }
-
-    private void OnClientInfoUserMessage(CCSUsrMsg_ClientInfo e)
-    {
-        ProcessAdvancedUserMessage("client_info", null, "Client info");
-    }
-
-    private void OnXRankGetUserMessage(CCSUsrMsg_XRankGet e)
-    {
-        ProcessAdvancedUserMessage("xrank_get", null, $"XRank get: Mode {e.ModeIdx}");
-    }
-
-    private void OnXRankUpdUserMessage(CCSUsrMsg_XRankUpd e)
-    {
-        ProcessAdvancedUserMessage("xrank_upd", null, $"XRank update: Mode {e.ModeIdx}");
-    }
-
-    private void OnCallVoteFailedUserMessage(CCSUsrMsg_CallVoteFailed e)
-    {
-        ProcessAdvancedUserMessage("call_vote_failed", null, $"Call vote failed: {e.Reason}");
-    }
-
-    private void OnVoteStartUserMessage(CCSUsrMsg_VoteStart e)
-    {
-        ProcessAdvancedUserMessage("vote_start", null, $"Vote start: {e.VoteType}");
-    }
-
-    private void OnVotePassUserMessage(CCSUsrMsg_VotePass e)
-    {
-        ProcessAdvancedUserMessage("vote_pass", null, $"Vote passed: {e.VoteType}");
-    }
-
-    private void OnVoteFailedUserMessage(CCSUsrMsg_VoteFailed e)
-    {
-        ProcessAdvancedUserMessage("vote_failed", null, $"Vote failed: {e.Reason}");
-    }
-
-    private void OnVoteSetupUserMessage(CCSUsrMsg_VoteSetup e)
-    {
-        ProcessAdvancedUserMessage("vote_setup", null, $"Vote setup: {e.PotentialIssues.Count} issues");
-    }
-
-    private void OnServerRankRevealAllUserMessage(CCSUsrMsg_ServerRankRevealAll e)
-    {
-        ProcessAdvancedUserMessage("server_rank_reveal_all", null, "Server rank reveal: Event data");
-    }
-
-    private void OnSendLastKillerDamageToClientUserMessage(CCSUsrMsg_SendLastKillerDamageToClient e)
-    {
-        ProcessAdvancedUserMessage("send_last_killer_damage", null, "Last killer damage: Event data");
-    }
-
-    private void OnServerRankUpdateUserMessage(CCSUsrMsg_ServerRankUpdate e)
-    {
-        ProcessAdvancedUserMessage("server_rank_update", null, "Server rank update: Event data");
-    }
-
-    private void OnItemPickupUserMessage(CCSUsrMsg_ItemPickup e)
-    {
-        ProcessAdvancedUserMessage("item_pickup", null, $"Item pickup: {e.Item}");
-    }
-
-    private void OnShowMenuUserMessage(CCSUsrMsg_ShowMenu e)
-    {
-        ProcessAdvancedUserMessage("show_menu", null, $"Show menu: {e.BitsValidSlots} slots");
-    }
-
-    private void OnBarTimeUserMessage(CCSUsrMsg_BarTime e)
-    {
-        ProcessAdvancedUserMessage("bar_time", null, $"Bar time: {e.Time}");
-    }
-
-    private void OnAmmoDeniedUserMessage(CCSUsrMsg_AmmoDenied e)
-    {
-        ProcessAdvancedUserMessage("ammo_denied", null, "Ammo denied: Event data");
-    }
-
-    private void OnMarkAchievementUserMessage(CCSUsrMsg_MarkAchievement e)
-    {
-        ProcessAdvancedUserMessage("mark_achievement", null, $"Mark achievement: {e.Achievement}");
-    }
-
-    private void OnMatchStatsUpdateUserMessage(CCSUsrMsg_MatchStatsUpdate e)
-    {
-        ProcessAdvancedUserMessage("match_stats_update", null, "Match stats update");
-    }
-
-    private void OnItemDropUserMessage(CCSUsrMsg_ItemDrop e)
-    {
-        ProcessAdvancedUserMessage("item_drop", null, $"Item drop: {e.Itemid}");
-    }
-
-    private void OnGlowPropTurnOffUserMessage(CCSUsrMsg_GlowPropTurnOff e)
-    {
-        ProcessAdvancedUserMessage("glow_prop_turn_off", null, $"Glow prop off: Entity {e.Entidx}");
-    }
-
-    private void OnSendPlayerItemDropsUserMessage(CCSUsrMsg_SendPlayerItemDrops e)
-    {
-        ProcessAdvancedUserMessage("send_player_item_drops", null, $"Player item drops: {e.EntityUpdates.Count} updates");
-    }
-
-    private void OnRoundBackupFilenamesUserMessage(CCSUsrMsg_RoundBackupFilenames e)
-    {
-        ProcessAdvancedUserMessage("round_backup_filenames", null, $"Round backup: {e.Count} files");
-    }
-
-    private void OnSendPlayerItemFoundUserMessage(CCSUsrMsg_SendPlayerItemFound e)
-    {
-        ProcessAdvancedUserMessage("send_player_item_found", null, "Player item found: Event data");
-    }
-
-    private void OnReportHitUserMessage(CCSUsrMsg_ReportHit e)
-    {
-        ProcessAdvancedUserMessage("report_hit", null, "Report hit: Event data");
-    }
-
-    private void OnXpUpdateUserMessage(CCSUsrMsg_XpUpdate e)
-    {
-        ProcessAdvancedUserMessage("xp_update", null, $"XP update: {e.Data}");
-    }
-
-    private void OnQuestProgressUserMessage(CCSUsrMsg_QuestProgress e)
-    {
-        ProcessAdvancedUserMessage("quest_progress", null, $"Quest progress: {e.QuestId}");
-    }
-
-    private void OnScoreLeaderboardDataUserMessage(CCSUsrMsg_ScoreLeaderboardData e)
-    {
-        ProcessAdvancedUserMessage("score_leaderboard_data", null, $"Leaderboard: {e.Data}");
-    }
-
-    private void OnPlayerDecalDigitalSignatureUserMessage(CCSUsrMsg_PlayerDecalDigitalSignature e)
-    {
-        ProcessAdvancedUserMessage("player_decal_digital_signature", null, $"Decal signature: {e.Data}");
-    }
-
-    private void OnWeaponSoundUserMessage(CCSUsrMsg_WeaponSound e)
-    {
-        ProcessAdvancedUserMessage("weapon_sound", null, $"Weapon sound: Entity {e.Entidx}");
-    }
-
-    private void OnUpdateScreenHealthBarUserMessage(CCSUsrMsg_UpdateScreenHealthBar e)
-    {
-        ProcessAdvancedUserMessage("update_screen_health_bar", null, $"Health bar: Entity {e.Entidx}");
-    }
-
-    private void OnEntityOutlineHighlightUserMessage(CCSUsrMsg_EntityOutlineHighlight e)
-    {
-        ProcessAdvancedUserMessage("entity_outline_highlight", null, $"Entity outline: {e.Entidx}");
-    }
-
-    private void OnSsuiUserMessage(CCSUsrMsg_SSUI e)
-    {
-        ProcessAdvancedUserMessage("ssui", null, $"SSUI: {e.Show}");
-    }
-
-    private void OnSurvivalStatsUserMessage(CCSUsrMsg_SurvivalStats e)
-    {
-        ProcessAdvancedUserMessage("survival_stats", null, "Survival stats: Event data");
-    }
-
-    private void OnEndOfMatchAllPlayersDataUserMessage(CCSUsrMsg_EndOfMatchAllPlayersData e)
-    {
-        ProcessAdvancedUserMessage("end_of_match_all_players_data", null, "End of match: Event data");
-    }
-
-    private void OnPostRoundDamageReportUserMessage(CCSUsrMsg_PostRoundDamageReport e)
-    {
-        ProcessAdvancedUserMessage("post_round_damage_report", null, "Post round damage: Event data");
-    }
-
-    private void OnCurrentRoundOddsUserMessage(CCSUsrMsg_CurrentRoundOdds e)
-    {
-        ProcessAdvancedUserMessage("current_round_odds", null, $"Round odds: {e.Odds}%");
-    }
-
-    private void OnDeepStatsUserMessage(CCSUsrMsg_DeepStats e)
-    {
-        ProcessAdvancedUserMessage("deep_stats", null, $"Deep stats: {e.Stats}");
-    }
-
-    private void OnShootInfoUserMessage(CCSUsrMsg_ShootInfo e)
-    {
-        ProcessAdvancedUserMessage("shoot_info", null, $"Shoot info at frame {e.FrameNumber}");
-    }
-
     private void ProcessAdvancedUserMessage(string messageType, CCSPlayerController? targetPlayer, string content)
     {
         if (_demo == null || _currentDemoFile == null) return;
@@ -3238,7 +2827,7 @@ public class CorrectedDemoParserService
             MessageType = messageType,
             MessageContent = content,
             Team = targetPlayerModel?.Team ?? "Unknown",
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             Description = $"{messageType}: {content}"
         };
         
@@ -3247,6 +2836,149 @@ public class CorrectedDemoParserService
     
     #endregion
     
+    /* Temporarily disabled - Entity Event Handlers
+    #region Entity Event Handlers - Temporarily Disabled
+    
+    // Enhanced: Real-time player state tracking via entity events
+    private void OnPlayerStateChanged(CCSPlayerPawn pawn, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || pawn.Controller == null) return;
+
+        var player = GetOrCreatePlayer(pawn.Controller);
+        
+        // Track state changes for advanced analytics
+        var stateChange = new Models.EntityPropertyChange
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = player.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EntityType = "CCSPlayerPawn",
+            PropertyName = "PlayerState",
+            OldValue = $"Health:{oldState.Health} Armor:{oldState.ArmorValue}",
+            NewValue = $"Health:{newState.Health} Armor:{newState.ArmorValue}",
+            Team = pawn.Controller.CSTeamNum.ToString(),
+            RoundNumber = GetDisplayRoundNumber(),
+            Description = $"{pawn.Controller.PlayerName} state changed"
+        };
+        
+        _entityPropertyChanges.Add(stateChange);
+    }
+    
+    private void OnWeaponStateChanged(CCSWeaponBase weapon, dynamic oldState, dynamic newState)
+    {
+        if (_demo == null || _currentDemoFile == null || weapon.OwnerEntity?.Value == null) return;
+
+        // Get the owner player from the weapon's OwnerEntity
+        var ownerEntityIndex = weapon.OwnerEntity.Value;
+        var ownerPlayer = _demo.Players.FirstOrDefault(p => p.EntityIndex.Value == ownerEntityIndex);
+        
+        if (ownerPlayer == null) return;
+        
+        var playerModel = GetOrCreatePlayer(ownerPlayer);
+
+        var weaponState = new Models.WeaponState
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = playerModel.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            WeaponName = weapon.GetType().Name,
+            AmmoClip = newState.Clip1,
+            AmmoReserve = 0, // Clip2 might not be available
+            EventType = "state_change",
+            Team = ownerPlayer.CSTeamNum.ToString(),
+            RoundNumber = GetDisplayRoundNumber(),
+            Description = $"Weapon state changed: {weapon.GetType().Name} clip: {oldState.Clip1} -> {newState.Clip1}"
+        };
+
+        _weaponStates.Add(weaponState);
+    }
+    
+    private void OnGrenadeEntityCreated(CBaseCSGrenadeProjectile grenade)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        var lifecycle = new Models.EntityLifecycle
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EntityType = grenade.GetType().Name,
+            EventType = "created",
+            Team = "Unknown",
+            RoundNumber = GetDisplayRoundNumber(),
+            Description = $"Grenade entity created: {grenade.GetType().Name}"
+        };
+
+        _entityLifecycles.Add(lifecycle);
+    }
+    
+    private void OnGrenadeEntityDestroyed(CBaseCSGrenadeProjectile grenade)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        var lifecycle = new Models.EntityLifecycle
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EntityType = grenade.GetType().Name,
+            EventType = "destroyed",
+            Team = "Unknown",
+            RoundNumber = GetDisplayRoundNumber(),
+            Description = $"Grenade entity destroyed: {grenade.GetType().Name}"
+        };
+
+        _entityLifecycles.Add(lifecycle);
+    }
+    
+    private void OnEconomicItemCreated(CEconEntity item)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        var lifecycle = new Models.EntityLifecycle
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EntityType = item.GetType().Name,
+            EventType = "created",
+            Team = "Unknown",
+            RoundNumber = GetDisplayRoundNumber(),
+            Description = $"Economic item created: {item.GetType().Name}"
+        };
+
+        _entityLifecycles.Add(lifecycle);
+    }
+
+    private void OnEconomicItemDestroyed(CEconEntity item)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
+
+        var lifecycle = new Models.EntityLifecycle
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            EntityType = item.GetType().Name,
+            EventType = "destroyed",
+            Team = "Unknown",
+            RoundNumber = GetDisplayRoundNumber(),
+            Description = $"Economic item destroyed: {item.GetType().Name}"
+        };
+
+        _entityLifecycles.Add(lifecycle);
+    }
+    
+    #endregion
+    End of temporarily disabled Entity Event Handlers */
     
     private CCSPlayerController? GetPlayerFromEntityId(int entityId)
     {
@@ -3291,35 +3023,34 @@ public class CorrectedDemoParserService
             e.MapName, e.TickInterval, 1 / e.TickInterval);
     }
 
-    // Commented out - VoiceCommunication model doesn't have required properties
-    //private void OnSvcVoiceData(CSVCMsg_VoiceData e)
-    //{
-    //    if (_demo == null || _currentDemoFile == null) return;
+    private void OnSvcVoiceData(CSVCMsg_VoiceData e)
+    {
+        if (_demo == null || _currentDemoFile == null) return;
 
-    //    var player = _demo.GetPlayerBySteamId(e.Xuid);
-    //    if (player == null) return;
+        var player = _demo.GetPlayerBySteamId(e.Xuid);
+        if (player == null) return;
 
-    //    var voiceComm = new Models.VoiceCommunication
-    //    {
-    //        DemoFileId = _currentDemoFile.Id,
-    //        RoundId = _currentRound?.Id,
-    //        PlayerId = GetOrCreatePlayer(player).Id,
-    //        Tick = _demo.CurrentDemoTick.Value,
-    //        GameTime = (float)_demo.CurrentGameTime.Value,
-    //        SteamId = e.Xuid,
-    //        Duration = 0, // Duration can be calculated from audio data if needed
-    //        Team = player.CSTeamNum.ToString(),
-    //        RoundNumber = _currentRoundNumber
-    //    };
+        var voiceComm = new Models.VoiceCommunication
+        {
+            DemoFileId = _currentDemoFile.Id,
+            RoundId = _currentRound?.Id,
+            PlayerId = GetOrCreatePlayer(player).Id,
+            Tick = _demo.CurrentDemoTick.Value,
+            GameTime = (float)_demo.CurrentGameTime.Value,
+            SteamId = e.Xuid,
+            Duration = 0, // Duration can be calculated from audio data if needed
+            Team = player.CSTeamNum.ToString(),
+            RoundNumber = GetDisplayRoundNumber()
+        };
 
-    //    _voiceCommunications.Add(voiceComm);
-    //}
+        _voiceCommunications.Add(voiceComm);
+    }
 
     #endregion
 
     #region Entity Event Handlers
 
-    private void OnPlayerGrenadeInventoryChanged(CCSPlayerPawn pawn, IReadOnlyList<CBaseCSGrenade> oldGrenades, IReadOnlyList<CBaseCSGrenade> newGrenades)
+    private void OnPlayerGrenadeInventoryChanged(CCSPlayerPawn pawn, IReadOnlyList<CBaseCSGrenadeProjectile> oldGrenades, IReadOnlyList<CBaseCSGrenadeProjectile> newGrenades)
     {
         if (_demo == null || _currentDemoFile == null || pawn.Controller == null) return;
 
@@ -3334,19 +3065,22 @@ public class CorrectedDemoParserService
             Action = "grenade_inventory_change",
             ItemName = string.Join(", ", newGrenades.Select(g => g.ServerClass?.Name ?? "unknown")),
             Team = pawn.Controller.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             IsActive = newGrenades.Count > 0
         };
 
         var playerPos = pawn.Origin;
-        inventoryChange.PositionX = (decimal)playerPos.X;
-        inventoryChange.PositionY = (decimal)playerPos.Y;
-        inventoryChange.PositionZ = (decimal)playerPos.Z;
+        if (playerPos != null)
+        {
+            inventoryChange.PositionX = (decimal)playerPos.Value.X;
+            inventoryChange.PositionY = (decimal)playerPos.Value.Y;
+            inventoryChange.PositionZ = (decimal)playerPos.Value.Z;
+        }
 
         _equipment.Add(inventoryChange);
     }
 
-    private void OnPlayerWeaponInventoryChanged(CCSPlayerPawn pawn, IReadOnlyList<CHandle<CBasePlayerWeapon, CsDemoParser>>? oldWeapons, IReadOnlyList<CHandle<CBasePlayerWeapon, CsDemoParser>>? newWeapons)
+    private void OnPlayerWeaponInventoryChanged(CCSPlayerPawn pawn, IReadOnlyList<CHandle<CBasePlayerWeapon>>? oldWeapons, IReadOnlyList<CHandle<CBasePlayerWeapon>>? newWeapons)
     {
         if (_demo == null || _currentDemoFile == null || pawn.Controller == null || newWeapons == null) return;
 
@@ -3359,16 +3093,19 @@ public class CorrectedDemoParserService
             Tick = _demo.CurrentDemoTick.Value,
             GameTime = (float)_demo.CurrentGameTime.Value,
             Action = "weapon_inventory_change",
-            ItemName = string.Join(", ", newWeapons.Select(w => w.Value.GetType().Name ?? "unknown")),
+            ItemName = string.Join(", ", newWeapons.Select(w => w.Value?.GetType().Name ?? "unknown")),
             Team = pawn.Controller.CSTeamNum.ToString(),
-            RoundNumber = _currentRoundNumber,
+            RoundNumber = GetDisplayRoundNumber(),
             IsActive = newWeapons.Count > 0
         };
 
         var playerPos = pawn.Origin;
-        inventoryChange.PositionX = (decimal)playerPos.X;
-        inventoryChange.PositionY = (decimal)playerPos.Y;
-        inventoryChange.PositionZ = (decimal)playerPos.Z;
+        if (playerPos != null)
+        {
+            inventoryChange.PositionX = (decimal)playerPos.Value.X;
+            inventoryChange.PositionY = (decimal)playerPos.Value.Y;
+            inventoryChange.PositionZ = (decimal)playerPos.Value.Z;
+        }
 
         _equipment.Add(inventoryChange);
     }

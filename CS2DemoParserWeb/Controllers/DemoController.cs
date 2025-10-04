@@ -13,17 +13,20 @@ namespace CS2DemoParserWeb.Controllers
         private readonly CS2DemoContext _context;
         private readonly ILogger<DemoController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public DemoController(
-            CorrectedDemoParserService demoParserService, 
+            CorrectedDemoParserService demoParserService,
             CS2DemoContext context,
             ILogger<DemoController> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _demoParserService = demoParserService;
             _context = context;
             _logger = logger;
             _configuration = configuration;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         [HttpPost("upload")]
@@ -94,89 +97,65 @@ namespace CS2DemoParserWeb.Controllers
 
                 _logger.LogInformation("File uploaded: {FileName} (Size: {Size} bytes, Source: {DemoSource}, Map: {MapName})", fileName, file.Length, demoSource, mapName);
 
-                // Auto-parse the uploaded demo with demo source context
-                _logger.LogInformation("Starting auto-parse for uploaded file: {FileName} with source: {DemoSource} and map: {MapName}", fileName, demoSource, mapName);
-                try 
+                // Start parsing in background task with new scope
+                _logger.LogInformation("Starting background parse for uploaded file: {FileName} with source: {DemoSource} and map: {MapName}", fileName, demoSource, mapName);
+                _ = Task.Run(async () =>
                 {
-                    // Pass demoSource and mapName to parser service
-                    var parseResult = await _demoParserService.ParseDemoAsync(filePath, demoSource, mapName);
-                    if (parseResult)
-                    {
-                        _logger.LogInformation("Auto-parse completed successfully for: {FileName}", fileName);
-                        
-                        // Clean up uploaded file after successful parsing
-                        try
-                        {
-                            System.IO.File.Delete(filePath);
-                            _logger.LogInformation("Cleaned up uploaded file after successful parsing: {FileName}", fileName);
-                        }
-                        catch (Exception cleanupEx)
-                        {
-                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file after successful parsing: {FileName}", fileName);
-                        }
-                        
-                        return Ok(new { 
-                            message = "File uploaded and parsed successfully", 
-                            fileName = fileName, 
-                            originalName = file.FileName,
-                            size = file.Length,
-                            demoSource = demoSource,
-                            mapName = mapName,
-                            parsed = true
-                        });
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Auto-parse failed for: {FileName}", fileName);
-                        
-                        // Clean up uploaded file after failed parsing
-                        try
-                        {
-                            System.IO.File.Delete(filePath);
-                            _logger.LogInformation("Cleaned up uploaded file after failed parsing: {FileName}", fileName);
-                        }
-                        catch (Exception cleanupEx)
-                        {
-                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file after failed parsing: {FileName}", fileName);
-                        }
-                        
-                        return Ok(new { 
-                            message = "File uploaded but parsing failed", 
-                            fileName = fileName, 
-                            originalName = file.FileName,
-                            size = file.Length,
-                            demoSource = demoSource,
-                            mapName = mapName,
-                            parsed = false
-                        });
-                    }
-                }
-                catch (Exception parseEx)
-                {
-                    _logger.LogError(parseEx, "Error during auto-parse for: {FileName}", fileName);
-                    
-                    // Clean up uploaded file after parsing error
+                    // Create a new scope for the background task
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var scopedParserService = scope.ServiceProvider.GetRequiredService<CorrectedDemoParserService>();
+
                     try
                     {
-                        System.IO.File.Delete(filePath);
-                        _logger.LogInformation("Cleaned up uploaded file after parsing error: {FileName}", fileName);
+                        var parseResult = await scopedParserService.ParseDemoAsync(filePath, demoSource, mapName);
+                        if (parseResult)
+                        {
+                            _logger.LogInformation("Background parse completed successfully for: {FileName}", fileName);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Background parse failed for: {FileName}", fileName);
+                        }
+
+                        // Clean up uploaded file after parsing
+                        try
+                        {
+                            System.IO.File.Delete(filePath);
+                            _logger.LogInformation("Cleaned up uploaded file: {FileName}", fileName);
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file: {FileName}", fileName);
+                        }
                     }
-                    catch (Exception cleanupEx)
+                    catch (Exception parseEx)
                     {
-                        _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file after parsing error: {FileName}", fileName);
+                        _logger.LogError(parseEx, "Error during background parse for: {FileName}", fileName);
+
+                        // Clean up uploaded file after parsing error
+                        try
+                        {
+                            System.IO.File.Delete(filePath);
+                            _logger.LogInformation("Cleaned up uploaded file after error: {FileName}", fileName);
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            _logger.LogWarning(cleanupEx, "Failed to clean up uploaded file: {FileName}", fileName);
+                        }
                     }
-                    
-                    return Ok(new { 
-                        message = "File uploaded but parsing encountered an error", 
-                        fileName = fileName, 
-                        originalName = file.FileName,
-                        size = file.Length,
-                        demoSource = demoSource,
-                        mapName = mapName,
-                        parsed = false,
-                        parseError = parseEx.Message
-                    });
-                }
+                });
+
+                // Return immediately - parsing happens in background
+                return Ok(new
+                {
+                    message = "File uploaded, parsing started",
+                    fileName = fileName,
+                    originalName = file.FileName,
+                    size = file.Length,
+                    demoSource = demoSource,
+                    mapName = mapName,
+                    parsing = true // Indicates parsing is in progress
+                });
             }
             catch (Exception ex)
             {
@@ -241,6 +220,25 @@ namespace CS2DemoParserWeb.Controllers
             {
                 _logger.LogError(ex, "Error parsing demo: {FileName}", fileName);
                 return StatusCode(500, $"Error parsing demo: {ex.Message}");
+            }
+        }
+
+        [HttpGet("progress")]
+        public IActionResult GetParseProgress()
+        {
+            try
+            {
+                return Ok(new
+                {
+                    isParsing = _demoParserService.IsParsing,
+                    progress = Math.Round(_demoParserService.ParseProgress, 2),
+                    fileName = _demoParserService.CurrentFileName
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving parse progress");
+                return StatusCode(500, "Error retrieving parse progress");
             }
         }
 
@@ -507,6 +505,189 @@ namespace CS2DemoParserWeb.Controllers
             {
                 _logger.LogError(ex, "Error fixing map names");
                 return StatusCode(500, "Error fixing map names");
+            }
+        }
+
+        [HttpPost("fix-bomb-teams")]
+        public async Task<IActionResult> FixBombTeams()
+        {
+            try
+            {
+                // Update Terrorist to 2
+                var terroristBombs = await _context.Bombs
+                    .Where(b => b.Team == "Terrorist")
+                    .ToListAsync();
+
+                foreach (var bomb in terroristBombs)
+                {
+                    bomb.Team = "2";
+                }
+
+                // Update CounterTerrorist to 3
+                var ctBombs = await _context.Bombs
+                    .Where(b => b.Team == "CounterTerrorist")
+                    .ToListAsync();
+
+                foreach (var bomb in ctBombs)
+                {
+                    bomb.Team = "3";
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new {
+                    message = $"Fixed bomb team values",
+                    terroristCount = terroristBombs.Count,
+                    ctCount = ctBombs.Count,
+                    total = terroristBombs.Count + ctBombs.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fixing bomb team values");
+                return StatusCode(500, "Error fixing bomb team values");
+            }
+        }
+
+        [HttpGet("recent-logs")]
+        public IActionResult GetRecentLogs([FromQuery] int count = 50)
+        {
+            // This would require a logging provider that stores logs
+            // For now, return a message about where to find logs
+            return Ok(new
+            {
+                message = "Logs are available in your application hosting environment",
+                suggestions = new[]
+                {
+                    "Check console output if running locally",
+                    "Check docker logs if running in container: docker logs <container-name>",
+                    "Check Application Insights if configured in Azure",
+                    "The logs you're looking for contain: 'ShouldSkipRound check', 'Round start event fired', 'Starting to parse demo file'"
+                }
+            });
+        }
+
+        [HttpGet("check-rounds")]
+        public async Task<IActionResult> CheckRounds([FromQuery] int? demoId = null)
+        {
+            try
+            {
+                var demo = demoId.HasValue
+                    ? await _context.DemoFiles.FindAsync(demoId.Value)
+                    : await _context.DemoFiles.OrderByDescending(d => d.Id).FirstOrDefaultAsync();
+
+                if (demo == null)
+                {
+                    return Ok(new { message = "No demo found" });
+                }
+
+                var rounds = await _context.Rounds
+                    .Where(r => r.DemoFileId == demo.Id)
+                    .OrderBy(r => r.RoundNumber)
+                    .Select(r => new
+                    {
+                        r.RoundNumber,
+                        r.StartTick,
+                        r.EndTick,
+                        r.CTScore,
+                        r.TScore,
+                        r.IsWarmup,
+                        r.IsKnifeRound,
+                        r.GamePhase
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    demoId = demo.Id,
+                    demoName = demo.FileName,
+                    demoSource = demo.DemoSource,
+                    totalRounds = rounds.Count,
+                    rounds = rounds,
+                    analysis = new
+                    {
+                        firstRoundNumber = rounds.FirstOrDefault()?.RoundNumber,
+                        lastRoundNumber = rounds.LastOrDefault()?.RoundNumber,
+                        hasSequentialRounds = rounds.Count > 0 && rounds.First().RoundNumber == 1 && rounds.Last().RoundNumber == rounds.Count,
+                        missingRounds = rounds.Count > 1
+                            ? Enumerable.Range(1, rounds.Max(r => r.RoundNumber))
+                                .Except(rounds.Select(r => r.RoundNumber))
+                                .ToList()
+                            : new List<int>()
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking rounds");
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("check-spawn-positions")]
+        public async Task<IActionResult> CheckSpawnPositions()
+        {
+            try
+            {
+                var latestDemo = await _context.DemoFiles
+                    .OrderByDescending(d => d.Id)
+                    .FirstOrDefaultAsync();
+
+                if (latestDemo == null)
+                {
+                    return Ok(new { message = "No demos found" });
+                }
+
+                // Get position counts per round
+                var roundPositions = await _context.Rounds
+                    .Where(r => r.DemoFileId == latestDemo.Id)
+                    .Select(r => new
+                    {
+                        RoundNumber = r.RoundNumber,
+                        PositionCount = _context.PlayerPositions.Count(pp => pp.DemoFileId == latestDemo.Id && pp.Tick >= r.StartTick && pp.Tick <= r.EndTick)
+                    })
+                    .ToListAsync();
+
+                // Get sample spawn positions from round 1
+                var round1 = await _context.Rounds
+                    .Where(r => r.DemoFileId == latestDemo.Id && r.RoundNumber == 1)
+                    .FirstOrDefaultAsync();
+
+                var spawnPositions = new List<object>();
+                if (round1 != null)
+                {
+                    var endTick = round1.StartTick + (5 * 64); // First 5 seconds at 64 tick rate
+                    spawnPositions = await _context.PlayerPositions
+                        .Where(pp => pp.DemoFileId == latestDemo.Id
+                            && pp.Tick >= round1.StartTick
+                            && pp.Tick <= endTick)
+                        .OrderBy(pp => pp.Tick)
+                        .Take(20)
+                        .Select(pp => new
+                        {
+                            PlayerName = pp.Player.PlayerName,
+                            Tick = pp.Tick,
+                            X = pp.PositionX,
+                            Y = pp.PositionY,
+                            Z = pp.PositionZ
+                        })
+                        .ToListAsync<object>();
+                }
+
+                return Ok(new
+                {
+                    demoId = latestDemo.Id,
+                    demoName = latestDemo.FileName,
+                    totalRounds = roundPositions.Count,
+                    roundPositions = roundPositions,
+                    round1SpawnSample = spawnPositions,
+                    hasPositions = spawnPositions.Count > 0
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking spawn positions");
+                return StatusCode(500, $"Error checking spawn positions: {ex.Message}");
             }
         }
     }

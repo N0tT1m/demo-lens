@@ -338,9 +338,9 @@ namespace CS2DemoParserWeb.Services
         public async Task<HeatmapData> GetBombSiteHeatmapAsync(HeatmapQuery query)
         {
             var sql = @"
-                SELECT 
+                SELECT
                     b.PositionX as X, b.PositionY as Y, b.PositionZ as Z,
-                    p.PlayerName, p.Team, r.RoundNumber, b.EventType,
+                    p.PlayerName, b.Team, r.RoundNumber, b.EventType,
                     COUNT(*) as EventCount
                 FROM Bombs b
                 INNER JOIN Players p ON b.PlayerId = p.Id
@@ -352,13 +352,22 @@ namespace CS2DemoParserWeb.Services
                     AND (@DemoId IS NULL OR d.Id = @DemoId)
                     AND (@MapName IS NULL OR d.MapName = @MapName)
                     AND (@PlayerName IS NULL OR p.PlayerName = @PlayerName)
-                    AND (@Team IS NULL OR p.Team = @Team)
+                    AND (@Team IS NULL OR b.Team = @Team OR
+                        (@Team = '2' AND b.Team = 'Terrorist') OR
+                        (@Team = '3' AND b.Team = 'CounterTerrorist'))
                     AND (@RoundNumber IS NULL OR r.RoundNumber = @RoundNumber)
-                GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, p.Team, r.RoundNumber, b.EventType
+                GROUP BY b.PositionX, b.PositionY, b.PositionZ, p.PlayerName, b.Team, r.RoundNumber, b.EventType
                 ORDER BY EventCount DESC";
 
+            _logger.LogInformation("Bomb heatmap query - Team filter: {Team}, DemoId: {DemoId}, MapName: {MapName}, RoundNumber: {RoundNumber}",
+                query.Team, query.DemoId, query.MapName, query.RoundNumber);
+
             var points = await ExecuteHeatmapQuery(sql, query, "bomb_events");
-            
+
+            _logger.LogInformation("Bomb heatmap returned {Count} points. Sample teams from data: {SampleTeams}",
+                points.Count,
+                string.Join(", ", points.Take(5).Select(p => p.Team ?? "null")));
+
             return new HeatmapData
             {
                 MapName = query.MapName ?? "Unknown",
@@ -715,15 +724,15 @@ namespace CS2DemoParserWeb.Services
         {
             // Adjust round number based on demo source for Faceit/ESEA demos
             var adjustedRoundNumber = GetAdjustedRoundNumber(query.RoundNumber, query.DemoSource);
-            
-            _logger.LogInformation("Adding SQL parameters - DemoId: {DemoId}, MapName: {MapName}, PlayerName: {PlayerName}, Team: {Team}, RoundNumber: {RoundNumber} (Original: {OriginalRound}, Adjusted: {AdjustedRound})", 
+
+            _logger.LogInformation("Adding SQL parameters - DemoId: {DemoId}, MapName: {MapName}, PlayerName: {PlayerName}, Team: {Team}, RoundNumber: {RoundNumber} (Original: {OriginalRound}, Adjusted: {AdjustedRound})",
                 query.DemoId, query.MapName, query.PlayerName, query.Team, adjustedRoundNumber, query.RoundNumber, adjustedRoundNumber);
-                
+
             command.Parameters.AddWithValue("@DemoName", (object?)query.DemoName ?? DBNull.Value);
             command.Parameters.AddWithValue("@DemoId", (object?)query.DemoId ?? DBNull.Value);
             command.Parameters.AddWithValue("@MapName", (object?)query.MapName ?? DBNull.Value);
-            command.Parameters.AddWithValue("@PlayerName", (object?)query.PlayerName ?? DBNull.Value);
-            command.Parameters.AddWithValue("@Team", (object?)query.Team ?? DBNull.Value);
+            command.Parameters.AddWithValue("@PlayerName", string.IsNullOrEmpty(query.PlayerName) ? DBNull.Value : query.PlayerName);
+            command.Parameters.AddWithValue("@Team", string.IsNullOrEmpty(query.Team) ? DBNull.Value : query.Team);
             command.Parameters.AddWithValue("@RoundNumber", (object?)adjustedRoundNumber ?? DBNull.Value);
         }
 

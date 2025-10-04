@@ -68,7 +68,14 @@ public class Round
     public bool IsPistolRound { get; set; }
     
     public bool IsOvertime { get; set; }
-    
+
+    public bool IsWarmup { get; set; }
+
+    public bool IsKnifeRound { get; set; }
+
+    [MaxLength(50)]
+    public string? GamePhase { get; set; }
+
     public virtual ICollection<PlayerRoundStats> PlayerRoundStats { get; set; } = new List<PlayerRoundStats>();
     public virtual ICollection<Kill> Kills { get; set; } = new List<Kill>();
     public virtual ICollection<Damage> Damages { get; set; } = new List<Damage>();
