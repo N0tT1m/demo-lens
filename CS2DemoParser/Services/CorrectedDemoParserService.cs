@@ -594,7 +594,19 @@ public class CorrectedDemoParserService
 
         // Determine round type based on game state
         var isWarmup = _demo.GameRules?.WarmupPeriod == true || _demo.GameRules?.CSGamePhase == CSGamePhase.WarmupRound;
-        var isKnifeRound = (_demoSource == "esea" || _demoSource == "faceit") && !isWarmup && _currentRoundNumber == 1;
+
+        // Knife round is the first non-warmup round for FACEIT/ESEA
+        var isKnifeRound = false;
+        if ((_demoSource == "esea" || _demoSource == "faceit") && !isWarmup && _isInWarmup)
+        {
+            isKnifeRound = true;
+            _isInWarmup = false; // Mark that we've exited warmup
+        }
+
+        if (isWarmup)
+        {
+            _isInWarmup = true;
+        }
 
         _currentRound = new Models.Round
         {
