@@ -309,6 +309,10 @@ This application processes CS2 demo files which may contain:
 
 *Last Updated: August 28, 2025*
 
+## 🙏 Special Thanks
+
+This application is powered by the awesome **[demofile-net](https://github.com/saul/demofile-net)** library by [saul](https://github.com/saul). This powerful .NET library makes it possible to parse and analyze CS2 demo files with ease. Huge thanks to saul for creating and maintaining this essential tool for the CS2 development community!
+
 ## 📄 License
 
 Demo Lens is open source software. See LICENSE file for details.
